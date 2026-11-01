@@ -138,7 +138,8 @@ function getSpeechWritingTokens(seg, text, syncSpeech) {
 const BUILTIN_WRITING_TIP_KINDS = new Set([
     'quill', 'rose', 'fountain_pen', 'brush', 'pencil', 'sparkle_wand',
     'butterfly', 'candle_flame', 'dove', 'heart', 'leaf', 'sakura',
-    'crown', 'music_note', 'cross_light', 'feather_gold'
+    'crown', 'music_note', 'cross_light', 'feather_gold',
+    'candy_cane', 'christmas_tree', 'holly_berry', 'snowflake_wand', 'santa_feather', 'jingle_bell'
 ]);
 function isImageOrVectorWritingTip(kind) {
     return kind === 'image' || BUILTIN_WRITING_TIP_KINDS.has(kind);
@@ -266,6 +267,90 @@ function drawSpeechWritingTip(ctx, kind, x, y, size, angle) {
             const a = .22 + i * .09, b = -.34 - i * .145;
             shape(`M${a} ${b} l-.035 -.18 M${a} ${b} l.19 -.025`, null, '#b45309', .012);
         }
+    } else if (kind === 'candy_cane') {
+        // 🍬 圣诞红白拐杖糖笔 (金笔尖 + 红白斜纹弯钩糖杆 + 翠绿蝴蝶结与红果)
+        shape('M0 0 L.08-.20 L.20-.08 Z', '#fbbf24', '#92400e', .016);
+        const canePath = 'M.11-.11 L.66-.78 C.82-.98 .60-1.22 .40-1.04 C.30-.95 .26-.84 .32-.78';
+        shape(canePath, null, '#7f1d1d', .17);
+        shape(canePath, null, '#fffdf9', .13);
+        ctx.save();
+        ctx.strokeStyle = '#dc2626';
+        ctx.lineWidth = .055;
+        ctx.setLineDash([.075, .075]);
+        ctx.stroke(new Path2D(canePath));
+        ctx.restore();
+        // 翠绿圣诞蝴蝶结与冬青果
+        shape('M.36-.44 C.20-.56 .18-.38 .34-.38 Z M.40-.44 C.58-.34 .56-.54 .40-.46 Z', '#16a34a', '#14532d', .016);
+        shape('M.35-.44 A.04 .04 0 1 1 .43-.44 A.04 .04 0 1 1 .35-.44 Z', '#ef4444', '#7f1d1d', .012);
+    } else if (kind === 'christmas_tree') {
+        // 🎄 璀璨金星圣诞树 (三层覆雪松林 + 彩球 + 伯利恒金星)
+        shape('M0 0 L.14-.18 L.22-.10 Z', '#92400e', '#451a03', .016);
+        // 三层松枝
+        shape('M.04-.20 L.46-.04 L.42-.38 Z', '#14532d', '#052e16', .018);
+        shape('M.16-.36 L.58-.20 L.54-.60 Z', '#15803d', '#052e16', .018);
+        shape('M.30-.54 L.70-.38 L.68-.84 Z', '#16a34a', '#052e16', .018);
+        // 树梢雪边与金色缠绕彩带
+        shape('M.08-.19 Q.24-.26 .43-.08 M.20-.35 Q.38-.42 .55-.24 M.34-.53 Q.48-.58 .67-.42', null, '#f8fafc', .026);
+        // 树顶璀璨金星
+        shape('M.68-.98 L.73-.86 L.86-.86 L.75-.78 L.79-.66 L.68-.74 L.57-.66 L.61-.78 L.50-.86 L.63-.86 Z', '#fde047', '#b45309', .016);
+        // 圣诞彩球装饰
+        shape('M.26-.22 A.038 .038 0 1 1 .33-.22 A.038 .038 0 1 1 .26-.22 Z', '#ef4444', '#7f1d1d', .01);
+        shape('M.41-.42 A.036 .036 0 1 1 .48-.42 A.036 .036 0 1 1 .41-.42 Z', '#fde047', '#a16207', .01);
+        shape('M.50-.60 A.034 .034 0 1 1 .57-.60 A.034 .034 0 1 1 .50-.60 Z', '#38bdf8', '#0369a1', .01);
+    } else if (kind === 'holly_berry') {
+        // 🍒 圣诞冬青红果叶 (金枝笔尖 + 双片锯齿冬青翠叶 + 三颗红果)
+        shape('M0 0 L.18-.18', null, '#b45309', .036);
+        // 左侧冬青叶
+        shape('M.16-.22 C.02-.42 .08-.68 .24-.88 C.34-.70 .38-.44 .22-.22 Z', '#15803d', '#052e16', .02);
+        shape('M.19-.24 L.23-.82', null, '#86efac', .016);
+        // 右侧冬青叶
+        shape('M.22-.18 C.44-.34 .72-.30 .90-.46 C.76-.20 .50-.08 .22-.18 Z', '#16a34a', '#052e16', .02);
+        shape('M.24-.19 L.82-.42', null, '#86efac', .016);
+        // 三颗饱满红果 + 高光
+        shape('M.12-.18 A.065 .065 0 1 1 .25-.18 A.065 .065 0 1 1 .12-.18 Z', '#dc2626', '#7f1d1d', .016);
+        shape('M.22-.28 A.065 .065 0 1 1 .35-.28 A.065 .065 0 1 1 .22-.28 Z', '#ef4444', '#7f1d1d', .016);
+        shape('M.24-.13 A.062 .062 0 1 1 .36-.13 A.062 .062 0 1 1 .24-.13 Z', '#b91c1c', '#7f1d1d', .016);
+        shape('M.26-.30 A.018 .018 0 1 1 .29-.30 Z M.16-.20 A.018 .018 0 1 1 .19-.20 Z', '#ffffff', null);
+    } else if (kind === 'snowflake_wand') {
+        // ❄️ 晶莹冰雪魔杖 (冰蓝银杖杆 + 六角晶莹雪花 + 星芒)
+        shape('M0 0 L.48-.52', null, '#0284c7', .05);
+        shape('M0 0 L.48-.52', null, '#e0f2fe', .024);
+        const cx = .62, cy = -.68, r = .28;
+        for (let i = 0; i < 6; i++) {
+            const rad = (i * 60) * Math.PI / 180;
+            const ex = cx + Math.cos(rad) * r;
+            const ey = cy + Math.sin(rad) * r;
+            const mx = cx + Math.cos(rad) * (r * 0.58);
+            const my = cy + Math.sin(rad) * (r * 0.58);
+            const b1 = rad + 0.55, b2 = rad - 0.55;
+            shape(`M${cx} ${cy} L${ex} ${ey} M${mx} ${my} L${mx + Math.cos(b1) * .09} ${my + Math.sin(b1) * .09} M${mx} ${my} L${mx + Math.cos(b2) * .09} ${my + Math.sin(b2) * .09}`, null, '#38bdf8', .034);
+            shape(`M${cx} ${cy} L${ex} ${ey}`, null, '#ffffff', .016);
+        }
+        shape(`M${cx - .06} ${cy} L${cx} ${cy - .06} L${cx + .06} ${cy} L${cx} ${cy + .06} Z`, '#fef08a', '#0284c7', .015);
+    } else if (kind === 'santa_feather') {
+        // 🎅 圣诞红金绒毛笔 (金尖 + 雪白绒毛护圈 + 圣诞红羽 + 绒球顶)
+        shape('M0 0 L.06-.20 L.20-.06 Z', '#fbbf24', '#92400e', .016);
+        // 圣诞红羽干
+        shape('M.14-.16 C.24-.54 .34-.88 .66-1.12 C.82-.84 .72-.44 .38-.22 Z', '#dc2626', '#7f1d1d', .02);
+        shape('M.16-.18 Q.42-.58 .72-1.04', null, '#fde047', .028);
+        // 底部雪白毛绒护圈
+        shape('M.08-.18 C.06-.28 .18-.32 .24-.24 C.32-.28 .36-.16 .26-.10 C.18-.06 .08-.10 .08-.18 Z', '#ffffff', '#cbd5e1', .016);
+        // 顶部雪白绒球
+        shape('M.64-1.10 A.095 .095 0 1 1 .83-1.10 A.095 .095 0 1 1 .64-1.10 Z', '#ffffff', '#cbd5e1', .018);
+    } else if (kind === 'jingle_bell') {
+        // 🔔 圣诞金铃铛 (金尖 + 圣诞红蝴蝶结 + 双金铃铛 + 翠绿冬青)
+        shape('M0 0 L.16-.18', null, '#b45309', .035);
+        // 翠绿冬青衬叶
+        shape('M.22-.44 C.08-.58 .12-.76 .28-.78 C.34-.64 .30-.50 .22-.44 Z M.44-.42 C.62-.52 .68-.34 .54-.24 C.46-.28 .44-.36 .44-.42 Z', '#16a34a', '#14532d', .016);
+        // 双金铃铛主体
+        shape('M.12-.28 A.16 .16 0 1 1 .44-.28 A.16 .16 0 1 1 .12-.28 Z', '#facc15', '#854d0e', .02);
+        shape('M.34-.42 A.15 .15 0 1 1 .64-.42 A.15 .15 0 1 1 .34-.42 Z', '#eab308', '#854d0e', .02);
+        // 铃铛十字音孔
+        shape('M.24-.22 A.03 .03 0 1 1 .30-.22 Z M.48-.36 A.03 .03 0 1 1 .54-.36 Z', '#713f12', null);
+        shape('M.16-.30 L.38-.20 M.38-.44 L.60-.34', null, '#fef08a', .022);
+        // 顶部圣诞红蝴蝶结
+        shape('M.36-.54 C.18-.72 .14-.46 .34-.48 Z M.40-.54 C.62-.46 .58-.72 .38-.48 Z', '#dc2626', '#7f1d1d', .018);
+        shape('M.33-.52 A.045 .045 0 1 1 .42-.52 A.045 .045 0 1 1 .33-.52 Z', '#fde047', '#92400e', .014);
     } else {
         // 🪶 默认复古羽毛笔 (quill)
         shape('M.05-.07 C.2-.48 .23-.87 .54-1.15 C.66-1.32 .82-1.4 .97-1.44 C1.04-1.02 .81-.55 .43-.3 Z', '#eee8d9', '#7e7264', .018);
@@ -754,6 +839,16 @@ class ReelsCanvasRenderer {
         // For non-scrolling lines, we only render if active
         if (!_isSubCall && (currentTime < segStart || currentTime > segEnd)) return;
 
+        // ── 按每屏词数上限 (max_words_per_segment) 与句尾标点自动切分自然短句屏 ──
+        const maxWordsPerSeg = Math.max(0, parseInt(s.max_words_per_segment, 10) || 0);
+        if (!_isSubCall && maxWordsPerSeg > 0 && (!segment.styled_ranges || segment.styled_ranges.length === 0)) {
+            const subSeg = this._resolveSubSegmentByWordLimit(segment, s, currentTime, maxWordsPerSeg);
+            if (subSeg && subSeg !== segment) {
+                this.renderSubtitle(style, subSeg, currentTime, videoW, videoH, true, _skipKineticBackdrop);
+                return;
+            }
+        }
+
         // 【拦截】如果包含富文本样式范围，或启用了自动着色规则，则进入独立的富文本渲染循环，以此保证旧版 0 损耗
         // 自动着色的字符坐标必须与实际绘制的文本一致。字幕经过编辑后
         // edited_text 与 text 可能不同；此前仍以 text 建立范围，会让命中词
@@ -885,12 +980,33 @@ class ReelsCanvasRenderer {
 
         const popMaxScaleGlobal = getSubtitleLayoutMaxScale(s);
         const antiCollisionPaddingGlobal = (popMaxScaleGlobal > 1.05) ? ((ctx.measureText(' ').width + wordSpacing) * (popMaxScaleGlobal - 1.0) * 1.2) : 0;
+        const maxWordsPerLine = Math.max(0, parseInt(s.max_words_per_line, 10) || 0);
+        const balancedTwoLine = Boolean(s.balanced_two_line_wrap);
 
         for (let i = 0; i < paragraphs.length; i++) {
             const paraWords = paraWordsGroups[i];
             if (paraWords.length > 0) {
                 const wrapWordSpacing = wordSpacing + randomWordSpacingMax + antiCollisionPaddingGlobal;
-                const paraLines = this._wrapTokensByPixelWidth(paraWords, autoWrap ? maxWidth : Infinity, joiner, letterSpacing, wrapWordSpacing);
+                let paraLines;
+                if (balancedTwoLine && paragraphs.length === 1 && paraWords.length >= 2) {
+                    paraLines = this._wrapBalancedTwoLines(
+                        paraWords,
+                        autoWrap ? maxWidth : Infinity,
+                        maxWordsPerLine,
+                        joiner,
+                        letterSpacing,
+                        wrapWordSpacing
+                    );
+                } else {
+                    paraLines = this._wrapTokensByPixelWidth(
+                        paraWords,
+                        autoWrap ? maxWidth : Infinity,
+                        joiner,
+                        letterSpacing,
+                        wrapWordSpacing,
+                        maxWordsPerLine
+                    );
+                }
                 lines.push(...paraLines);
             } else {
                 const isLast = (i === paragraphs.length - 1);
@@ -1052,6 +1168,10 @@ class ReelsCanvasRenderer {
         let finalMaxLineW = 0; // 所有词完全展开后的最终宽度（用于稳定居中锚点）
         const actualLineWidths = []; // 每行动画后实际渲染宽度
         const finalLineWidths = [];  // 每行最终宽度（不随时间变化）
+        const pushApartEnabled = highlightScaleEnabled && s.highlight_push_apart !== false && highlightScaleFactor > 1.001;
+        const pushApartExtraPad = pushApartEnabled
+            ? Math.max(4, (s.use_stroke !== false ? (Number(s.border_width) || 3) * 0.9 : 2)) * (highlightScaleFactor - 1.0)
+            : 0;
         let simWordIdx = 0;
         for (let li = 0; li < visibleLines.length; li++) {
             const lineTokens = visibleLines[li].split(/\s+/).filter(Boolean);
@@ -1087,14 +1207,30 @@ class ReelsCanvasRenderer {
                     }
                 }
 
-                const slotW = ww * lScale * allocScale;
+                let isSimActiveSpoken = false;
+                if (activeSpokenIdx >= 0) {
+                    if (wordPopGroups) {
+                        const activeTiming = resolvedWordTimings[activeSpokenIdx];
+                        const simTiming = resolvedWordTimings[simWordIdx];
+                        isSimActiveSpoken = activeTiming != null && simTiming != null
+                            && Math.abs(simTiming.start - activeTiming.start) < 1e-6
+                            && Math.abs(simTiming.end - activeTiming.end) < 1e-6;
+                    } else {
+                        isSimActiveSpoken = simWordIdx === activeSpokenIdx;
+                    }
+                }
+
+                const baseSlotW = ww * lScale * allocScale;
+                const activeSlotW = (pushApartEnabled && isSimActiveSpoken)
+                    ? (ww * Math.max(allocScale, highlightScaleFactor) + pushApartExtraPad * 2) * lScale
+                    : baseSlotW;
                 const gapW = (safeBaseSpaceW_ + this._computeRandomWordSpacing(s, simWordIdx, segStart, spacingWordStart)) * lScale;
                 if (ti < lineTokens.length - 1) {
-                    lineRenderedW += slotW + gapW;
-                    lineFinalW += slotW + gapW;
+                    lineRenderedW += activeSlotW + gapW;
+                    lineFinalW += baseSlotW + gapW;
                 } else {
-                    lineRenderedW += slotW;
-                    lineFinalW += slotW;
+                    lineRenderedW += activeSlotW;
+                    lineFinalW += baseSlotW;
                 }
                 simWordIdx++;
             }
@@ -1496,9 +1632,132 @@ class ReelsCanvasRenderer {
 
             const brushEngine = (typeof window !== 'undefined' && (window.ReelsBrushEngine || window.ReelsOverlay?.ReelsBrushEngine));
             const bStyle = s.box_brush_style;
+            const isTextBacking = Boolean(brushEngine && typeof brushEngine.isTextBackingStyle === 'function' && brushEngine.isTextBackingStyle(bStyle));
             const isBrush = brushEngine && bStyle && bStyle !== 'rect' && bStyle !== 'none';
 
-            if (isBrush) {
+            if (isTextBacking) {
+                const bColorMode = s.box_brush_color_mode || 'original';
+                const backingLines = [];
+                let backingStartY = cy - totalH / 2;
+                if (advEnabled) {
+                    const advValign = (s.advanced_textbox_valign || 'center').toLowerCase();
+                    if (advValign === 'top') backingStartY = advY;
+                    else if (advValign === 'bottom') backingStartY = advY + advH - totalH;
+                }
+                const progressiveTw = isTypewriter && twRevealedCount >= 0 && twUnreadOpacity <= 0.05;
+                const progressiveSpoken = hideUntilSpoken && unreadOpacityFactor <= 0.05 && currentTime != null;
+                let wCounter = 0;
+                let cCounter = 0;
+
+                for (let i = 0; i < visibleLines.length; i++) {
+                    const line = visibleLines[i];
+                    const lineW = lineWidths[i];
+                    const lineScale = lineScales[i] || 1.0;
+                    const lineHScaled = lineH * lineScale;
+                    const scaledLineW = lineW * lineScale;
+                    const hasCustomLineScale = Math.abs(lineScale - 1.0) > 0.001;
+                    const anchorLineW = (finalLineWidths[i] != null && (hasCustomLineScale || finalLineWidths[i] > lineW))
+                        ? finalLineWidths[i] : scaledLineW;
+                    const effectiveLineW = (actualLineWidths[i] != null && (hasCustomLineScale || actualLineWidths[i] > lineW))
+                        ? actualLineWidths[i] : scaledLineW;
+                    const lineAlignMode = resolveLineAlignMode(i);
+                    const xStart = computeAlignedLineX(i, lineAlignMode === 'right' ? effectiveLineW : anchorLineW);
+                    const y = backingStartY + (lineTextTopOffsets[i] || 0);
+
+                    const lineWords = line.split(/\s+/).filter(Boolean);
+                    if (!progressiveTw && !progressiveSpoken && !s.only_show_active_word) {
+                        backingLines.push({
+                            text: line,
+                            x: xStart,
+                            y,
+                            w: effectiveLineW,
+                            h: lineHScaled,
+                            fontSize: fontSize * lineScale,
+                            fontStr,
+                            letterSpacing,
+                            lineIndex: i,
+                        });
+                        wCounter += lineWords.length;
+                        continue;
+                    }
+
+                    let currX = textDirection === 'rtl' ? xStart + effectiveLineW : xStart;
+                    const visWords = [];
+                    let minWX = Infinity;
+                    let maxWX = -Infinity;
+                    const baseSpaceW = ctx.measureText(' ').width + wordSpacing;
+
+                    for (const wordStr of lineWords) {
+                        const wordW = this._measureTextWithSpacing(ctx, wordStr, letterSpacing);
+                        const wordIdx = wCounter++;
+                        const wt = resolvedWordTimings[wordIdx] || {
+                            start: segStart + segDur * (wordIdx / totalWordCount),
+                            end: segStart + segDur * ((wordIdx + 1) / totalWordCount),
+                        };
+                        const wordStart = wt.start;
+                        const wordEnd = wt.end;
+                        const slotW = wordW * lineScale;
+                        const slotX = textDirection === 'rtl' ? currX - slotW : currX;
+                        const wordDrawX = s.only_show_active_word ? (cx - wordW / 2) : slotX;
+
+                        let visText = wordStr;
+                        let visW = slotW;
+                        let isVis = true;
+
+                        if (s.only_show_active_word) {
+                            isVis = currentTime == null || (currentTime >= wordStart && (wordIdx === totalWordCount - 1 ? currentTime <= wordEnd : currentTime < wordEnd));
+                        } else if (progressiveTw) {
+                            const chars = Array.from(wordStr);
+                            const wordUnits = typewriterRevealType === 'char' ? chars.length : 1;
+                            const revealedUnits = Math.max(0, Math.min(wordUnits, twRevealedCount - cCounter));
+                            cCounter += wordUnits;
+                            if (revealedUnits <= 0) {
+                                isVis = false;
+                            } else if (typewriterRevealType === 'char' && revealedUnits < wordUnits) {
+                                visText = chars.slice(0, revealedUnits).join('');
+                                visW = this._measureTextWithSpacing(ctx, visText, letterSpacing) * lineScale;
+                            }
+                        } else if (progressiveSpoken) {
+                            isVis = currentTime >= wordStart || wordIdx === activeSpokenIdx;
+                        }
+
+                        if (isVis && visText.trim()) {
+                            visWords.push({ text: visText, x: wordDrawX, y, w: visW });
+                            if (wordDrawX < minWX) minWX = wordDrawX;
+                            if (wordDrawX + visW > maxWX) maxWX = wordDrawX + visW;
+                        }
+                        currX += textDirection === 'rtl' ? -(slotW + baseSpaceW * lineScale) : (slotW + baseSpaceW * lineScale);
+                    }
+
+                    if (visWords.length > 0) {
+                        backingLines.push({
+                            text: visWords.map(w => w.text).join(' '),
+                            x: minWX,
+                            y,
+                            w: Math.max(1, maxWX - minWX),
+                            h: lineHScaled,
+                            fontSize: fontSize * lineScale,
+                            fontStr,
+                            letterSpacing,
+                            lineIndex: i,
+                            words: visWords,
+                        });
+                    }
+                }
+
+                if (backingLines.length > 0) {
+                    brushEngine.drawTextCutoutBacking(ctx, backingLines, {
+                        style: bStyle,
+                        color: bgColor,
+                        opacity: 1,
+                        colormode: bColorMode,
+                        padX: padLeft,
+                        padY: (padTop + padBottom) * 0.5,
+                        padTop,
+                        padBottom,
+                    });
+                }
+            } else if (isBrush) {
                 let brushColor = bgColor;
                 let brushDir = 'horizontal';
                 if (s.bg_gradient_enabled) {
@@ -1754,6 +2013,11 @@ class ReelsCanvasRenderer {
             ? visibleLines.reduce((sum, ln) => sum + ln.split(/\s+/).filter(Boolean).reduce((c, w) => c + Array.from(w).length, 0), 0)
             : 0;
         const activeHighlightIdx = highlightEnabled ? activeSpokenIdx : -1;
+        const useUnifiedStrokeFillPasses = Boolean(
+            useStroke && !s.stroke_expand_enabled && !s.dynamic_box && !s.ambient_glow_enabled
+            && borderW >= 3 && !isTypewriter && !isExtendedCharAnim
+        );
+        const deferredFillPasses = [];
 
         for (let i = 0; i < visibleLines.length; i++) {
             const line = visibleLines[i];
@@ -1762,11 +2026,16 @@ class ReelsCanvasRenderer {
             const lineHScaled = lineH * lineScale;
             const scaledLineW = lineW * lineScale;
             const hasCustomLineScale = Math.abs(lineScale - 1.0) > 0.001;
+            const lineRange = lineWordRanges[i];
+            const lineHasActiveZoom = pushApartEnabled && activeSpokenIdx >= 0 && lineRange
+                && activeSpokenIdx >= lineRange.startWordIdx && activeSpokenIdx < lineRange.endWordIdx;
 
-            // Text alignment — 使用最终行宽（所有词展开后）来锚定位置，避免逐词弹出时偏移
-            const anchorLineW = (finalLineWidths[i] != null && (hasCustomLineScale || finalLineWidths[i] > lineW))
-                ? finalLineWidths[i] : scaledLineW;
-            const effectiveLineW = (actualLineWidths[i] != null && (hasCustomLineScale || actualLineWidths[i] > lineW))
+            // Text alignment — 当行内有放大推开词时按实际展开行宽动态居中，否则使用最终行宽稳定锚定
+            const anchorLineW = lineHasActiveZoom
+                ? (actualLineWidths[i] ?? scaledLineW)
+                : ((finalLineWidths[i] != null && (hasCustomLineScale || finalLineWidths[i] > lineW))
+                    ? finalLineWidths[i] : scaledLineW);
+            const effectiveLineW = (actualLineWidths[i] != null && (hasCustomLineScale || actualLineWidths[i] > lineW || lineHasActiveZoom))
                 ? actualLineWidths[i] : scaledLineW;
             const lineAlignMode = resolveLineAlignMode(i);
             const xStart = computeAlignedLineX(i, lineAlignMode === 'right' ? effectiveLineW : anchorLineW);
@@ -1839,7 +2108,9 @@ class ReelsCanvasRenderer {
                     if (ljScale > 1.0) allocScale = ljScale;
                 }
 
-                const slotW = wordW * lineScale * allocScale;
+                const slotW = (pushApartEnabled && isHighlightZoom)
+                    ? (wordW * Math.max(allocScale, highlightScaleFactor) + pushApartExtraPad * 2) * lineScale
+                    : (wordW * lineScale * allocScale);
                 const slotX = textDirection === 'rtl' ? currX - slotW : currX;
 
                 const isWordActive = !s.only_show_active_word || (currentTime == null || (currentTime >= wordStart && (wordIdx === totalWordCount - 1 ? currentTime <= wordEnd : currentTime < wordEnd)));
@@ -2244,8 +2515,60 @@ class ReelsCanvasRenderer {
                             }
                             charX += chW + letterSpacing;
                         }
+                    } else if (useUnifiedStrokeFillPasses) {
+                        this._drawWordShadowAndStroke(
+                            ctx, wordStr, textDrawX, textDrawY,
+                            wordStrokeColor, borderW, outlineAlpha,
+                            currentShadowBlur, shadowOffX, shadowOffY, currentShadowColor, shadowAlpha,
+                            letterSpacing, s
+                        );
+                        const _wCx = wordCenterX;
+                        const _wCy = wordCenterY;
+                        const _wScale = wordScale;
+                        const _lScale = lineScale;
+                        const _fillAlpha = globalAlpha * wordOpacity * (isBullet && lineAlpha < 0.999 ? lineAlpha : 1);
+                        const _wordStr = wordStr;
+                        const _textDrawX = textDrawX;
+                        const _textDrawY = textDrawY;
+                        const _wordColor = wordColor;
+                        const _wordStrokeColor = wordStrokeColor;
+                        const _currentShadowColor = currentShadowColor;
+                        const _activeGradBounds = activeGradBounds;
+                        const _isHighlight = isHighlight;
+                        deferredFillPasses.push(() => {
+                            ctx.save();
+                            ctx.globalAlpha = _fillAlpha;
+                            if (_wScale !== 1.0) {
+                                ctx.translate(_wCx, _wCy);
+                                ctx.scale(_wScale, _wScale);
+                                ctx.translate(-_wCx, -_wCy);
+                            }
+                            if (_lScale !== 1.0) {
+                                ctx.translate(_wCx, _wCy);
+                                ctx.scale(_lScale, _lScale);
+                                ctx.translate(-_wCx, -_wCy);
+                            }
+                            const punctMatch = (_isHighlight && !s.highlight_include_punctuation && _wordColor !== textColor && textDirection !== 'rtl')
+                                ? _wordStr.match(/^(.+?)([,.:;!?，。：；！？]+)$/)
+                                : null;
+                            if (punctMatch) {
+                                const [, corePart, punctPart] = punctMatch;
+                                const coreW = this._measureTextWithSpacing(ctx, corePart, letterSpacing);
+                                this._drawWord(ctx, corePart, _textDrawX, _textDrawY, _wordColor,
+                                    false, _wordStrokeColor, 0, outlineAlpha,
+                                    0, 0, 0, _currentShadowColor, 0, letterSpacing, s, _activeGradBounds);
+                                this._drawWord(ctx, punctPart, _textDrawX + coreW, _textDrawY, textColor,
+                                    false, _wordStrokeColor, 0, outlineAlpha,
+                                    0, 0, 0, _currentShadowColor, 0, letterSpacing, s, _activeGradBounds);
+                            } else {
+                                this._drawWord(ctx, _wordStr, _textDrawX, _textDrawY, _wordColor,
+                                    false, _wordStrokeColor, 0, outlineAlpha,
+                                    0, 0, 0, _currentShadowColor, 0, letterSpacing, s, _activeGradBounds);
+                            }
+                            ctx.restore();
+                        });
                     } else {
-                        const punctMatch = (isHighlight && wordColor !== textColor && textDirection !== 'rtl')
+                        const punctMatch = (isHighlight && !s.highlight_include_punctuation && wordColor !== textColor && textDirection !== 'rtl')
                             ? wordStr.match(/^(.+?)([,.:;!?，。：；！？]+)$/)
                             : null;
                         if (punctMatch) {
@@ -2288,6 +2611,12 @@ class ReelsCanvasRenderer {
                 const randomGapW = this._computeRandomWordSpacing(s, wordIdx, segStart, wordStart);
                 const advanceW = slotW + (safeBaseSpaceW_ + randomGapW) * lineScale;
                 currX += textDirection === 'rtl' ? -advanceW : advanceW;
+            }
+        }
+
+        if (deferredFillPasses.length > 0) {
+            for (const runFillPass of deferredFillPasses) {
+                runFillPass();
             }
         }
 
@@ -2792,6 +3121,218 @@ class ReelsCanvasRenderer {
         }
     }
 
+    // ─── Helper: draw word shadow + outer stroke only (Pass 1 of unified sticker outline) ───
+    _drawWordShadowAndStroke(ctx, text, x, y,
+        strokeColor, strokeWidth, strokeAlpha,
+        shadowBlur, shadowOffX, shadowOffY, shadowColor, shadowAlpha, letterSpacing = 0, s = null) {
+        if (shadowBlur > 0 || shadowOffX !== 0 || shadowOffY !== 0) {
+            ctx.save();
+            ctx.globalAlpha *= shadowAlpha;
+            ctx.fillStyle = shadowColor;
+            if (shadowBlur > 0) {
+                ctx.shadowColor = shadowColor;
+                ctx.shadowBlur = shadowBlur;
+                ctx.shadowOffsetX = shadowOffX;
+                ctx.shadowOffsetY = shadowOffY;
+            }
+            const sx = x + (shadowBlur > 0 ? 0 : shadowOffX);
+            const sy = y + (shadowBlur > 0 ? 0 : shadowOffY);
+            if (strokeWidth > 0) {
+                ctx.strokeStyle = shadowColor;
+                ctx.lineWidth = strokeWidth * 2;
+                ctx.lineJoin = 'round';
+                ctx.miterLimit = 2;
+                if (letterSpacing > 0) {
+                    this._strokeTextSpaced(ctx, text, sx, sy, letterSpacing);
+                } else {
+                    ctx.strokeText(text, sx, sy);
+                }
+            }
+            if (letterSpacing > 0) {
+                this._fillTextSpaced(ctx, text, sx, sy, letterSpacing);
+            } else {
+                ctx.fillText(text, sx, sy);
+            }
+            ctx.restore();
+        }
+
+        if (strokeWidth > 0) {
+            ctx.save();
+            ctx.globalAlpha *= strokeAlpha;
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = strokeWidth * 2;
+            ctx.lineJoin = 'round';
+            ctx.miterLimit = 2;
+            if (letterSpacing > 0) {
+                this._strokeTextSpaced(ctx, text, x, y, letterSpacing);
+            } else {
+                ctx.strokeText(text, x, y);
+            }
+            ctx.restore();
+        }
+    }
+
+    // ─── Render-time sub-paging by max_words_per_segment & sentence/clause breaks ───
+    _resolveSubSegmentByWordLimit(segment, s, currentTime, maxWordsPerSeg) {
+        if (!segment || !(maxWordsPerSeg > 0)) return segment;
+        const rawText = String(segment.edited_text ?? segment.text ?? '').trim();
+        if (!rawText) return segment;
+        const tokens = rawText.split(/\s+/).filter(Boolean);
+        if (tokens.length === 0) return segment;
+
+        const isSentenceEndToken = (tok) => {
+            const t = String(tok || '').trim();
+            if (!/[.!?。！？]+['"\u201D\u2019）)】\]》」]*$/.test(t)) return false;
+            if (/^(mr|mrs|ms|dr|st|prof|sr|jr|vs|etc|no)\.$/i.test(t)) return false;
+            return true;
+        };
+        const isClauseCommaToken = (tok) => /[，,;；]['"\u201D\u2019）)】\]》」]*$/.test(String(tok || '').trim());
+
+        const hasInternalSentenceBreak = tokens.slice(0, -1).some(isSentenceEndToken);
+        if (tokens.length <= maxWordsPerSeg && !hasInternalSentenceBreak) {
+            return segment;
+        }
+
+        const segStart = Number(segment.start) || 0;
+        const segEnd = Math.max(segStart + 0.001, Number(segment.end) || (segStart + 0.001));
+        const segDur = Math.max(0.001, segEnd - segStart);
+        const rawWords = Array.isArray(segment.words) ? segment.words : [];
+
+        let timedWords;
+        if (rawWords.length === tokens.length) {
+            timedWords = tokens.map((tok, i) => {
+                const w = rawWords[i];
+                const fbStart = segStart + segDur * (i / tokens.length);
+                const fbEnd = segStart + segDur * ((i + 1) / tokens.length);
+                const ws = Number(w?.start);
+                const we = Number(w?.end);
+                return {
+                    word: tok,
+                    start: Number.isFinite(ws) ? ws : fbStart,
+                    end: Number.isFinite(we) ? we : fbEnd,
+                };
+            });
+        } else {
+            const weights = tokens.map(tok => {
+                let w = Math.max(1, tok.replace(/[^\p{L}\p{N}]/gu, '').length || 1);
+                if (isSentenceEndToken(tok)) w += 2.5;
+                else if (isClauseCommaToken(tok)) w += 1.2;
+                return w;
+            });
+            const totalW = Math.max(1, weights.reduce((a, b) => a + b, 0));
+            let accum = 0;
+            timedWords = tokens.map((tok, i) => {
+                const ws = segStart + segDur * (accum / totalW);
+                accum += weights[i];
+                const we = i === tokens.length - 1 ? segEnd : (segStart + segDur * (accum / totalW));
+                return { word: tok, start: ws, end: we };
+            });
+        }
+
+        const chunks = [];
+        let curChunk = [];
+        let clauseWordCount = 0;
+
+        for (let i = 0; i < timedWords.length; i++) {
+            const wObj = timedWords[i];
+            curChunk.push(wObj);
+            clauseWordCount++;
+            const isLast = (i === timedWords.length - 1);
+            if (isLast) break;
+
+            const nextObj = timedWords[i + 1];
+            const gapToNext = (Number(nextObj?.start) || 0) - (Number(wObj?.end) || 0);
+            const sentBreak = isSentenceEndToken(wObj.word);
+            const commaBreak = isClauseCommaToken(wObj.word) && (clauseWordCount > maxWordsPerSeg || gapToNext >= 0.22);
+
+            if (sentBreak || commaBreak) {
+                chunks.push(curChunk);
+                curChunk = [];
+                clauseWordCount = 0;
+            } else if (curChunk.length >= maxWordsPerSeg) {
+                chunks.push(curChunk);
+                curChunk = [];
+            }
+        }
+        if (curChunk.length > 0) chunks.push(curChunk);
+        if (chunks.length <= 1) return segment;
+
+        const subPages = chunks.map((chunkWords, idx) => {
+            const firstW = chunkWords[0];
+            const lastW = chunkWords[chunkWords.length - 1];
+            const cStart = idx === 0 ? segStart : Math.max(segStart, Number(firstW.start) || segStart);
+            const cEnd = idx === chunks.length - 1
+                ? segEnd
+                : Math.max(cStart + 0.001, Number(chunks[idx + 1][0].start) || Number(lastW.end) || segEnd);
+            const subText = chunkWords.map(w => w.word).join(' ');
+            return {
+                ...segment,
+                start: cStart,
+                end: cEnd,
+                text: subText,
+                edited_text: subText,
+                words: chunkWords,
+            };
+        });
+
+        if (currentTime == null) return subPages[0];
+        for (let idx = 0; idx < subPages.length; idx++) {
+            const sp = subPages[idx];
+            const isLast = (idx === subPages.length - 1);
+            if (currentTime >= sp.start - 1e-6 && (isLast ? currentTime <= sp.end + 1e-6 : currentTime < sp.end)) {
+                return sp;
+            }
+        }
+        return currentTime < subPages[0].start ? subPages[0] : subPages[subPages.length - 1];
+    }
+
+    // ─── Balanced 2-Line Wrapper (top-heavy pyramid / balanced 2-line caption layout) ───
+    _wrapBalancedTwoLines(words, maxWidth, maxWordsPerLine = 0, joiner = ' ', letterSpacing = 0, wordSpacing = 0) {
+        if (!Array.isArray(words) || words.length === 0) return [];
+        if (words.length === 1) return [words[0]];
+
+        const ctx = this.ctx;
+        let bestK = Math.ceil(words.length / 2);
+        let bestCost = Infinity;
+
+        for (let k = 1; k < words.length; k++) {
+            const line1Words = words.slice(0, k);
+            const line2Words = words.slice(k);
+            const line1Str = line1Words.join(joiner);
+            const line2Str = line2Words.join(joiner);
+            const w1 = this._measureLineWithSpacing(ctx, line1Str, letterSpacing, wordSpacing);
+            const w2 = this._measureLineWithSpacing(ctx, line2Str, letterSpacing, wordSpacing);
+
+            let wordCountOverflow = 0;
+            if (maxWordsPerLine > 0) {
+                wordCountOverflow = (
+                    Math.max(0, line1Words.length - maxWordsPerLine) +
+                    Math.max(0, line2Words.length - maxWordsPerLine)
+                ) * 5000;
+            }
+
+            let widthOverflow = 0;
+            if (Number.isFinite(maxWidth) && maxWidth > 0) {
+                widthOverflow = (Math.max(0, w1 - maxWidth) + Math.max(0, w2 - maxWidth)) * 4.0;
+            }
+
+            const diff = Math.abs(w1 - w2);
+            // Prefer Line 1 >= Line 2 (top-heavy pyramid, e.g. "3 SIGNS GOD IS / PROTECTING", "YOU FROM / HARM.")
+            const bottomHeavyPenalty = w2 > w1 ? (w2 - w1) * 1.8 : 0;
+
+            const cost = wordCountOverflow + widthOverflow + diff + bottomHeavyPenalty;
+            if (cost < bestCost) {
+                bestCost = cost;
+                bestK = k;
+            }
+        }
+
+        return [
+            words.slice(0, bestK).join(joiner),
+            words.slice(bestK).join(joiner),
+        ];
+    }
+
     // ─── Letter-spaced text rendering ───
     _fillTextSpaced(ctx, text, x, y, spacing) {
         let cx = x;
@@ -2949,11 +3490,12 @@ class ReelsCanvasRenderer {
     }
 
     // ─── Wrap tokens by pixel width ───
-    _wrapTokensByPixelWidth(words, maxWidth, joiner = ' ', letterSpacing = 0, wordSpacing = 0) {
+    _wrapTokensByPixelWidth(words, maxWidth, joiner = ' ', letterSpacing = 0, wordSpacing = 0, maxWordsPerLine = 0) {
         const ctx = this.ctx;
         const lines = [];
         let currentLine = '';
         let currentLineW = 0;
+        let currentLineWordCount = 0;
         const joinerW = ctx.measureText(joiner).width + wordSpacing;
 
         // A subtitle from Chinese ASR often arrives as one uninterrupted token.
@@ -2966,9 +3508,11 @@ class ReelsCanvasRenderer {
                     lines.push(currentLine);
                     currentLine = char;
                     currentLineW = charW;
+                    currentLineWordCount = 1;
                 } else {
                     currentLine += char;
                     currentLineW += charW;
+                    if (currentLineWordCount === 0) currentLineWordCount = 1;
                 }
             }
         };
@@ -2984,18 +3528,22 @@ class ReelsCanvasRenderer {
                     lines.push(currentLine);
                     currentLine = '';
                     currentLineW = 0;
+                    currentLineWordCount = 0;
                 }
                 appendOversizeToken(word);
                 continue;
             }
             const testW = currentLine ? currentLineW + joinerW + wordW : wordW;
-            if (testW > maxWidth && currentLine) {
+            const exceedsWordLimit = maxWordsPerLine > 0 && currentLineWordCount >= maxWordsPerLine;
+            if ((testW > maxWidth || exceedsWordLimit) && currentLine) {
                 lines.push(currentLine);
                 currentLine = word;
                 currentLineW = wordW;
+                currentLineWordCount = 1;
             } else {
                 currentLine = currentLine ? currentLine + joiner + word : word;
                 currentLineW = testW;
+                currentLineWordCount++;
             }
         }
         if (currentLine) lines.push(currentLine);
@@ -3914,28 +4462,121 @@ class ReelsCanvasRenderer {
 
         // 4. Background box rendering
         if (s.use_box) {
-            ctx.save();
-            const bgColor = s.color_bg || '#000000';
-            const bgAlpha = (s.opacity_bg ?? 180) / 255;
-            ctx.globalAlpha = bgAlpha;
-            const rad = s.box_radius || 12;
+            const brushEngine = (typeof window !== 'undefined' && window.ReelsBrushEngine)
+                || (typeof globalThis !== 'undefined' && globalThis.ReelsBrushEngine);
+            const brushStyle = s.box_brush_style || 'rect';
+            const isTextBacking = brushEngine && typeof brushEngine.isTextBackingStyle === 'function' && brushEngine.isTextBackingStyle(brushStyle);
 
-            ctx.beginPath();
-            let r = Math.min(rad, rectW / 2, rectH / 2);
-            ctx.moveTo(rectX + r, rectY);
-            ctx.lineTo(rectX + rectW - r, rectY);
-            ctx.quadraticCurveTo(rectX + rectW, rectY, rectX + rectW, rectY + r);
-            ctx.lineTo(rectX + rectW, rectY + rectH - r);
-            ctx.quadraticCurveTo(rectX + rectW, rectY + rectH, rectX + rectW - r, rectY + rectH);
-            ctx.lineTo(rectX + r, rectY + rectH);
-            ctx.quadraticCurveTo(rectX, rectY + rectH, rectX, rectY + rectH - r);
-            ctx.lineTo(rectX, rectY + r);
-            ctx.quadraticCurveTo(rectX, rectY, rectX + r, rectY);
-            ctx.closePath();
+            if (isTextBacking) {
+                const twAlign = (s.fullpage_typewriter_align || 'center').toLowerCase();
+                const unrevOpacity = s.fullpage_typewriter_unrevealed_opacity ?? s.tw_unrevealed_opacity ?? 0.0;
+                const hideUnrevealedBacking = unrevOpacity <= 0.05;
+                const backingLines = [];
 
-            ctx.fillStyle = bgColor;
-            ctx.fill();
-            ctx.restore();
+                for (let li = 0; li < visibleLines.length; li++) {
+                    const globalLi = visibleLineIndices[li];
+                    const lineTokens = visibleLines[li];
+                    const lineW = lineWidths[li];
+                    let startX;
+                    if (advEnabled) {
+                        if (advAlign === 'left') startX = advX + padLeft;
+                        else if (advAlign === 'right') startX = advX + advW - padRight - lineW;
+                        else startX = advX + advW / 2 - lineW / 2;
+                    } else {
+                        if (twAlign === 'left') startX = cx - maxLineW / 2;
+                        else if (twAlign === 'right') startX = cx + maxLineW / 2 - lineW;
+                        else startX = cx - lineW / 2;
+                    }
+
+                    let currX = textDirection === 'rtl' ? startX + lineW : startX;
+                    let y = advEnabled ? advY + padTop : cy - totalH / 2;
+                    for (let prevLi = 0; prevLi < li; prevLi++) {
+                        y += getLineHeight(visibleLineIndices[prevLi]) + lineSpacing;
+                    }
+
+                    const lineFontStr = getLineFontStr(globalLi);
+                    const lineFs = getLineFontSize(globalLi);
+                    const lineH = getLineHeight(globalLi);
+                    ctx.font = lineFontStr;
+
+                    const lineSegs = [];
+                    let minX = Infinity;
+                    let maxX = -Infinity;
+                    let revealedText = '';
+
+                    for (const tok of lineTokens) {
+                        const tokW = this._measureTextWithSpacing(ctx, tok.text, letterSpacing);
+                        const tokenX = textDirection === 'rtl' ? currX - tokW : currX;
+                        const isVisibleTok = !hideUnrevealedBacking || (currentTime >= tok.start);
+                        if (isVisibleTok) {
+                            revealedText += tok.text;
+                            if (tok.text.trim()) {
+                                lineSegs.push({ text: tok.text, x: tokenX, w: tokW });
+                                if (tokenX < minX) minX = tokenX;
+                                if (tokenX + tokW > maxX) maxX = tokenX + tokW;
+                            }
+                        }
+                        currX += textDirection === 'rtl' ? -tokW : tokW;
+                    }
+
+                    if (lineSegs.length > 0 && maxX > minX) {
+                        backingLines.push({
+                            x: minX,
+                            y: y,
+                            textY: y,
+                            w: maxX - minX,
+                            h: lineH,
+                            padX: padLeft,
+                            padY: (padTop + padBottom) * 0.5,
+                            text: revealedText,
+                            font: lineFontStr,
+                            fontStr: lineFontStr,
+                            fontSize: lineFs,
+                            letterSpacing: letterSpacing,
+                            textBaseline: 'top',
+                            segments: lineSegs
+                        });
+                    }
+                }
+
+                if (backingLines.length > 0) {
+                    brushEngine.drawTextCutoutBacking(ctx, backingLines, {
+                        style: brushStyle,
+                        color: s.color_bg || '#F3EFE6',
+                        opacity: (s.opacity_bg ?? 255) / 255,
+                        padX: padLeft,
+                        padY: (padTop + padBottom) * 0.5,
+                        padTop,
+                        padBottom,
+                        connected: s.box_connected !== false,
+                        radius: s.box_radius ?? 14,
+                        seed: (typeof pageStartIdx === 'number' ? pageStartIdx : 0) + 17
+                    });
+                }
+            } else {
+                ctx.save();
+                const bgColor = s.color_bg || '#000000';
+                const bgAlpha = (s.opacity_bg ?? 180) / 255;
+                ctx.globalAlpha = bgAlpha;
+                const rad = s.box_radius || 12;
+
+                ctx.beginPath();
+                let r = Math.min(rad, rectW / 2, rectH / 2);
+                ctx.moveTo(rectX + r, rectY);
+                ctx.lineTo(rectX + rectW - r, rectY);
+                ctx.quadraticCurveTo(rectX + rectW, rectY, rectX + rectW, rectY + r);
+                ctx.lineTo(rectX + rectW, rectY + rectH - r);
+                ctx.quadraticCurveTo(rectX + rectW, rectY + rectH, rectX + rectW - r, rectY + rectH);
+                ctx.lineTo(rectX + r, rectY + rectH);
+                ctx.quadraticCurveTo(rectX, rectY + rectH, rectX, rectY + rectH - r);
+                ctx.lineTo(rectX, rectY + r);
+                ctx.quadraticCurveTo(rectX, rectY, rectX + r, rectY);
+                ctx.closePath();
+
+                ctx.fillStyle = bgColor;
+                ctx.fill();
+                ctx.restore();
+            }
         }
 
         // 5. Draw text character/word by character

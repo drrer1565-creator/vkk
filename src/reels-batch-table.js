@@ -262,6 +262,14 @@ function _getActiveTab() {
     return _batchTableState.tabs.find(t => t.id === _batchTableState.activeTabId) || _batchTableState.tabs[0];
 }
 
+function reelsSyncActiveBatchTabFromId(tabId) {
+    if (!tabId || _batchTableState.visible) return;
+    if (_batchTableState.tabs.some(t => t.id === tabId)) {
+        _batchTableState.activeTabId = tabId;
+    }
+}
+window.reelsSyncActiveBatchTabFromId = reelsSyncActiveBatchTabFromId;
+
 function _normalizeBatchTabState() {
     if (!_batchTableState.tabs.length) return;
     if (!_batchTableState.tabs.some(t => t.id === _batchTableState.activeTabId)) {
@@ -324,19 +332,140 @@ function _syncGroupedProjectionToTabs(activeTasks) {
 }
 
 function reelsSyncTaskRemovalToBatchTabs(removedTasks) {
-    const list = Array.isArray(removedTasks) ? removedTasks : (removedTasks ? [removedTasks] : []);
+    const list = (Array.isArray(removedTasks) ? removedTasks : (removedTasks ? [removedTasks] : [])).filter(Boolean);
     const removedIds = new Set(list.map(t => t?.id).filter(Boolean));
-    if (removedIds.size > 0) {
+    const matchesRemoved = (t, tabId = '') => {
+        if (!t) return false;
+        if (t.id && removedIds.has(t.id)) return true;
+        return list.some(r => {
+            if (!r) return false;
+            const rTabId = r._batchTabId || _batchTableState.activeTabId || '';
+            const tTabId = t._batchTabId || tabId || '';
+            if (rTabId && tTabId && rTabId !== tTabId) return false;
+            return (t.baseName || '') === (r.baseName || '')
+                && (t.fileName || '') === (r.fileName || '')
+                && (t.bgPath || '') === (r.bgPath || '')
+                && (t.audioPath || '') === (r.audioPath || '')
+                && (t.srtPath || '') === (r.srtPath || '');
+        });
+    };
+    if (list.length > 0) {
         for (const tab of _batchTableState.tabs || []) {
             if (Array.isArray(tab.tasks)) {
-                tab.tasks = tab.tasks.filter(t => !t || !removedIds.has(t.id));
+                tab.tasks = tab.tasks.filter(t => !matchesRemoved(t, tab.id));
             }
+        }
+        if (_batchTableState.editSessionSnapshot) {
+            const snap = _batchTableState.editSessionSnapshot;
+            if (Array.isArray(snap.tabs)) {
+                snap.tabs.forEach(tab => {
+                    if (Array.isArray(tab.tasks)) {
+                        tab.tasks = tab.tasks.filter(t => !matchesRemoved(t, tab.id));
+                    }
+                });
+            }
+            if (Array.isArray(snap.tasks)) {
+                snap.tasks = snap.tasks.filter(t => !matchesRemoved(t, t?._batchTabId || snap.activeTabId || ''));
+            }
+        }
+        if (_batchTableState.openedGroupedProjection && Array.isArray(_batchTableState.openedGroupedProjection.tasks)) {
+            _batchTableState.openedGroupedProjection.tasks = _batchTableState.openedGroupedProjection.tasks.filter(
+                t => !matchesRemoved(t, t?._batchTabId || '')
+            );
         }
     }
     _syncTasksToActiveTab();
     _batchAutoSave({ skipSync: true });
 }
 window.reelsSyncTaskRemovalToBatchTabs = reelsSyncTaskRemovalToBatchTabs;
+
+function _isBatchTableRowIncomplete(t) {
+    if (typeof window._isReelsTaskIncomplete === 'function') {
+        return window._isReelsTaskIncomplete(t);
+    }
+    if (!t) return true;
+    const hasBg = Boolean(t.bgPath || t.videoPath || (Array.isArray(t.bgPaths) && t.bgPaths.length > 0));
+    const hasAudio = Boolean(t.audioPath || t.audioFile);
+    const hasSrt = Boolean(t.srtPath || t.srtFile || (Array.isArray(t.segments) && t.segments.length > 0));
+    const hasTxt = Boolean(
+        (t.txtContent && String(t.txtContent).trim()) ||
+        (t.ttsText && String(t.ttsText).trim()) ||
+        (t.aiScript && String(t.aiScript).trim())
+    );
+    return !hasBg || !hasAudio || (t.subtitleMode !== 'none' && !hasSrt && !hasTxt);
+}
+
+function reelsCleanAllTabsIncompleteTasks(opts = {}) {
+    const removedTasks = [];
+    const affectedTabNames = [];
+    for (const tab of _batchTableState.tabs || []) {
+        if (!Array.isArray(tab.tasks)) continue;
+        const bad = tab.tasks.filter(_isBatchTableRowIncomplete);
+        if (bad.length > 0) {
+            affectedTabNames.push(`${tab.name}(${bad.length}条)`);
+            bad.forEach(item => {
+                if (item && !item._batchTabId) item._batchTabId = tab.id;
+            });
+            removedTasks.push(...bad);
+        }
+    }
+    if (removedTasks.length === 0) {
+        if (!opts.silentWhenZero) {
+            alert('✨ 当前所有标签页的任务素材均完整（BG / VO / SRT 齐全），没有需要清理的残缺空行！');
+        }
+        return 0;
+    }
+    if (!confirm(`在其他标签页中检测到共 ${removedTasks.length} 条残缺/空任务（分布在：${affectedTabNames.slice(0, 6).join('、')}${affectedTabNames.length > 6 ? ' 等' : ''}）。\n\n确定一键清理这 ${removedTasks.length} 条残缺任务吗？`)) {
+        return 0;
+    }
+    for (const tab of _batchTableState.tabs || []) {
+        if (!Array.isArray(tab.tasks)) continue;
+        tab.tasks = tab.tasks.filter(t => !_isBatchTableRowIncomplete(t));
+    }
+    if (Array.isArray(window._reelsState?.tasks)) {
+        window._reelsState.tasks = window._reelsState.tasks.filter(t => !_isBatchTableRowIncomplete(t));
+    }
+    reelsSyncTaskRemovalToBatchTabs(removedTasks);
+    if (_batchTableState.visible) {
+        _skipNextApply = true;
+        _renderBatchTable();
+    }
+    if (typeof _renderTaskList === 'function') _renderTaskList({ preserveScroll: true });
+    if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
+    if (typeof showToast === 'function') showToast(`🧹 已一键清理 ${removedTasks.length} 条残缺空任务`, 'success');
+    return removedTasks.length;
+}
+window.reelsCleanAllTabsIncompleteTasks = reelsCleanAllTabsIncompleteTasks;
+
+function _rbtCleanIncompleteRows() {
+    const tasks = window._reelsState?.tasks || [];
+    const badIndices = [];
+    tasks.forEach((t, idx) => {
+        if (_isBatchTableRowIncomplete(t)) badIndices.push(idx);
+    });
+    if (badIndices.length > 0) {
+        const activeTab = _getActiveTab();
+        const tabLabel = activeTab?.name || '当前标签页';
+        if (!confirm(`在「${tabLabel}」中检测到 ${badIndices.length} 条残缺/空行（缺少配音 VO、字幕 SRT 或背景 BG）。\n\n确定一键清理这 ${badIndices.length} 条残缺空行吗？`)) {
+            return 0;
+        }
+        const removedTasks = [];
+        [...badIndices].sort((a, b) => b - a).forEach(idx => {
+            if (idx >= 0 && idx < tasks.length) {
+                removedTasks.push(...tasks.splice(idx, 1));
+            }
+        });
+        _batchTableState.selectedRows = new Set();
+        reelsSyncTaskRemovalToBatchTabs(removedTasks);
+        _skipNextApply = true;
+        _renderBatchTable();
+        if (typeof _renderTaskList === 'function') _renderTaskList({ preserveScroll: true });
+        if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
+        if (typeof showToast === 'function') showToast(`🧹 已一键清理 ${removedTasks.length} 条残缺空行`, 'success');
+        return removedTasks.length;
+    }
+    return reelsCleanAllTabsIncompleteTasks({ silentWhenZero: false });
+}
 
 // Importers (for example 文案自动剪辑) add a task directly to the Reels queue.
 // Archive it immediately in the active batch tab as well; otherwise opening the
@@ -474,12 +603,29 @@ function _removeTab(tabId) {
     if (idx < 0) return;
     if (!confirm(`确定删除标签「${_batchTableState.tabs[idx].name}」及其所有任务？`)) return;
     _batchTableState.tabs.splice(idx, 1);
+    if (Array.isArray(_batchTableState.appliedTabIds)) {
+        _batchTableState.appliedTabIds = _batchTableState.appliedTabIds.filter(id => id !== tabId);
+    }
+    if (_batchTableState.editSessionSnapshot) {
+        const snap = _batchTableState.editSessionSnapshot;
+        if (Array.isArray(snap.tabs)) snap.tabs = snap.tabs.filter(t => t.id !== tabId);
+        if (Array.isArray(snap.appliedTabIds)) snap.appliedTabIds = snap.appliedTabIds.filter(id => id !== tabId);
+        if (Array.isArray(snap.tasks)) snap.tasks = snap.tasks.filter(t => t?._batchTabId !== tabId);
+        if (snap.activeTabId === tabId) snap.activeTabId = _batchTableState.tabs[0]?.id || '';
+    }
+    if (_batchTableState.openedGroupedProjection) {
+        const opened = _batchTableState.openedGroupedProjection;
+        if (Array.isArray(opened.appliedTabIds)) opened.appliedTabIds = opened.appliedTabIds.filter(id => id !== tabId);
+        if (Array.isArray(opened.knownTabIds)) opened.knownTabIds = opened.knownTabIds.filter(id => id !== tabId);
+        if (Array.isArray(opened.tasks)) opened.tasks = opened.tasks.filter(t => t?._batchTabId !== tabId);
+    }
     if (_batchTableState.activeTabId === tabId) {
         _batchTableState.activeTabId = _batchTableState.tabs[Math.min(idx, _batchTableState.tabs.length - 1)].id;
         _loadTabTasks(_getActiveTab());
     }
     _skipNextApply = true;
     _renderBatchTable();
+    _batchAutoSave({ skipSync: true });
 }
 
 async function _renameTab(tabId) {
@@ -651,8 +797,10 @@ function _restoreGroupedProjectionFromTabs(tabIds) {
     _batchTableState.tabs.forEach((tab, tabOrder) => {
         if (!ids.includes(tab.id)) return;
         (tab.tasks || []).forEach((task, taskOrder) => {
+            _ensureTaskId(task);
             const cloned = _cloneBatchTasks([task])[0];
             if (!cloned) return;
+            cloned.id = task.id;
             cloned._batchProjection = true;
             cloned._batchTabId = tab.id;
             cloned._batchTabName = tab.name;
@@ -717,6 +865,9 @@ function reelsToggleBatchTable(options = {}) {
                 } else {
                     curTask.overlays = [...(window._reelsState.overlayProxy.overlayMgr.overlays || [])];
                 }
+            }
+            if (curTask?._batchTabId && _batchTableState.tabs.some(t => t.id === curTask._batchTabId)) {
+                _batchTableState.activeTabId = curTask._batchTabId;
             }
         }
         const wasGroupedProjection = _isBatchGroupedProjection(window._reelsState?.tasks || []);
@@ -1288,6 +1439,7 @@ function _renderBatchTable() {
                         <span class="rbt-batch-rowbreak"></span>
                         <span class="rbt-batch-subgroup">工程管理</span>
                         <button class="rbt-btn" id="rbt-add-row-btn" style="padding:2px 8px;font-size:11px;background:rgba(40,80,40,0.6);border:1px solid rgba(80,180,80,0.3);color:#a0e0b0;">添加行</button>
+                        <button class="rbt-btn" id="rbt-clean-empty-btn" style="padding:2px 8px;font-size:11px;background:rgba(245,158,11,0.18);border:1px solid rgba(251,191,36,0.45);color:#fcd34d;font-weight:600;" title="一键清理缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空行">🧹 一键清理空行</button>
                         <button class="rbt-btn" id="rbt-clear-btn" style="padding:2px 8px;font-size:11px;background:rgba(120,40,40,0.6);border:1px solid rgba(220,80,80,0.3);color:#f48484;" title="清空全部">清空</button>
                         <span style="color:rgba(255,255,255,0.2);margin:0 2px;">|</span>
                         <button class="rbt-btn rbt-btn-primary" id="rbt-save-queue-btn">保存队列</button>
@@ -1300,7 +1452,8 @@ function _renderBatchTable() {
                         <input type="file" id="rbt-file-config" class="rbt-hidden-input" accept=".json">
                         <span style="color:rgba(255,255,255,0.2);margin:0 2px;">|</span>
                         <button class="rbt-btn" id="rbt-col-settings-btn" title="勾选显示或隐藏列；拖动表头右边界调整宽度，双击边界恢复默认" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;">显示 / 隐藏列</button>
-                        <button class="rbt-btn" id="rbt-close-btn" style="padding:2px 8px;font-size:11px;background:rgba(120,40,40,0.6);border:1px solid rgba(220,80,80,0.3);color:#f48484;" title="放弃本次打开表格后的修改">关闭不保存</button>
+                        <button class="rbt-btn" id="rbt-top-apply-btn" style="padding:2px 10px;font-size:11px;background:rgba(40,120,70,0.75);border:1px solid rgba(80,200,120,0.45);color:#bbf7d0;font-weight:700;" title="保存表格修改并返回主界面">✅ 保存并关闭</button>
+                        <button class="rbt-btn" id="rbt-close-btn" style="padding:2px 8px;font-size:11px;background:rgba(120,40,40,0.6);border:1px solid rgba(220,80,80,0.3);color:#f48484;" title="放弃本次打开表格后的未保存编辑（已确认的删除仍会保留）">关闭不保存</button>
                         <span class="rbt-batch-rowbreak"></span>
                         <span class="rbt-batch-subgroup">数据录入</span>
                         <button id="rbt-open-media-pool-btn" class="rbt-btn" style="background:${_batchTableState.mediaPoolOpen ? 'rgba(50,70,160,0.6)' : 'rgba(40,60,120,0.6)'}; color:#9bb0ff; border:1px solid rgba(80,120,220,0.3); font-size:11px; padding:2px 8px;">${_batchTableState.mediaPoolOpen ? '收起素材池' : '打开素材池'}</button>
@@ -1533,6 +1686,7 @@ function _renderBatchTable() {
                         <button class="rbt-btn" id="rbt-invert-select" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;">反选</button>
                         <button class="rbt-btn" id="rbt-deselect-all" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;">取消</button>
                         <button class="rbt-btn" id="rbt-delete-selected" disabled style="padding:2px 9px;font-size:11px;background:rgba(239,68,68,0.14);border:1px solid rgba(239,68,68,0.35);color:#f87171;font-weight:600;">🗑 删除选中</button>
+                        <button class="rbt-btn" id="rbt-clean-empty-bar-btn" style="padding:2px 9px;font-size:11px;background:rgba(245,158,11,0.16);border:1px solid rgba(251,191,36,0.4);color:#fcd34d;font-weight:600;" title="一键清理缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空行">🧹 一键清理空行</button>
                         <span style="color:rgba(255,255,255,0.2);margin:0 2px;">|</span>
                         <button class="rbt-btn" id="rbt-ai-preset-btn" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;" title="一键覆盖选中行参数">任务预设设置</button>
                         <button class="rbt-btn" id="rbt-import-task-preset-btn" style="padding:2px 6px;font-size:10px;background:rgba(100,100,255,0.1);border:1px solid rgba(100,100,255,0.2);color:#8b8bfa;" title="导入任务组合预设 JSON 文件">📥</button>
@@ -3022,6 +3176,7 @@ function _bindBatchTableEvents() {
     });
 
     // Close
+    container.querySelector('#rbt-top-apply-btn')?.addEventListener('click', () => reelsToggleBatchTable({ saveOnClose: true }));
     container.querySelector('#rbt-close-btn')?.addEventListener('click', () => reelsToggleBatchTable({ saveOnClose: false }));
     container.querySelector('#rbt-discard-btn')?.addEventListener('click', () => reelsToggleBatchTable({ saveOnClose: false }));
     container.querySelector('#reels-naming-mode')?.addEventListener('change', async (e) => {
@@ -3603,6 +3758,8 @@ function _bindBatchTableEvents() {
         if (typeof _batchAutoSave === 'function') _batchAutoSave();
         if (typeof showToast === 'function') showToast(`✅ 已删除 ${indices.length} 条选中任务`, 'success');
     });
+    container.querySelector('#rbt-clean-empty-btn')?.addEventListener('click', () => _rbtCleanIncompleteRows());
+    container.querySelector('#rbt-clean-empty-bar-btn')?.addEventListener('click', () => _rbtCleanIncompleteRows());
 
     // ══ Batch template apply ══
     container.querySelector('#rbt-apply-batch-sub')?.addEventListener('click', () => {
@@ -4039,12 +4196,16 @@ function _bindBatchTableEvents() {
 
     // Clear
     container.querySelector('#rbt-clear-btn')?.addEventListener('click', () => {
-        if (confirm('确定清空所有任务？')) {
+        if (confirm('确定清空当前标签页的所有任务？')) {
+            const removed = [...(window._reelsState.tasks || [])];
             window._reelsState.tasks = [];
             const activeTab = _getActiveTab();
             if (activeTab) activeTab.tasks = [];
-            _batchTableState.appliedTabIds = [];
-            _batchAutoSave({ skipSync: true });
+            if (removed.length > 0 && typeof window.reelsSyncTaskRemovalToBatchTabs === 'function') {
+                window.reelsSyncTaskRemovalToBatchTabs(removed);
+            } else {
+                _batchAutoSave({ skipSync: true });
+            }
             _skipNextApply = true;
             _renderBatchTable();
         }
@@ -6268,7 +6429,23 @@ function _bindBatchTableEvents() {
                 const task = window._reelsState?.tasks?.[idx];
                 if (!task) return;
                 const action = await window.reelsShowInputDialog?.('本任务插入素材：1追加 / 2重生成自动 / 3清空重来 / 4时间线微调', '输入 1、2、3 或 4', '1');
-                if (action === '4') { _applyBatchTableChanges(); reelsToggleBatchTable(); if (typeof reelsSelectTask === 'function') reelsSelectTask(idx); return; }
+                if (action === '4') {
+                    const targetTask = window._reelsState?.tasks?.[idx];
+                    const targetId = targetTask?.id;
+                    const activeTabId = _batchTableState.activeTabId;
+                    const targetBaseName = targetTask?.baseName;
+                    _applyBatchTableChanges();
+                    reelsToggleBatchTable({ saveOnClose: true });
+                    if (typeof reelsSelectTask === 'function') {
+                        const allTasks = window._reelsState?.tasks || [];
+                        let resolvedIdx = targetId ? allTasks.findIndex(t => t && t.id === targetId) : -1;
+                        if (resolvedIdx < 0 && targetBaseName) {
+                            resolvedIdx = allTasks.findIndex(t => t && (!t._batchTabId || t._batchTabId === activeTabId) && t.baseName === targetBaseName);
+                        }
+                        reelsSelectTask(resolvedIdx >= 0 ? resolvedIdx : Math.min(idx, Math.max(0, allTasks.length - 1)));
+                    }
+                    return;
+                }
                 if (!['1', '2', '3'].includes(action)) return;
                 window.reelsInsertAtSilences?.({ task, mode: action === '2' ? 'regenerate' : action === '3' ? 'reset' : 'append' });
                 return;
@@ -6277,9 +6454,20 @@ function _bindBatchTableEvents() {
             const selectBtn = e.target.closest('.rbt-select-btn');
             if (selectBtn) {
                 const idx = parseInt(selectBtn.dataset.idx);
+                const targetTask = window._reelsState?.tasks?.[idx];
+                const targetId = targetTask?.id;
+                const activeTabId = _batchTableState.activeTabId;
+                const targetBaseName = targetTask?.baseName;
                 _applyBatchTableChanges();
-                reelsToggleBatchTable();
-                if (typeof reelsSelectTask === 'function') reelsSelectTask(idx);
+                reelsToggleBatchTable({ saveOnClose: true });
+                if (typeof reelsSelectTask === 'function') {
+                    const allTasks = window._reelsState?.tasks || [];
+                    let resolvedIdx = targetId ? allTasks.findIndex(t => t && t.id === targetId) : -1;
+                    if (resolvedIdx < 0 && targetBaseName) {
+                        resolvedIdx = allTasks.findIndex(t => t && (!t._batchTabId || t._batchTabId === activeTabId) && t.baseName === targetBaseName);
+                    }
+                    reelsSelectTask(resolvedIdx >= 0 ? resolvedIdx : Math.min(idx, Math.max(0, allTasks.length - 1)));
+                }
                 return;
             }
             // 对比差异按钮
@@ -17224,8 +17412,10 @@ function _batchAutoSave(options = {}) {
             console.warn('[BatchTable] Workspace file save failed');
             if (typeof showToast === 'function') showToast('标签自动保存失败，请检查软件目录是否可写', 'warning', 5000);
         }
-        try { localStorage.setItem(BATCH_CONFIG_KEY, jsonStr); cacheSaved=true; }
-        catch (e) { console.warn('[BatchTable] Browser cache save failed:', e.message); }
+        if (!diskSaved || jsonStr.length <= 4_500_000) {
+            try { localStorage.setItem(BATCH_CONFIG_KEY, jsonStr); cacheSaved=true; }
+            catch (e) { console.warn('[BatchTable] Browser cache save failed:', e.message); }
+        }
 
         // 统一写入安装目录与共享工程目录 (Electron环境)，确保绿色版与安装版完全互通
         if (_batchTableState.projectName && window.electronAPI?.saveSharedProjectFile) {
@@ -17355,8 +17545,10 @@ function _batchAutoRestore() {
                         return;
                     }
                     if (key) seenTaskKeys.add(key);
+                    _ensureTaskId(task);
                     uniqueTabTasks.push(task);
                     const cloned = _cloneBatchTasks([task])[0] || { ...task };
+                    cloned.id = task.id;
                     if ((!cloned.subtitleStyle || Object.keys(cloned.subtitleStyle).length === 0)
                         && cloned.style && typeof cloned.style === 'object'
                         && Object.keys(cloned.style).length > 0) {
@@ -19887,7 +20079,7 @@ window.reelsCaptureBatchTableState = function() {
         activeTabId: _batchTableState?.activeTabId || '',
         appliedTabIds: [...(_batchTableState?.appliedTabIds || [])],
         nextTabId: _batchTableState?.nextTabId || 1,
-        tabs: _cloneBatchTasks((_batchTableState?.tabs || []).map(tab => ({ ...tab, tasks: _cloneBatchTasks(tab.tasks || []) }))),
+        tabs: (_batchTableState?.tabs || []).map(tab => ({ ...tab, tasks: _cloneBatchTasks(tab.tasks || []) })),
         selectedRows: [...(_batchTableState?.selectedRows || [])],
     };
 };

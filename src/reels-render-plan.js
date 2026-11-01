@@ -530,6 +530,9 @@
                         label = `文本: ${(ov.content || '').slice(0, 10)}`;
                     } else if (ov.type === 'solid_mask') {
                         label = '纯色蒙版';
+                    } else if (ov.type === 'decor') {
+                        const stName = root.ReelsOverlay?.DECOR_OVERLAY_STYLES?.[ov.decor_style]?.name || '点缀图层';
+                        label = `点缀: ${stName.replace(/^[^\s]+\s*/, '').slice(0, 12)}`;
                     } else if (ov.type === 'video') {
                         label = '覆层视频';
                     } else {
@@ -542,6 +545,7 @@
                     name: trackName,
                     _timelineTrackId: `track_overlay_${ov.id || index}`,
                     _overlayId: ov.id,
+                    _overlayType: ov.type,
                     _overlayIndex: index,
                     locked: false,
                     visible: !ov.disabled,
@@ -584,6 +588,10 @@
         const overlayAboveSubtitle = task.overlayAboveSubtitle !== false;
         const layerRank = (track) => {
             const compositeRank = rank.get(entryKey(track));
+            if (track._overlayType === 'decor') {
+                // 点缀与颗粒层固定作为中间装饰层：位于视频素材/插片前面、T字幕与普通覆层后面
+                return 600 + (compositeRank ?? 0);
+            }
             if (compositeRank != null) return (overlayAboveSubtitle ? 3000 : 1000) + compositeRank;
             if (track.type === 'subs') return 2000;
             return 0;
@@ -888,7 +896,17 @@
         const order = [...saved.filter(key => keys.has(key)), ...entries.map(entry => entry.key).filter(key => !saved.includes(key))];
         if (task && JSON.stringify(saved) !== JSON.stringify(order)) task.visualOverlayOrder = order;
         const rank = new Map(order.map((key, index) => [key, index]));
-        return entries.sort((a, b) => rank.get(a.key) - rank.get(b.key)).map((entry, index) => ({
+        const tierOf = (ov) => {
+            if (!ov) return 2;
+            if (ov._insertClip) return 0;
+            if (ov.type === 'decor') return 1; // 点缀与颗粒层固定处于插片之后、普通覆层之前
+            return 2;
+        };
+        return entries.sort((a, b) => {
+            const tierDelta = tierOf(a.overlay) - tierOf(b.overlay);
+            if (tierDelta !== 0) return tierDelta;
+            return rank.get(a.key) - rank.get(b.key);
+        }).map((entry, index) => ({
             ...entry.overlay,
             // 保留旧覆层已有 z 字段，同时给所有合成项一个统一且稳定的层级。
             z_index: 100 + index,

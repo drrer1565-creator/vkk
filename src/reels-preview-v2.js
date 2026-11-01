@@ -308,7 +308,8 @@
                     <input class="rpv2-seek" data-role="seek" type="range" min="0" max="1000" value="0" step="1">
                     <label class="rpv2-check" title="循环播放"><input data-role="loop" type="checkbox" checked>循环</label>
                     <label class="rpv2-check" title="预览与导出字幕总开关：关闭后，导出的视频也不会带字幕"><input data-role="subs" type="checkbox" checked>字幕(关闭=导出不带)</label>
-                    <label class="rpv2-check" title="预览与导出覆层总开关：关闭后，导出的视频也不会带覆层"><input data-role="overlays" type="checkbox" checked>覆层(关闭=导出不带)</label>
+                    <label class="rpv2-check" title="预览与导出覆层总开关：关闭后，导出的视频也不会带普通覆层（不影响点缀与颗粒）"><input data-role="overlays" type="checkbox" checked>覆层(关闭=导出不带)</label>
+                    <label class="rpv2-check" title="预览与导出点缀/颗粒总开关：勾选时预览并导出点缀层；关闭后不预览且导出的视频也不带点缀层"><input data-role="decor" type="checkbox" checked>点缀(关闭=导出不带)</label>
                     <button class="rpv2-icon-btn" data-action="fit" title="适应窗口">适</button>
                     <button class="rpv2-icon-btn" data-action="zoom-out" title="缩小">−</button>
                     <span class="rpv2-zoom-label" data-role="zoom-label">100%</span>
@@ -357,6 +358,16 @@
             if (exportOverlayToggle) exportOverlayToggle.checked = overlayToggle.checked;
             if (typeof window.reelsOnOverlayToggleChange === 'function') {
                 window.reelsOnOverlayToggleChange(exportOverlayToggle || overlayToggle);
+            }
+            render();
+        });
+        const decorToggle = root.querySelector('[data-role="decor"]');
+        const exportDecorToggle = document.getElementById('reels-decor-toggle');
+        if (decorToggle && exportDecorToggle) decorToggle.checked = exportDecorToggle.checked;
+        decorToggle?.addEventListener('change', () => {
+            if (exportDecorToggle) exportDecorToggle.checked = decorToggle.checked;
+            if (typeof window.reelsOnDecorToggleChange === 'function') {
+                window.reelsOnDecorToggleChange(exportDecorToggle || decorToggle);
             }
             render();
         });
@@ -719,6 +730,45 @@
         applyViewTransform();
     }
 
+    function clientToCanvasCoords(clientX, clientY) {
+        const canvas = state.canvas;
+        if (!canvas) return null;
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return null;
+        return {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height),
+        };
+    }
+
+    function hitTestOverlayHandle(mx, my, bounds, canvasW) {
+        if (!bounds) return null;
+        const hs = Math.max(12, Math.min(22, (canvasW || 1080) / 60));
+        const { x, y, w, h } = bounds;
+        const handles = {
+            tl: [x, y],
+            tc: [x + w / 2, y],
+            tr: [x + w, y],
+            ml: [x, y + h / 2],
+            mr: [x + w, y + h / 2],
+            bl: [x, y + h],
+            bc: [x + w / 2, y + h],
+            br: [x + w, y + h],
+        };
+        for (const [name, [cx, cy]] of Object.entries(handles)) {
+            if (Math.abs(mx - cx) <= hs && Math.abs(my - cy) <= hs) return name;
+        }
+        return null;
+    }
+
+    function getActiveOverlaysForHitTest() {
+        const rs = window._reelsState;
+        const list = rs?.overlayProxy?.overlayMgr?.overlays
+            || getSelectedTask()?.overlays
+            || [];
+        return Array.isArray(list) ? list : [];
+    }
+
     function setupPanZoomHandlers() {
         const wrap = state.root?.querySelector('.rpv2-stage-wrap');
         if (!wrap || wrap.dataset.rpv2PanZoomBound === '1') return;
@@ -732,6 +782,77 @@
 
         wrap.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
+
+            // Check if clicking an overlay or its 8 resize handles on the canvas
+            const pt = !e.altKey ? clientToCanvasCoords(e.clientX, e.clientY) : null;
+            const canvasW = state.canvas?.width || 1080;
+            const canvasH = state.canvas?.height || 1920;
+            if (pt && pt.x >= 0 && pt.x <= canvasW && pt.y >= 0 && pt.y <= canvasH) {
+                const overlays = getActiveOverlaysForHitTest();
+                const rs = window._reelsState;
+                const selId = rs?.overlaySelectedId;
+                if (selId) {
+                    const selOv = overlays.find(o => o && o.id === selId && !o.disabled);
+                    if (selOv) {
+                        const b = getOverlayBounds(selOv, state.currentTime, canvasW, canvasH);
+                        const handle = hitTestOverlayHandle(pt.x, pt.y, b, canvasW);
+                        if (handle) {
+                            state.ovDrag = {
+                                ov: selOv,
+                                handle,
+                                startX: pt.x,
+                                startY: pt.y,
+                                origX: numberOr(selOv.x, b.x),
+                                origY: numberOr(selOv.y, b.y),
+                                origW: numberOr(selOv.w, b.w),
+                                origH: numberOr(selOv.h, b.h),
+                                origBgW: Number(selOv.bg_width) || 0,
+                                origBgH: Number(selOv.bg_height) || 0,
+                            };
+                            e.preventDefault();
+                            e.stopPropagation();
+                            return;
+                        }
+                    }
+                }
+                let hitOv = null;
+                for (let i = overlays.length - 1; i >= 0; i--) {
+                    const ov = overlays[i];
+                    // 点缀与颗粒层(decor)固定作为中间装饰层，不拦截字幕或普通覆层的画布点击/拖拽
+                    if (!ov || ov.disabled || ov.type === 'decor') continue;
+                    const b = getOverlayBounds(ov, state.currentTime, canvasW, canvasH);
+                    if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) {
+                        hitOv = ov;
+                        break;
+                    }
+                }
+                if (hitOv) {
+                    if (rs) {
+                        rs.overlaySelectedId = hitOv.id;
+                        if (rs.overlayPanel && typeof rs.overlayPanel.selectOverlay === 'function') {
+                            rs.overlayPanel.selectOverlay(hitOv);
+                        }
+                    }
+                    const b = getOverlayBounds(hitOv, state.currentTime, canvasW, canvasH);
+                    state.ovDrag = {
+                        ov: hitOv,
+                        handle: null,
+                        startX: pt.x,
+                        startY: pt.y,
+                        origX: numberOr(hitOv.x, b.x),
+                        origY: numberOr(hitOv.y, b.y),
+                        origW: numberOr(hitOv.w, b.w),
+                        origH: numberOr(hitOv.h, b.h),
+                        origBgW: Number(hitOv.bg_width) || 0,
+                        origBgH: Number(hitOv.bg_height) || 0,
+                    };
+                    renderCurrentFrame();
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
             state.panning = true;
             state.panStartX = e.clientX;
             state.panStartY = e.clientY;
@@ -742,13 +863,97 @@
         });
 
         window.addEventListener('mousemove', (e) => {
-            if (!state.panning) return;
+            if (state.ovDrag) {
+                const pt = clientToCanvasCoords(e.clientX, e.clientY);
+                if (!pt) return;
+                const d = state.ovDrag;
+                const ov = d.ov;
+                const dx = pt.x - d.startX;
+                const dy = pt.y - d.startY;
+                if (!d.handle) {
+                    ov.x = Math.round(d.origX + dx);
+                    ov.y = Math.round(d.origY + dy);
+                    if (ov.auto_center_v) ov.auto_center_v = false;
+                } else {
+                    const h = d.handle;
+                    let nx = d.origX, ny = d.origY, nw = d.origW, nh = d.origH;
+                    if (h.includes('l')) { nx += dx; nw -= dx; }
+                    if (h.includes('r')) { nw += dx; }
+                    if (h.includes('t')) { ny += dy; nh -= dy; }
+                    if (h.includes('b')) { nh += dy; }
+                    if (nw < 60) { nw = 60; if (h.includes('l')) nx = d.origX + d.origW - 60; }
+                    if (nh < 40) { nh = 40; if (h.includes('t')) ny = d.origY + d.origH - 40; }
+                    ov.x = Math.round(nx);
+                    ov.y = Math.round(ny);
+                    ov.w = Math.round(nw);
+                    if (ov.type !== 'textcard' || !ov.auto_fit) {
+                        ov.h = Math.round(nh);
+                    }
+                    if (ov.type === 'scroll') {
+                        if (d.origBgW > 0 && (h.includes('l') || h.includes('r'))) {
+                            const deltaW = h.includes('l') ? -dx : dx;
+                            ov.bg_width = Math.max(80, Math.round(d.origBgW + deltaW));
+                        }
+                        if (d.origBgH > 0 && (h.includes('t') || h.includes('b'))) {
+                            const deltaH = h.includes('t') ? -dy : dy;
+                            ov.bg_height = Math.max(60, Math.round(d.origBgH + deltaH));
+                        }
+                    }
+                    if (ov.auto_center_v) ov.auto_center_v = false;
+                }
+                const rs = window._reelsState;
+                if (rs?.overlayPanel && rs.overlayPanel._selectedOv?.id === ov.id) {
+                    rs.overlayPanel._syncFromOverlay(ov);
+                }
+                renderCurrentFrame();
+                return;
+            }
+            if (!state.panning) {
+                // Update hover cursor over canvas resize handles
+                if (state.canvas) {
+                    const pt = clientToCanvasCoords(e.clientX, e.clientY);
+                    const rs = window._reelsState;
+                    const selId = rs?.overlaySelectedId;
+                    let cursor = '';
+                    if (pt && selId) {
+                        const overlays = getActiveOverlaysForHitTest();
+                        const selOv = overlays.find(o => o && o.id === selId && !o.disabled);
+                        if (selOv) {
+                            const b = getOverlayBounds(selOv, state.currentTime, state.canvas.width || 1080, state.canvas.height || 1920);
+                            const h = hitTestOverlayHandle(pt.x, pt.y, b, state.canvas.width || 1080);
+                            const cursorMap = {
+                                tl: 'nwse-resize', br: 'nwse-resize',
+                                tr: 'nesw-resize', bl: 'nesw-resize',
+                                tc: 'ns-resize', bc: 'ns-resize',
+                                ml: 'ew-resize', mr: 'ew-resize',
+                            };
+                            if (h && cursorMap[h]) cursor = cursorMap[h];
+                            else if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) cursor = 'move';
+                        }
+                    }
+                    state.canvas.style.cursor = cursor;
+                }
+                return;
+            }
             state.panX = state.panOrigX + (e.clientX - state.panStartX);
             state.panY = state.panOrigY + (e.clientY - state.panStartY);
             applyViewTransform();
         });
 
         window.addEventListener('mouseup', () => {
+            if (state.ovDrag) {
+                const ov = state.ovDrag.ov;
+                state.ovDrag = null;
+                const rs = window._reelsState;
+                if (typeof window._syncCurrentOverlayEditorToSelectedTask === 'function') {
+                    window._syncCurrentOverlayEditorToSelectedTask();
+                }
+                if (ov && rs?.overlayPanel && typeof rs.overlayPanel._syncOverlayStyleToScopeTasks === 'function') {
+                    rs.overlayPanel._syncOverlayStyleToScopeTasks(ov);
+                }
+                renderCurrentFrame();
+                return;
+            }
             if (!state.panning) return;
             state.panning = false;
             wrap.classList.remove('panning');
@@ -1193,10 +1398,13 @@
         drawGlobalMask(ctx, getResolvedStyle(task), w, h, phase);
         drawContentVideo(ctx, task, w, h, phase);
         state.renderer?.renderAmbientLightingBase?.(getResolvedStyle(task), w, h);
+        // 1. 先绘制插片轨与独立中间装饰层【✨ 点缀与颗粒】（严格位于视频素材前面、T字幕与普通覆层后面，绝不遮挡字幕）
+        drawOverlays(ctx, task, overlayTime, w, h, phase, 'middle');
+        // 2. 再按覆层与字幕上下关系绘制普通覆层和 T 字幕
         const overlayAboveSubtitle = task.overlayAboveSubtitle !== false;
-        if (!overlayAboveSubtitle) drawOverlays(ctx, task, overlayTime, w, h, phase);
+        if (!overlayAboveSubtitle) drawOverlays(ctx, task, overlayTime, w, h, phase, 'overlay');
         drawSubtitles(ctx, task, subtitleTime, w, h, phase);
-        if (overlayAboveSubtitle) drawOverlays(ctx, task, overlayTime, w, h, phase);
+        if (overlayAboveSubtitle) drawOverlays(ctx, task, overlayTime, w, h, phase, 'overlay');
         drawWatermarks(ctx, w, h);
         updateTimeUI(Math.min(t, dur || t), dur);
         syncTimelinePlayhead(t, task);
@@ -1575,21 +1783,35 @@
         }
     }
 
-    function drawOverlays(ctx, task, time, w, h, phase = getPhaseInfo(getCurrentTime(), task)) {
-        const show = state.root?.querySelector('[data-role="overlays"]')?.checked !== false;
+    function drawOverlays(ctx, task, time, w, h, phase = getPhaseInfo(getCurrentTime(), task), passMode = 'all') {
+        const showOverlay = state.root?.querySelector('[data-role="overlays"]')?.checked !== false;
+        const showDecor = state.root?.querySelector('[data-role="decor"]')?.checked !== false;
         if (!window.ReelsOverlay || !task) return;
-        // 插入轨不是用户创建的“覆层”。无论普通覆层预览开关状态如何，它都
-        // 必须按时间线独立合成；否则用户会看到插入片段存在但画面消失。
+        // 插入轨不是用户创建的“覆层”；点缀与颗粒(decor)有自己独立的开关(showDecor)，
+        // 关闭普通覆层预览(showOverlay=false)绝不会隐藏点缀与颗粒层。
         const inserts = !phase.inCover && !phase.inHook
             ? getInsertTrackOverlays(task, w, h)
             : [];
         const overlays = phase.inCover && task.cover && Array.isArray(task.cover.overlays)
             ? task.cover.overlays
             : (phase.inHook ? [] : getLiveOverlays(task));
-        const visibleOverlays = show ? overlays : [];
-        const drawable = !phase.inCover && !phase.inHook && typeof window.ReelsRenderPlan?.getCompositedOverlays === 'function'
-            ? window.ReelsRenderPlan.getCompositedOverlays(task, { width: w, height: h }).filter(ov => ov._insertClip || show)
-            : [...inserts, ...visibleOverlays];
+        const filterByToggle = (ov) => {
+            if (!ov) return false;
+            if (ov._insertClip) return true;
+            if (ov.type === 'decor') return showDecor;
+            return showOverlay;
+        };
+        const filterByPass = (ov) => {
+            if (!ov) return false;
+            const isMiddle = Boolean(ov._insertClip || ov.type === 'decor');
+            if (passMode === 'middle') return isMiddle;
+            if (passMode === 'overlay') return !isMiddle;
+            return true;
+        };
+        const allEnabled = !phase.inCover && !phase.inHook && typeof window.ReelsRenderPlan?.getCompositedOverlays === 'function'
+            ? window.ReelsRenderPlan.getCompositedOverlays(task, { width: w, height: h }).filter(filterByToggle)
+            : [...inserts, ...overlays.filter(filterByToggle)];
+        const drawable = allEnabled.filter(filterByPass);
         // Compute scroll anchors before compositing, without changing layer order.
         // Rendering a preview copy must publish its anchor to the bound media.
         if (drawable.some(ov => ov?.bind_scroll_overlay_id)) {
@@ -1598,7 +1820,7 @@
             if (measure.height !== h) measure.height = h;
             const measureCtx = measure.getContext('2d');
             measureCtx.clearRect(0, 0, w, h);
-            for (const ov of drawable) {
+            for (const ov of allEnabled) {
                 if (!ov || ov.type !== 'scroll') continue;
                 delete ov._scrollBodyFirstLineY;
                 delete ov._scrollBodyCurX;
@@ -1618,20 +1840,23 @@
             // 与 WYSIWYG 输出一致：普通覆层只在时间范围内显示；
             // 滚动覆层到达结束时间后保留最终位置。
             if (time < start || (ov.type !== 'scroll' && time > end)) continue;
-            try {
-                // Preview must never inherit a stale/concurrent export marker,
-                // otherwise ReelsOverlay intentionally suppresses guide boxes.
-                const previewOv = { ...ov, _allOverlays: drawable, _taskSegments: task.segments, _exporting: false };
-                window.ReelsOverlay.drawOverlay(ctx, previewOv, time, w, h);
-                // Keep computed bounds available to hit-testing/property UI.
-                for (const key of ['_renderedX', '_renderedY', '_renderedW', '_renderedH', '_scrollBodyFirstLineY', '_scrollBodyCurX']) {
-                    if (previewOv[key] != null) ov[key] = previewOv[key];
+                ctx.save();
+                try {
+                    // Preview must never inherit a stale/concurrent export marker,
+                    // otherwise ReelsOverlay intentionally suppresses guide boxes.
+                    const previewOv = { ...ov, _allOverlays: allEnabled, _taskSegments: task.segments, _exporting: false };
+                    window.ReelsOverlay.drawOverlay(ctx, previewOv, time, w, h);
+                    // Keep computed bounds available to hit-testing/property UI.
+                    for (const key of ['_renderedX', '_renderedY', '_renderedW', '_renderedH', '_scrollBodyFirstLineY', '_scrollBodyCurX']) {
+                        if (previewOv[key] != null) ov[key] = previewOv[key];
+                    }
+                } catch (err) {
+                    console.warn('[PreviewV2] overlay render failed', err);
+                } finally {
+                    ctx.restore();
                 }
-            } catch (err) {
-                console.warn('[PreviewV2] overlay render failed', err);
-            }
         }
-        if (!phase.inCover && !phase.inHook) drawOverlaySelection(ctx, drawable, time, w, h);
+        if (!phase.inCover && !phase.inHook && passMode !== 'middle') drawOverlaySelection(ctx, drawable, time, w, h);
     }
 
     function drawOverlaySelection(ctx, overlays, time, w, h) {
@@ -1674,6 +1899,12 @@
         let x = numberOr(ov.x, 0);
         let y = ov.type === 'textcard' && ov._renderedY != null ? numberOr(ov._renderedY, 0) : numberOr(ov.y, 0);
         if (ov.type === 'textcard' && ov._renderedH != null) height = numberOr(ov._renderedH, height);
+        if (ov.type === 'scroll' && ov._renderedW > 0 && ov._renderedH > 0) {
+            x = numberOr(ov._renderedX, x);
+            y = numberOr(ov._renderedY, y);
+            width = numberOr(ov._renderedW, width);
+            height = numberOr(ov._renderedH, height);
+        }
 
         if (ov.anim_dest_enabled && ov.type !== 'scroll') {
             const start = numberOr(ov.start, 0);

@@ -1076,6 +1076,12 @@ function createWindow() {
 
     mainWindow.on('closed', () => {
         mainWindow = null;
+        if (templateWindows.size === 0 && isolatedReelsRenderers.size > 0) {
+            for (const [, isoWin] of isolatedReelsRenderers) {
+                try { if (isoWin && !isoWin.isDestroyed()) isoWin.destroy(); } catch (_) {}
+            }
+            isolatedReelsRenderers.clear();
+        }
     });
 }
 
@@ -1649,6 +1655,7 @@ app.whenReady().then(async () => {
             isolatedReelsRenderers.set(requestId, win);
             let settled = false;
             const timeout = setTimeout(() => finish(new Error('后台渲染任务超时（60 分钟）')), 60 * 60 * 1000);
+            const readyTimeout = setTimeout(() => finish(new Error('后台渲染进程异常退出：ready-timeout')), 15 * 1000);
 
             const removeListeners = () => {
                 ipcMain.removeListener('isolated-wysiwyg-ready', onReady);
@@ -1660,15 +1667,20 @@ app.whenReady().then(async () => {
                 if (settled) return;
                 settled = true;
                 clearTimeout(timeout);
+                clearTimeout(readyTimeout);
                 removeListeners();
                 isolatedReelsRenderers.delete(requestId);
                 if (!win.isDestroyed()) win.destroy();
                 if (error) reject(error);
                 else resolve(result);
             };
+            if (owner && typeof owner.once === 'function') {
+                owner.once('destroyed', () => finish(new Error('主窗口已关闭')));
+            }
             const fromThisWindow = ipcEvent => ipcEvent.sender === win.webContents;
             const onReady = async ipcEvent => {
                 if (!fromThisWindow(ipcEvent)) return;
+                clearTimeout(readyTimeout);
                 try { await require(process.resourcesPath && fs.existsSync(path.join(process.resourcesPath, 'export-cpu-budget.js')) ? path.join(process.resourcesPath, 'export-cpu-budget.js') : path.join(__dirname, '..', 'resources', 'export-cpu-budget.js')).assign(win.webContents.getOSProcessId()); }
                 catch (error) { finish(error); return; }
                 if (win.isDestroyed()) return;
@@ -1695,6 +1707,10 @@ app.whenReady().then(async () => {
             ipcMain.on('isolated-wysiwyg-progress', onProgress);
             ipcMain.on('isolated-wysiwyg-log', onLog);
             ipcMain.on('isolated-wysiwyg-result', onResult);
+            win.webContents.once('did-fail-load', (_ev, code, desc) => {
+                if (settled) return;
+                finish(new Error(`后台渲染进程异常退出：did-fail-load (${code}: ${desc || 'unknown'})`));
+            });
             win.webContents.once('render-process-gone', (_goneEvent, details = {}) => {
                 if (settled) return;
                 const report = writeRendererCrashReport({

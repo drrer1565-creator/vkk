@@ -453,6 +453,7 @@ function createScrollOverlay(opts = {}) {
         scroll_min_fontsize: opts.scroll_min_fontsize ?? 16,
         // 卡片背景
         bg_enabled: opts.bg_enabled || false,
+        bg_style: opts.bg_style || 'solid',
         bg_color: opts.bg_color || '#000000',
         bg_opacity: opts.bg_opacity || 191,
         bg_radius: opts.bg_radius || 12,
@@ -460,6 +461,12 @@ function createScrollOverlay(opts = {}) {
         bg_padding_bottom: opts.bg_padding_bottom ?? 55,
         bg_padding_left: opts.bg_padding_left ?? 16,
         bg_padding_right: opts.bg_padding_right ?? 16,
+        bg_width: opts.bg_width ?? 0,                       // 0 = 自动跟随裁切区+边距，>0 = 显式背景/边框宽
+        bg_height: opts.bg_height ?? 0,                     // 0 = 自动跟随裁切区+边距，>0 = 显式背景/边框高(长度)
+        bg_offset_x: opts.bg_offset_x ?? 0,                 // 背景/边框水平偏移
+        bg_offset_y: opts.bg_offset_y ?? 0,                 // 背景/边框垂直偏移
+        bg_body_only: opts.bg_body_only ?? false,           // 仅包裹正文滚动区（不含顶部固定标题）
+        bg_scroll_follow: opts.bg_scroll_follow !== false,  // 报纸/背景纹理随字幕向上循环滚动（默认开启）
         bg_fullscreen: opts.bg_fullscreen ?? false,
         // 卡片边框
         bg_border_enabled: opts.bg_border_enabled ?? false,
@@ -476,15 +483,34 @@ function createScrollOverlay(opts = {}) {
         // 整体偏移（裁切区+滚动坐标一起移动）
         scroll_offset_x: opts.scroll_offset_x ?? 0,
         scroll_offset_y: opts.scroll_offset_y ?? 0,
+        // 正文独立背景与底衬纹理
+        scroll_body_bg_enabled: opts.scroll_body_bg_enabled ?? false,
+        scroll_body_bg_style: opts.scroll_body_bg_style || 'solid',
+        scroll_body_bg_mode: opts.scroll_body_bg_mode || 'block',
+        scroll_body_bg_color: opts.scroll_body_bg_color || '#000000',
+        scroll_body_bg_opacity: opts.scroll_body_bg_opacity ?? 60,
+        scroll_body_bg_pad_h: opts.scroll_body_bg_pad_h ?? 16,
+        scroll_body_bg_pad_top: opts.scroll_body_bg_pad_top ?? 10,
+        scroll_body_bg_pad_bottom: opts.scroll_body_bg_pad_bottom ?? 10,
+        scroll_body_bg_radius: opts.scroll_body_bg_radius ?? 12,
+        scroll_title_bg_style: opts.scroll_title_bg_style || 'solid',
         // ── 出字效果（朗诵打字机/手写跟读）──
         scroll_typewriter_enabled: opts.scroll_typewriter_enabled === true,
         scroll_tw_start: opts.scroll_tw_start ?? null,
         scroll_tw_end: opts.scroll_tw_end ?? null,
         scroll_tw_speech_sync: opts.scroll_tw_speech_sync !== false,
         scroll_tw_reveal_type: opts.scroll_tw_reveal_type || 'char', // 'char' | 'word' | 'sentence'
-        scroll_tw_unrevealed_opacity: opts.scroll_tw_unrevealed_opacity ?? 0, // 0~100 (%)
+        scroll_tw_hide_unread: opts.scroll_tw_hide_unread !== undefined
+            ? Boolean(opts.scroll_tw_hide_unread)
+            : (Number(opts.scroll_tw_unrevealed_opacity ?? 0) < 100),
+        scroll_tw_unrevealed_opacity: opts.scroll_tw_unrevealed_opacity !== undefined
+            ? Number(opts.scroll_tw_unrevealed_opacity)
+            : (opts.scroll_tw_hide_unread === false ? 100 : 0), // 0~100 (%)
         scroll_tw_active_highlight: opts.scroll_tw_active_highlight !== false,
         scroll_tw_active_color: opts.scroll_tw_active_color || '#FFD700',
+        scroll_tw_active_scale_enabled: opts.scroll_tw_active_scale_enabled !== undefined
+            ? Boolean(opts.scroll_tw_active_scale_enabled)
+            : (Number(opts.scroll_tw_active_scale ?? 100) !== 100),
         scroll_tw_active_scale: opts.scroll_tw_active_scale ?? 100, // 100~200 (%)
         scroll_tw_cursor_enabled: opts.scroll_tw_cursor_enabled !== false,
         scroll_tw_cursor_kind: opts.scroll_tw_cursor_kind || 'quill', // 'quill' | 'rose' | 'image' | 'char'
@@ -500,7 +526,105 @@ function createScrollOverlay(opts = {}) {
         // 动画
         transition_preset: opts.transition_preset || 'none',
         transition_duration: opts.transition_duration || 0.35,
+        ...(opts._taskSegments ? { _taskSegments: opts._taskSegments } : {}),
+        ...(opts._exporting !== undefined ? { _exporting: opts._exporting } : {}),
     };
+}
+
+/**
+ * 创建点缀装饰覆层 (边缘点缀 / 圣诞装饰 / 发光星星 / 复古画框 / 飘雪氛围)。
+ * @param {object} [opts]
+ * @returns {object}
+ */
+function createDecorOverlay(opts = {}) {
+    const styleId = opts.decor_style || 'dark_floating_dust';
+    const preset = (typeof DECOR_OVERLAY_STYLES !== 'undefined' && DECOR_OVERLAY_STYLES[styleId])
+        ? DECOR_OVERLAY_STYLES[styleId]
+        : null;
+    return {
+        id: opts.id || _overlayId(),
+        name: opts.name || '',
+        fixed_text: opts.fixed_text ?? true,
+        type: 'decor',
+        x: opts.x ?? 0,
+        y: opts.y ?? 0,
+        w: opts.w ?? 1080,
+        h: opts.h ?? 1920,
+        rotation: opts.rotation ?? 0,
+        opacity: opts.opacity ?? 255,
+        start: opts.start ?? 0,
+        end: opts.end ?? 9999,
+        decor_style: styleId,
+        decor_layout: opts.decor_layout || preset?.layout || 'edges_and_float', // 'edges_and_float' | 'edges_only' | 'corners_only' | 'top_bottom' | 'full_scatter'
+        decor_density: opts.decor_density ?? preset?.density ?? 55,              // 5 ~ 200
+        decor_size: opts.decor_size ?? preset?.size ?? 100,                      // 20 ~ 300 (%)
+        decor_glow: opts.decor_glow ?? preset?.glow ?? 100,                      // 0 ~ 200 (%)
+        decor_speed: opts.decor_speed ?? preset?.speed ?? 100,                   // 0 ~ 300 (%)
+        decor_margin: opts.decor_margin ?? preset?.margin ?? 36,                 // 0 ~ 300 (px)
+        decor_center_clear: opts.decor_center_clear ?? preset?.center_clear ?? 65, // 0 ~ 95 (%)
+        decor_color1: opts.decor_color1 || preset?.color1 || '#FFD700',
+        decor_color2: opts.decor_color2 || preset?.color2 || '#FFFDF5',
+        decor_glow_stars: opts.decor_glow_stars !== undefined ? Boolean(opts.decor_glow_stars) : (preset ? Boolean(preset.glow_stars) : true),
+        decor_snowflakes: opts.decor_snowflakes !== undefined ? Boolean(opts.decor_snowflakes) : (preset ? Boolean(preset.snowflakes) : false),
+        decor_corner_ornaments: opts.decor_corner_ornaments !== undefined ? Boolean(opts.decor_corner_ornaments) : (preset ? Boolean(preset.corner_ornaments) : true),
+        decor_edge_garland: opts.decor_edge_garland !== undefined ? Boolean(opts.decor_edge_garland) : (preset ? Boolean(preset.edge_garland) : true),
+        // 黑色氛围模板 & 飘浮粒子控制
+        decor_dark_enabled: opts.decor_dark_enabled !== undefined
+            ? Boolean(opts.decor_dark_enabled)
+            : ((opts.decor_dark_vignette ?? preset?.dark_vignette ?? 0) > 0),
+        decor_dark_vignette: opts.decor_dark_vignette ?? preset?.dark_vignette ?? 0,       // 0 ~ 100 (%)
+        decor_vignette_spread: opts.decor_vignette_spread ?? preset?.vignette_spread ?? 55, // 10 ~ 95 (%)
+        decor_dark_tint: opts.decor_dark_tint || preset?.dark_tint || '#05070B',
+        decor_floating_particles: opts.decor_floating_particles !== undefined ? Boolean(opts.decor_floating_particles) : Boolean(preset?.floating_particles),
+        decor_particle_mode: opts.decor_particle_mode || preset?.particle_mode || 'dust',   // 'dust' | 'embers' | 'fireflies' | 'ash' | 'neon' | 'sunset_bokeh' | 'prism'
+        // 电影颗粒 & 回忆颗粒感控制
+        decor_grain_enabled: opts.decor_grain_enabled !== undefined
+            ? Boolean(opts.decor_grain_enabled)
+            : (((opts.decor_grain_intensity ?? preset?.grain_intensity ?? 0) > 0) || ((opts.decor_grain_warmth ?? preset?.grain_warmth ?? 0) > 0)),
+        decor_grain_intensity: opts.decor_grain_intensity ?? preset?.grain_intensity ?? 0,  // 0 ~ 100 (%)
+        decor_grain_size: opts.decor_grain_size ?? preset?.grain_size ?? 100,               // 50 ~ 250 (%)
+        decor_grain_warmth: opts.decor_grain_warmth ?? preset?.grain_warmth ?? 0,           // 0 ~ 100 (%)
+        decor_film_scratches: opts.decor_film_scratches !== undefined ? Boolean(opts.decor_film_scratches) : Boolean(preset?.film_scratches),
+        decor_light_leak: opts.decor_light_leak !== undefined ? Boolean(opts.decor_light_leak) : Boolean(preset?.light_leak),
+        transition_preset: opts.transition_preset || 'none',
+        transition_duration: opts.transition_duration || 0.35,
+        anim_in_type: opts.anim_in_type || 'none',
+        anim_out_type: opts.anim_out_type || 'none',
+        anim_in_duration: opts.anim_in_duration ?? 0.3,
+        anim_out_duration: opts.anim_out_duration ?? 0.3,
+    };
+}
+
+/**
+ * 将指定 30 款点缀/黑色模板/颗粒预设的默认参数应用到已有 decor 覆层上
+ */
+function applyDecorStylePreset(ov, styleId) {
+    if (!ov || !styleId) return ov;
+    const preset = DECOR_OVERLAY_STYLES[styleId];
+    ov.decor_style = styleId;
+    if (!preset) return ov;
+    ov.decor_color1 = preset.color1 || '#FFD700';
+    ov.decor_color2 = preset.color2 || '#FFFDF5';
+    ov.decor_glow_stars = Boolean(preset.glow_stars);
+    ov.decor_snowflakes = Boolean(preset.snowflakes);
+    ov.decor_corner_ornaments = Boolean(preset.corner_ornaments);
+    ov.decor_edge_garland = Boolean(preset.edge_garland);
+    ov.decor_dark_enabled = (preset.dark_vignette ?? 0) > 0;
+    ov.decor_dark_vignette = preset.dark_vignette ?? 0;
+    ov.decor_vignette_spread = preset.vignette_spread ?? 55;
+    ov.decor_dark_tint = preset.dark_tint || '#05070B';
+    ov.decor_floating_particles = Boolean(preset.floating_particles);
+    ov.decor_particle_mode = preset.particle_mode || 'dust';
+    ov.decor_grain_enabled = ((preset.grain_intensity ?? 0) > 0) || ((preset.grain_warmth ?? 0) > 0);
+    ov.decor_grain_intensity = preset.grain_intensity ?? 0;
+    ov.decor_grain_size = preset.grain_size ?? 100;
+    ov.decor_grain_warmth = preset.grain_warmth ?? 0;
+    ov.decor_film_scratches = Boolean(preset.film_scratches);
+    ov.decor_light_leak = Boolean(preset.light_leak);
+    if (preset.layout) ov.decor_layout = preset.layout;
+    if (preset.density !== undefined) ov.decor_density = preset.density;
+    if (preset.center_clear !== undefined) ov.decor_center_clear = preset.center_clear;
+    return ov;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1255,94 +1379,97 @@ function drawOverlay(ctx, origOv, currentTime = 0, canvasW = 1920, canvasH = 108
     const opacity = (rawOp <= 1.0 && rawOp >= 0) ? rawOp : rawOp / 255;
 
     ctx.save();
+    try {
+        // 旋转
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        ctx.translate(cx, cy);
+        if (rotation) ctx.rotate(rotation * Math.PI / 180);
 
-    // 旋转
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    ctx.translate(cx, cy);
-    if (rotation) ctx.rotate(rotation * Math.PI / 180);
+        // 转场动画
+        let transOp = 1, transScale = 1, transDx = 0, transDy = 0;
+        if (window.ReelsAnimEngine) {
+            const preset = ov.transition_preset || 'none';
+            const dur = parseFloat(ov.transition_duration || 0.35);
+            const result = ReelsAnimEngine.computeTransitionParams(currentTime, start, end, preset, dur);
+            // result is an array: [opacityFactor, scale, dx, dy]
+            transOp = result[0];
+            transScale = result[1];
+            transDx = result[2];
+            transDy = result[3];
+        }
+        
+        transScale *= destScaleOffset;
 
-    // 转场动画
-    let transOp = 1, transScale = 1, transDx = 0, transDy = 0;
-    if (window.ReelsAnimEngine) {
-        const preset = ov.transition_preset || 'none';
-        const dur = parseFloat(ov.transition_duration || 0.35);
-        const result = ReelsAnimEngine.computeTransitionParams(currentTime, start, end, preset, dur);
-        // result is an array: [opacityFactor, scale, dx, dy]
-        transOp = result[0];
-        transScale = result[1];
-        transDx = result[2];
-        transDy = result[3];
-    }
-    
-    transScale *= destScaleOffset;
+        ctx.translate(transDx, transDy);
+        if (Math.abs(transScale - 1) > 0.0001) {
+            ctx.scale(transScale, transScale);
+        }
+        ctx.translate(-cx, -cy);
 
-    ctx.translate(transDx, transDy);
-    if (Math.abs(transScale - 1) > 0.0001) {
-        ctx.scale(transScale, transScale);
-    }
-    ctx.translate(-cx, -cy);
+        ctx.globalAlpha = opacity * transOp;
 
-    ctx.globalAlpha = opacity * transOp;
+        // ── 入/出场动画（image/video/text 在此统一处理；textcard 有自己的特化实现）──
+        const inType = ov.anim_in_type || 'none';
+        const outType = ov.anim_out_type || 'none';
+        const _applySharedAnim = ov.type !== 'textcard' && ov.type !== 'scroll';
+        if (_applySharedAnim && window.ReelsAnimEngine && (inType !== 'none' || outType !== 'none')) {
+            const inDur = inType !== 'none' ? parseFloat(ov.anim_in_duration || 0.3) : 0;
+            const outDur = outType !== 'none' ? parseFloat(ov.anim_out_duration || 0.3) : 0;
+            const [inProgress, outProgress] = ReelsAnimEngine.computeAnimProgress(
+                currentTime, start, end, inDur, outDur
+            );
 
-    // ── 入/出场动画（image/video/text 在此统一处理；textcard 有自己的特化实现）──
-    const inType = ov.anim_in_type || 'none';
-    const outType = ov.anim_out_type || 'none';
-    const _applySharedAnim = ov.type !== 'textcard' && ov.type !== 'scroll';
-    if (_applySharedAnim && window.ReelsAnimEngine && (inType !== 'none' || outType !== 'none')) {
-        const inDur = inType !== 'none' ? parseFloat(ov.anim_in_duration || 0.3) : 0;
-        const outDur = outType !== 'none' ? parseFloat(ov.anim_out_duration || 0.3) : 0;
-        const [inProgress, outProgress] = ReelsAnimEngine.computeAnimProgress(
-            currentTime, start, end, inDur, outDur
-        );
+            // 淡入/淡出
+            if (inType === 'fade') ctx.globalAlpha *= inProgress;
+            if (outType === 'fade') ctx.globalAlpha *= outProgress;
 
-        // 淡入/淡出
-        if (inType === 'fade') ctx.globalAlpha *= inProgress;
-        if (outType === 'fade') ctx.globalAlpha *= outProgress;
+            // 弹出
+            if (inType === 'pop' || outType === 'pop') {
+                let popScale = 1;
+                if (inType === 'pop') popScale = Math.min(popScale, ReelsAnimEngine.computePopScale(inProgress));
+                if (outType === 'pop') popScale = Math.min(popScale, ReelsAnimEngine.computePopScale(outProgress));
+                if (popScale < 0.999) {
+                    ctx.translate(x + w / 2, y + h / 2);
+                    ctx.scale(popScale, popScale);
+                    ctx.translate(-(x + w / 2), -(y + h / 2));
+                }
+            }
 
-        // 弹出
-        if (inType === 'pop' || outType === 'pop') {
-            let popScale = 1;
-            if (inType === 'pop') popScale = Math.min(popScale, ReelsAnimEngine.computePopScale(inProgress));
-            if (outType === 'pop') popScale = Math.min(popScale, ReelsAnimEngine.computePopScale(outProgress));
-            if (popScale < 0.999) {
-                ctx.translate(x + w / 2, y + h / 2);
-                ctx.scale(popScale, popScale);
-                ctx.translate(-(x + w / 2), -(y + h / 2));
+            // 滑入/滑出
+            const slideDistance = Math.max(w, h) * 0.5;
+            if (inType.startsWith('slide_') && inProgress < 1) {
+                const ease = 1 - inProgress;
+                if (inType === 'slide_up') ctx.translate(0, slideDistance * ease);
+                else if (inType === 'slide_down') ctx.translate(0, -slideDistance * ease);
+                else if (inType === 'slide_left') ctx.translate(slideDistance * ease, 0);
+                else if (inType === 'slide_right') ctx.translate(-slideDistance * ease, 0);
+            }
+            if (outType.startsWith('slide_') && outProgress < 1) {
+                const ease = 1 - outProgress;
+                if (outType === 'slide_up') ctx.translate(0, -slideDistance * ease);
+                else if (outType === 'slide_down') ctx.translate(0, slideDistance * ease);
             }
         }
 
-        // 滑入/滑出
-        const slideDistance = Math.max(w, h) * 0.5;
-        if (inType.startsWith('slide_') && inProgress < 1) {
-            const ease = 1 - inProgress;
-            if (inType === 'slide_up') ctx.translate(0, slideDistance * ease);
-            else if (inType === 'slide_down') ctx.translate(0, -slideDistance * ease);
-            else if (inType === 'slide_left') ctx.translate(slideDistance * ease, 0);
-            else if (inType === 'slide_right') ctx.translate(-slideDistance * ease, 0);
+        if (ov.type === 'image') {
+            _drawImageOverlay(ctx, ov, x, y, w, h);
+        } else if (ov.type === 'text') {
+            _drawTextOverlay(ctx, ov, x, y, w, h, currentTime);
+        } else if (ov.type === 'textcard') {
+            _drawTextCardOverlay(ctx, ov, x, y, w, h, canvasW, canvasH, currentTime);
+        } else if (ov.type === 'solid_mask') {
+            _drawSolidMaskOverlay(ctx, ov, x, y, w, h, canvasW, canvasH, currentTime);
+        } else if (ov.type === 'scroll') {
+            _drawScrollOverlay(ctx, ov, x, y, w, h, currentTime, canvasW, canvasH);
+        } else if (ov.type === 'decor') {
+            _drawDecorOverlay(ctx, ov, x, y, w, h, currentTime, canvasW, canvasH);
+        } else if (ov.type === 'video') {
+            _drawVideoOverlay(ctx, ov, x, y, w, h, currentTime);
         }
-        if (outType.startsWith('slide_') && outProgress < 1) {
-            const ease = 1 - outProgress;
-            if (outType === 'slide_up') ctx.translate(0, -slideDistance * ease);
-            else if (outType === 'slide_down') ctx.translate(0, slideDistance * ease);
-        }
+    } finally {
+        ctx.restore();
     }
-
-    if (ov.type === 'image') {
-        _drawImageOverlay(ctx, ov, x, y, w, h);
-    } else if (ov.type === 'text') {
-        _drawTextOverlay(ctx, ov, x, y, w, h, currentTime);
-    } else if (ov.type === 'textcard') {
-        _drawTextCardOverlay(ctx, ov, x, y, w, h, canvasW, canvasH, currentTime);
-    } else if (ov.type === 'solid_mask') {
-        _drawSolidMaskOverlay(ctx, ov, x, y, w, h, canvasW, canvasH, currentTime);
-    } else if (ov.type === 'scroll') {
-        _drawScrollOverlay(ctx, ov, x, y, w, h, currentTime, canvasW, canvasH);
-    } else if (ov.type === 'video') {
-        _drawVideoOverlay(ctx, ov, x, y, w, h, currentTime);
-    }
-
-    ctx.restore();
 }
 
 /**
@@ -3528,21 +3655,60 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
     let progress = (currentTime - start) / effectiveDuration;
     progress = Math.max(0, Math.min(1, progress));
 
+    // ── 预计算自定义画板/边框尺寸对裁切与换行的联动 ──
+    const _rawBgW = Number(ov.bg_width) || 0;
+    const _rawBgH = Number(ov.bg_height) || 0;
+    const _bgOffX = parseFloat(ov.bg_offset_x ?? 0);
+    const _bgOffY = parseFloat(ov.bg_offset_y ?? 0);
+    const _padT0 = parseFloat(ov.bg_padding_top ?? 16);
+    const _padB0 = parseFloat(ov.bg_padding_bottom ?? 16);
+    const _padL0 = parseFloat(ov.bg_padding_left ?? 16);
+    const _padR0 = parseFloat(ov.bg_padding_right ?? 16);
+    const _origClipX = clipX;
+    const _origClipY = clipY;
+    const _origClipW = clipW;
+    const _origClipH = clipH;
+    if (!ov.bg_fullscreen && (_rawBgW > 0 || _padL0 < 0 || _padR0 < 0 || _bgOffX !== 0)) {
+        const targetCardW = _rawBgW > 0 ? Math.max(60, _rawBgW) : Math.max(60, _origClipW + _padL0 + _padR0);
+        const targetCardX = _rawBgW > 0
+            ? (_origClipX + _origClipW / 2 - targetCardW / 2 + _bgOffX)
+            : (_origClipX - _padL0 + _bgOffX);
+        if (_rawBgW > 0 || _padL0 < 0 || _padR0 < 0) {
+            const innerX = Math.min(24, Math.max(8, targetCardW * 0.04));
+            clipX = targetCardX + innerX;
+            clipW = Math.max(40, targetCardW - innerX * 2);
+        } else {
+            clipX = _origClipX + _bgOffX;
+        }
+    }
+    if (!ov.bg_fullscreen && !ov.bg_body_only && (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0)) {
+        const targetCardH = _rawBgH > 0 ? Math.max(60, _rawBgH) : Math.max(60, _origClipH + _padT0 + _padB0);
+        const targetCardY = _rawBgH > 0
+            ? (_origClipY + _origClipH / 2 - targetCardH / 2 + _bgOffY)
+            : (_origClipY - _padT0 + _bgOffY);
+        if (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0) {
+            const innerY = Math.min(24, Math.max(8, targetCardH * 0.035));
+            clipY = targetCardY + innerY;
+            clipH = Math.max(40, targetCardH - innerY * 2);
+        } else {
+            clipY = _origClipY + _bgOffY;
+        }
+    }
+
     // 插值当前位置（加上整体偏移）。
     // scroll_x_anchor=center 时，scroll_from_x/scroll_to_x 表示文本中心轴，
     // text_width 会从中心轴向两侧展开。
-    const rawFromX = parseFloat(ov.scroll_from_x ?? (clipX + clipW / 2));
+    const rawFromX = parseFloat(ov.scroll_from_x ?? (_origClipX - offsetX + _origClipW / 2));
     const rawToX = parseFloat(ov.scroll_to_x ?? rawFromX);
     const legacyDefaultLeftX = ov.scroll_x_anchor == null
         && Math.abs(rawFromX - 90) < 0.001
         && Math.abs(rawToX - 90) < 0.001;
     const useCenterAnchor = ov.scroll_x_anchor === 'center' || legacyDefaultLeftX;
-    const fromX = (legacyDefaultLeftX ? (clipX + clipW / 2) : rawFromX + offsetX);
-    const fromY = parseFloat(ov.scroll_from_y ?? (clipY + clipH)) + offsetY;
-    const toX   = (legacyDefaultLeftX ? (clipX + clipW / 2) : rawToX + offsetX);
+    const fromX = (legacyDefaultLeftX ? (clipX + clipW / 2) : rawFromX + offsetX + _bgOffX);
+    let fromY   = parseFloat(ov.scroll_from_y ?? (clipY + clipH)) + offsetY + (!ov.bg_body_only ? _bgOffY : 0);
+    const toX   = (legacyDefaultLeftX ? (clipX + clipW / 2) : rawToX + offsetX + _bgOffX);
     const toY   = parseFloat(ov.scroll_to_y ?? (clipY - 500)) + offsetY;
 
-    // 字体设置
     // 字体设置 (可能被 auto_fit 缩小)
     let fontSize     = ov.fontsize || 40;
     const fontFamily  = ov.font_family || 'Arial';
@@ -3551,7 +3717,10 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
     const fallback    = _resolveOverlayFallback(fontFamily);
     const lineSpacing = parseFloat(ov.line_spacing ?? 6);
     const align       = ov.text_align || 'center';
-    const textW       = Math.max(1, parseFloat(ov.text_width || (clipW - 40)));
+    const rawTextW    = Math.max(1, parseFloat(ov.text_width || (clipW - 40)));
+    const textW       = (_rawBgW > 0 || _padL0 < 0 || _padR0 < 0)
+        ? Math.min(rawTextW, Math.max(60, clipW - 16))
+        : rawTextW;
 
     // ── 计算标题占用高度 ──
     let titleOccupiedH = 0;
@@ -3694,21 +3863,102 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
 
     const curAxisX = fromX + (toX - fromX) * progress;
     const curX  = useCenterAnchor ? curAxisX - textW / 2 : curAxisX;
+    const _titleFixed = ov.scroll_title_fixed !== false && (ov.scroll_title || '').trim();
+    const featherT_static = Math.max(0, parseFloat(ov.feather_top ?? 0)) + Math.max(0, parseFloat(ov.feather_top_offset ?? 0));
+    let bodyClipTopBase = (_titleFixed && !titleIndependent) ? (clipY + titleOccupiedH) : clipY;
+    let bodyClipBotBase = clipY + clipH;
+    if (!ov.bg_fullscreen && ov.bg_body_only && (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0)) {
+        const baseBodyY = (_titleFixed && !titleIndependent) ? (_origClipY + titleOccupiedH) : _origClipY;
+        const baseBodyH = (_titleFixed && !titleIndependent) ? Math.max(40, _origClipH - titleOccupiedH) : _origClipH;
+        const targetBodyCardH = _rawBgH > 0 ? Math.max(60, _rawBgH) : Math.max(60, baseBodyH + _padT0 + _padB0);
+        const targetBodyCardY = _rawBgH > 0
+            ? (baseBodyY + baseBodyH / 2 - targetBodyCardH / 2 + _bgOffY)
+            : (baseBodyY - _padT0 + _bgOffY);
+        const innerY = Math.min(24, Math.max(8, targetBodyCardH * 0.035));
+        bodyClipTopBase = targetBodyCardY + innerY;
+        bodyClipBotBase = targetBodyCardY + targetBodyCardH - innerY;
+    }
+    if ((_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0) && fromY > bodyClipBotBase - 16) {
+        const featherB_clamp = Math.max(0, parseFloat(ov.feather_bottom ?? 0)) * 0.5;
+        fromY = Math.max(bodyClipTopBase, bodyClipBotBase - featherB_clamp - lineHeight * 0.35);
+    }
     let curY;
+    let _scrollOriginFromY = fromY;
     if (ov.scroll_static) {
         // 固定显示模式：文字固定在裁切区顶部（考虑羽化偏移）
-        const featherT_static = parseFloat(ov.feather_top ?? 0) + parseFloat(ov.feather_top_offset ?? 0);
-        const titleFixed = ov.scroll_title_fixed !== false && (ov.scroll_title || '').trim();
-        const staticBaseY = (titleFixed && !titleIndependent) ? (clipY + titleOccupiedH + featherT_static) : (clipY + featherT_static);
+        const staticBaseY = bodyClipTopBase + featherT_static;
         curY = staticBaseY;
+        _scrollOriginFromY = staticBaseY;
     } else {
-        curY = fromY + (effectiveToY - fromY) * progress;
+        // 向上滚动且有固定标题时，防止长标题换行后把第一行正文压在标题背后被裁切掉
+        const minVisibleStartFromY = bodyClipTopBase
+            + Math.max(0, parseFloat(ov.feather_top_offset ?? 0))
+            + (parseFloat(ov.feather_top ?? 0) > 0 ? Math.min(parseFloat(ov.feather_top) * 0.45, lineHeight * 0.35) : 0);
+        const effectiveFromY = (_titleFixed && !titleIndependent && fromY >= effectiveToY)
+            ? Math.max(fromY, minVisibleStartFromY)
+            : fromY;
+        _scrollOriginFromY = effectiveFromY;
+        curY = effectiveFromY + (effectiveToY - effectiveFromY) * progress;
+
+        // 当启用出字效果时，确保当前正在朗读/书写的行不会提前滚出顶部羽化区或滞留在底部羽化区外
+        if (ov.scroll_typewriter_enabled === true && lines.length > 0 && effectiveFromY >= effectiveToY) {
+            const _twSegmentsEarly = Array.isArray(ov._taskSegments)
+                ? ov._taskSegments
+                : (typeof window !== 'undefined' && window._reelsState?.tasks?.[window._reelsState?.selectedIdx]?.segments) || null;
+            const _twContextEarly = { currentTime, start, end, effectiveDuration, segments: _twSegmentsEarly };
+            const earlyTokensList = _buildScrollTypewriterLines(ov, lines, bodyDirection, _twContextEarly);
+            const lineRanges = earlyTokensList._lineTimeRanges || [];
+            if (lineRanges.length === lines.length) {
+                let smoothActiveLine = 0;
+                const firstRange = lineRanges.find(Boolean);
+                let lastRangeIdx = lineRanges.length - 1;
+                while (lastRangeIdx >= 0 && !lineRanges[lastRangeIdx]) lastRangeIdx--;
+                const lastRange = lastRangeIdx >= 0 ? lineRanges[lastRangeIdx] : null;
+                if (firstRange && currentTime <= firstRange.start) {
+                    smoothActiveLine = 0;
+                } else if (lastRange && currentTime >= lastRange.end) {
+                    smoothActiveLine = lastRangeIdx + 1;
+                } else {
+                    for (let li = 0; li < lineRanges.length; li++) {
+                        const lr = lineRanges[li];
+                        if (!lr) continue;
+                        if (currentTime >= lr.start && currentTime <= lr.end) {
+                            const frac = (currentTime - lr.start) / Math.max(0.05, lr.end - lr.start);
+                            smoothActiveLine = li + Math.max(0, Math.min(1, frac));
+                            break;
+                        }
+                        const nextLr = lineRanges[li + 1];
+                        if (nextLr && currentTime > lr.end && currentTime < nextLr.start) {
+                            smoothActiveLine = li + 1;
+                            break;
+                        }
+                    }
+                }
+                const fTop = Math.max(0, parseFloat(ov.feather_top ?? 0));
+                const fTopOff = Math.max(0, parseFloat(ov.feather_top_offset ?? 0));
+                const fBot = Math.max(0, parseFloat(ov.feather_bottom ?? 0));
+                const fBotOff = Math.max(0, parseFloat(ov.feather_bottom_offset ?? 0));
+                const safeTopY = bodyClipTopBase + fTopOff + fTop * 0.55;
+                const safeBotY = bodyClipBotBase - fBotOff - fBot * 0.55 - lineHeight * 0.15;
+                if (safeBotY > safeTopY + lineHeight) {
+                    const topGuardLine = Math.max(0, smoothActiveLine - 0.8);
+                    const minCurYForSpeechNotCutTop = safeTopY - topGuardLine * lineHeight;
+                    const botGuardLine = Math.min(lines.length, smoothActiveLine + 1.15);
+                    const maxCurYForSpeechInBot = safeBotY - botGuardLine * lineHeight;
+                    if (curY < minCurYForSpeechNotCutTop) {
+                        curY = Math.min(Math.max(effectiveFromY, safeTopY), minCurYForSpeechNotCutTop);
+                    }
+                    if (curY > maxCurYForSpeechInBot) {
+                        curY = Math.max(effectiveToY, maxCurYForSpeechInBot);
+                    }
+                }
+            }
+        }
     }
 
     // 将正文第一行的实时位置暴露出去，供媒体覆层「跟随滚动」绑定使用
     // 固定标题模式下正文直接从 curY 开始（_skipTitle 跳过标题绘制）；
     // 标题跟随滚动时正文在标题块后面，需加 titleOccupiedH。
-    const _titleFixed = ov.scroll_title_fixed !== false && (ov.scroll_title || '').trim();
     ov._scrollBodyFirstLineY = _titleFixed ? curY : (curY + titleOccupiedH);
     ov._scrollBodyLineHeight = lineHeight;
     ov._scrollResolvedEndY = effectiveToY - offsetY;
@@ -3722,19 +3972,61 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
     // Reuse the exact wrapping, title, auto-fit and auto-stop layout without painting.
     if (ov._scrollBindingMeasureOnly) return;
 
+    // ── 统一计算卡片背景与边框几何尺寸 (支持显式宽度/长度、负边距、仅包裹正文区) ──
+    const _baseCardRefX = _origClipX;
+    const _baseCardRefW = _origClipW;
+    const _baseCardRefY = (ov.bg_body_only && _titleFixed && !titleIndependent)
+        ? (_origClipY + titleOccupiedH)
+        : _origClipY;
+    const _baseCardRefH = (ov.bg_body_only && _titleFixed && !titleIndependent)
+        ? Math.max(40, _origClipH - titleOccupiedH)
+        : _origClipH;
+    const _cardW = ov.bg_fullscreen
+        ? canvasW
+        : (_rawBgW > 0 ? Math.max(60, _rawBgW) : Math.max(60, _baseCardRefW + _padL0 + _padR0));
+    const _cardH = ov.bg_fullscreen
+        ? canvasH
+        : (_rawBgH > 0 ? Math.max(60, _rawBgH) : Math.max(60, _baseCardRefH + _padT0 + _padB0));
+    const _cardX = ov.bg_fullscreen
+        ? 0
+        : (_rawBgW > 0 ? (_baseCardRefX + _baseCardRefW / 2 - _cardW / 2 + _bgOffX) : (_baseCardRefX - _padL0 + _bgOffX));
+    const _cardY = ov.bg_fullscreen
+        ? 0
+        : (_rawBgH > 0 ? (_baseCardRefY + _baseCardRefH / 2 - _cardH / 2 + _bgOffY) : (_baseCardRefY - _padT0 + _bgOffY));
+    const _cardRad = ov.bg_fullscreen ? 0 : parseFloat(ov.bg_radius ?? 12);
+
+    if (!ov.bg_fullscreen && (ov.bg_enabled || ov.bg_border_enabled || _rawBgW > 0 || _rawBgH > 0)) {
+        ov._renderedX = _cardX;
+        ov._renderedY = _cardY;
+        ov._renderedW = _cardW;
+        ov._renderedH = _cardH;
+    } else {
+        ov._renderedX = clipX;
+        ov._renderedY = clipY;
+        ov._renderedW = clipW;
+        ov._renderedH = clipH;
+    }
+
+    // ── 计算背景随字幕向上循环滚动偏移量 ──
+    let _bgScrollOffsetY = 0;
+    if (ov.bg_scroll_follow !== false && !ov.scroll_static) {
+        const rawDelta = curY - _scrollOriginFromY;
+        if (Math.abs(_scrollOriginFromY - effectiveToY) > 2) {
+            _bgScrollOffsetY = rawDelta;
+        } else {
+            // 即使短文本无需长距离位移，开启背景滚动时仍保持柔和向上循环卷动
+            _bgScrollOffsetY = -Math.max(0, currentTime - start) * 48;
+        }
+    }
+
     // ── 磨砂模糊 (Frosted Glass) ──
     if (ov.bg_blur_enabled) {
         const blurPx = Math.max(1, Math.min(40, parseFloat(ov.bg_blur_amount ?? 10)));
-        const padT_blur = parseFloat(ov.bg_padding_top ?? 16);
-        const padB_blur = parseFloat(ov.bg_padding_bottom ?? 16);
-        const padL_blur = parseFloat(ov.bg_padding_left ?? 16);
-        const padR_blur = parseFloat(ov.bg_padding_right ?? 16);
-        const rad_blur = parseFloat(ov.bg_radius || 12);
         ctx.save();
         if (ov.bg_fullscreen) {
             ctx.rect(0, 0, canvasW, canvasH);
         } else {
-            _roundRect(ctx, clipX - padL_blur, clipY - padT_blur, clipW + padL_blur + padR_blur, clipH + padT_blur + padB_blur, rad_blur);
+            _roundRect(ctx, _cardX, _cardY, _cardW, _cardH, _cardRad);
         }
         ctx.clip();
         ctx.filter = `blur(${blurPx}px)`;
@@ -3745,41 +4037,36 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
 
     // ── 卡片背景 ──
     if (ov.bg_enabled) {
-        const bgAlpha = (ov.bg_opacity || 191) / 255;
-        const padT = parseFloat(ov.bg_padding_top ?? 16);
-        const padB = parseFloat(ov.bg_padding_bottom ?? 16);
-        const padL = parseFloat(ov.bg_padding_left ?? 16);
-        const padR = parseFloat(ov.bg_padding_right ?? 16);
-        const rad = parseFloat(ov.bg_radius || 12);
-        ctx.save();
-        ctx.globalAlpha = bgAlpha * ctx.globalAlpha;
-        ctx.fillStyle = ov.bg_color || '#000000';
-        if (ov.bg_fullscreen) {
-            // 全屏蒙版
-            _roundRect(ctx, 0, 0, canvasW, canvasH, 0);
+        const bgAlpha = (ov.bg_opacity ?? 191) / 255;
+        const bgStyle = ov.bg_style || 'solid';
+        if (bgStyle !== 'solid' && typeof ReelsBrushEngine !== 'undefined' && ReelsBrushEngine.drawThemedCardBackground) {
+            ReelsBrushEngine.drawThemedCardBackground(ctx, _cardX, _cardY, _cardW, _cardH, _cardRad, {
+                style: bgStyle,
+                color: ov.bg_color || '#000000',
+                opacity: bgAlpha,
+                scrollOffsetY: _bgScrollOffsetY,
+            });
         } else {
-            _roundRect(ctx, clipX - padL, clipY - padT, clipW + padL + padR, clipH + padT + padB, rad);
+            ctx.save();
+            ctx.globalAlpha = bgAlpha * ctx.globalAlpha;
+            ctx.fillStyle = ov.bg_color || '#000000';
+            _roundRect(ctx, _cardX, _cardY, _cardW, _cardH, _cardRad);
+            ctx.fill();
+            ctx.restore();
         }
-        ctx.fill();
-        ctx.restore();
     }
 
     // ── 卡片边框 ──
     if (ov.bg_border_enabled && !ov.bg_fullscreen) {
-        const padT_b = parseFloat(ov.bg_padding_top ?? 16);
-        const padB_b = parseFloat(ov.bg_padding_bottom ?? 16);
-        const padL_b = parseFloat(ov.bg_padding_left ?? 16);
-        const padR_b = parseFloat(ov.bg_padding_right ?? 16);
-        const rad_b = parseFloat(ov.bg_radius || 12);
         const borderW = parseFloat(ov.bg_border_width ?? 3);
         const borderOp = (ov.bg_border_opacity ?? 100) / 100;
         const borderStyle = ov.bg_border_style || 'solid';
         const borderSides = ov.bg_border_sides || 'all';
 
-        const rx = clipX - padL_b;
-        const ry = clipY - padT_b;
-        const rw = clipW + padL_b + padR_b;
-        const rh = clipH + padT_b + padB_b;
+        const rx = _cardX;
+        const ry = _cardY;
+        const rw = _cardW;
+        const rh = _cardH;
 
         ctx.save();
         ctx.globalAlpha = borderOp * ctx.globalAlpha;
@@ -3795,7 +4082,7 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
         }
 
         if (borderSides === 'all') {
-            _roundRect(ctx, rx, ry, rw, rh, rad_b);
+            _roundRect(ctx, rx, ry, rw, rh, _cardRad);
             ctx.stroke();
         } else {
             ctx.beginPath();
@@ -3830,6 +4117,20 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
     const featherRight  = parseFloat(ov.feather_right ?? 0);
     const featherLeftOff = parseFloat(ov.feather_left_offset ?? 0);
     const featherRightOff = parseFloat(ov.feather_right_offset ?? 0);
+    const _acquireFeatherCanvas = (w, h) => {
+        if (!ov._featherCanvas) ov._featherCanvas = document.createElement('canvas');
+        const tmp = ov._featherCanvas;
+        if (tmp.width !== w || tmp.height !== h) {
+            tmp.width = w;
+            tmp.height = h;
+        }
+        const tc = tmp.getContext('2d');
+        if (typeof tc.setTransform === 'function') tc.setTransform(1, 0, 0, 1, 0, 0);
+        tc.globalCompositeOperation = 'source-over';
+        tc.globalAlpha = 1;
+        if (typeof tc.clearRect === 'function') tc.clearRect(0, 0, w, h);
+        return { tmp, tc };
+    };
 
     // ── 固定标题模式 ──
         let titleText = (ov.scroll_title || '').trim();
@@ -3882,30 +4183,7 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
 
             // 标题独立背景
             if (ov.scroll_title_bg_enabled && titleLines.length > 0) {
-                ctx.save();
-                const tbgAlpha = (ov.scroll_title_bg_opacity ?? 60) / 100;
-                ctx.globalAlpha = tbgAlpha * ctx.globalAlpha;
-                ctx.fillStyle = ov.scroll_title_bg_color || '#000000';
-                const tbgPadH = parseFloat(ov.scroll_title_bg_pad_h ?? 0);
-                const tbgPadTop = parseFloat(ov.scroll_title_bg_pad_top ?? 0);
-                const tbgPadBot = parseFloat(ov.scroll_title_bg_pad_bottom ?? 0);
-                const tbgRad = parseFloat(ov.scroll_title_bg_radius ?? 12);
-                if (ov.scroll_title_bg_mode === 'inline' || ov.scroll_title_bg_mode === 'inline-joined') {
-                    // 每行独立包裹
-                    let ty = titleDrawY;
-                    for (const line of titleLines) {
-                        const lw = ctx.measureText(line).width;
-                        const lx = _alignX(ctx, line, titleDrawX, tTextW, tAlign, tLetterSpacing);
-                        _roundRect(ctx, lx - tbgPadH, ty - tbgPadTop, lw + tbgPadH * 2, tLineH + tbgPadTop + tbgPadBot, tbgRad);
-                        ctx.fill();
-                        ty += tLineH;
-                    }
-                } else {
-                    // 整块
-                    _roundRect(ctx, titleDrawX - tbgPadH, titleDrawY - tbgPadTop, tTextW + tbgPadH * 2, titleBlockH + tbgPadTop + tbgPadBot, tbgRad);
-                    ctx.fill();
-                }
-                ctx.restore();
+                _drawScrollTitleBackground(ctx, ov, titleLines, titleDrawX, titleDrawY, tTextW, tLineH, titleBlockH, tSize, tAlign, tLetterSpacing);
             }
 
             // 阴影
@@ -4082,16 +4360,18 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
             ? ov._taskSegments
             : (typeof window !== 'undefined' && window._reelsState?.tasks?.[window._reelsState?.selectedIdx]?.segments) || null;
         const _twContext = { currentTime, start, end, effectiveDuration, segments: _twSegments };
-        const bodyClipY = titleIndependent ? clipY : (clipY + titleBlockH + tGap);
-        const bodyClipH = titleIndependent ? clipH : (clipH - titleBlockH - tGap);
+        const bodyClipY = (ov.bg_body_only && (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0))
+            ? bodyClipTopBase
+            : (titleIndependent ? clipY : (clipY + titleBlockH + tGap));
+        const bodyClipH = (ov.bg_body_only && (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0))
+            ? (bodyClipBotBase - bodyClipTopBase)
+            : (titleIndependent ? clipH : (clipH - titleBlockH - tGap));
         if (bodyClipH > 0) {
             const ovProxy = Object.assign({}, ov, { _skipTitle: true });
             const hasFeather = featherTop > 0 || featherBottom > 0 || featherTopOff > 0 || featherBotOff > 0 || featherLeft > 0 || featherRight > 0 || featherLeftOff > 0 || featherRightOff > 0;
             if (hasFeather) {
                 const cW = Math.ceil(clipW), cH = Math.ceil(bodyClipH);
-                const tmp = document.createElement('canvas');
-                tmp.width = cW; tmp.height = cH;
-                const tc = tmp.getContext('2d');
+                const { tmp, tc } = _acquireFeatherCanvas(cW, cH);
                 tc.font = fontStr;
                 const offX = curX - clipX;
                 const offY = curY - bodyClipY;
@@ -4175,9 +4455,7 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
         const hasFeather = featherTop > 0 || featherBottom > 0 || featherTopOff > 0 || featherBotOff > 0 || featherLeft > 0 || featherRight > 0 || featherLeftOff > 0 || featherRightOff > 0;
         if (hasFeather) {
             const cW = Math.ceil(clipW), cH = Math.ceil(clipH);
-            const tmp = document.createElement('canvas');
-            tmp.width = cW; tmp.height = cH;
-            const tc = tmp.getContext('2d');
+            const { tmp, tc } = _acquireFeatherCanvas(cW, cH);
             tc.font = fontStr;
 
             const offX = curX - clipX;
@@ -4334,13 +4612,34 @@ function _buildScrollTypewriterLines(ov, lines, textDirection, twContext) {
         : Array.from(str || '');
     const norm = (str) => String(str || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
 
-    // 1. Build per-line tokens with charOffset within each line
+    // 1. Build per-line tokens with charOffset within each line + word groups for active-word highlight/scale
     const lineTokensList = [];
     const allTokens = [];
     const bodySlots = [];
+    const wordGroups = [];
+    const wordSpanRegex = /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]|[^\s\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]+/g;
 
     for (let li = 0; li < lines.length; li++) {
         const line = lines[li] || '';
+        const lineWordGroups = [];
+        wordSpanRegex.lastIndex = 0;
+        let wm;
+        while ((wm = wordSpanRegex.exec(line)) !== null) {
+            const wg = {
+                id: wordGroups.length,
+                lineIdx: li,
+                charStart: wm.index,
+                charEnd: wm.index + wm[0].length,
+                text: wm[0],
+                tokens: [],
+                start: start,
+                end: start,
+                activeEnd: start,
+            };
+            wordGroups.push(wg);
+            lineWordGroups.push(wg);
+        }
+
         let rawChunks;
         if (revealType === 'char') {
             rawChunks = splitGraphemes(line);
@@ -4349,17 +4648,34 @@ function _buildScrollTypewriterLines(ov, lines, textDirection, twContext) {
         }
         const lineTokens = [];
         let charOffset = 0;
+        let wgCursor = 0;
         for (const chunk of rawChunks) {
+            const cStart = charOffset;
+            const cEnd = charOffset + chunk.length;
+            charOffset = cEnd;
+            let wordId = null;
+            if (!/^\s+$/.test(chunk)) {
+                while (wgCursor < lineWordGroups.length && lineWordGroups[wgCursor].charEnd <= cStart) {
+                    wgCursor++;
+                }
+                const wg = lineWordGroups[wgCursor];
+                if (wg && cStart < wg.charEnd && cEnd > wg.charStart) {
+                    wordId = wg.id;
+                }
+            }
             const tok = {
                 text: chunk,
                 lineIdx: li,
-                charStart: charOffset,
-                charEnd: charOffset + chunk.length,
+                charStart: cStart,
+                charEnd: cEnd,
+                wordId,
                 start: start,
                 end: start,
                 slots: [],
             };
-            charOffset += chunk.length;
+            if (wordId !== null && wordGroups[wordId]) {
+                wordGroups[wordId].tokens.push(tok);
+            }
             const graphemes = splitGraphemes(chunk);
             for (const g of graphemes) {
                 const n = norm(g);
@@ -4422,14 +4738,38 @@ function _buildScrollTypewriterLines(ov, lines, textDirection, twContext) {
     const M = bodySlots.length;
     if (M > 0) {
         if (speechChars.length > 0) {
-            // If speech starts with scroll_title and body doesn't, skip title prefix in speechChars
+            // If speech starts with scroll_title (or hook) and body doesn't, skip title prefix in speechChars.
+            // Supports both exact match and anchor substring search when title has digits ("4") vs ASR words ("four").
             let sOffset = 0;
             const titleNorm = norm(ov.scroll_title || '');
+            const speechStr = speechChars.map(c => c.ch).join('');
+            const bodyStr = bodySlots.map(c => c.ch).join('');
             if (titleNorm.length > 0 && speechChars.length > titleNorm.length) {
-                const speechPrefix = speechChars.slice(0, titleNorm.length).map(c => c.ch).join('');
-                const bodyPrefix = bodySlots.slice(0, titleNorm.length).map(c => c.ch).join('');
+                const speechPrefix = speechStr.slice(0, titleNorm.length);
+                const bodyPrefix = bodyStr.slice(0, titleNorm.length);
                 if (speechPrefix === titleNorm && bodyPrefix !== titleNorm) {
                     sOffset = titleNorm.length;
+                } else if (bodyPrefix !== titleNorm && bodyStr.length >= 6) {
+                    const maxSearchEnd = Math.min(speechStr.length, Math.max(titleNorm.length * 2 + 60, 140));
+                    const minSearchStart = Math.max(0, Math.floor(titleNorm.length * 0.4));
+                    const searchRegion = speechStr.slice(0, maxSearchEnd);
+                    for (const anchorOff of [0, 3, 6, 10]) {
+                        if (anchorOff + 6 > bodyStr.length) break;
+                        const anchor = bodyStr.slice(anchorOff, Math.min(bodyStr.length, anchorOff + 12));
+                        if (anchor.length < 6) continue;
+                        const idx = searchRegion.indexOf(anchor, Math.max(0, minSearchStart - anchorOff));
+                        if (idx >= 0) {
+                            sOffset = Math.max(0, idx - anchorOff);
+                            break;
+                        }
+                    }
+                }
+            } else if (bodyStr.length >= 10 && speechStr.length > bodyStr.length + 8 && speechStr.slice(0, 8) !== bodyStr.slice(0, 8)) {
+                const searchRegion = speechStr.slice(0, Math.min(speechStr.length, 160));
+                const anchor = bodyStr.slice(0, Math.min(12, bodyStr.length));
+                const idx = searchRegion.indexOf(anchor);
+                if (idx > 4) {
+                    sOffset = idx;
                 }
             }
             const activeSpeech = speechChars.slice(sOffset);
@@ -4438,7 +4778,7 @@ function _buildScrollTypewriterLines(ov, lines, textDirection, twContext) {
                 // Two-pointer alignment with lookahead resync
                 const matched = new Array(M).fill(null);
                 let bi = 0, si = 0;
-                const lookahead = 18;
+                const lookahead = 40;
                 while (bi < M && si < K) {
                     if (bodySlots[bi].ch === activeSpeech[si].ch) {
                         matched[bi] = activeSpeech[si];
@@ -4452,9 +4792,12 @@ function _buildScrollTypewriterLines(ov, lines, textDirection, twContext) {
                             if (db === 0 && ds === 0) continue;
                             if (db + ds >= bestDist) break;
                             if (bodySlots[bi + db].ch === activeSpeech[si + ds].ch) {
-                                // Require at least 2 consecutive matching chars when jumping more than 2 chars
+                                // Require consecutive matching chars when jumping across mismatches
                                 if (db + ds > 2 && bi + db + 1 < M && si + ds + 1 < K) {
                                     if (bodySlots[bi + db + 1].ch !== activeSpeech[si + ds + 1].ch) continue;
+                                }
+                                if (db + ds > 10 && bi + db + 2 < M && si + ds + 2 < K) {
+                                    if (bodySlots[bi + db + 2].ch !== activeSpeech[si + ds + 2].ch) continue;
                                 }
                                 bestDist = db + ds;
                                 foundB = bi + db;
@@ -4569,6 +4912,39 @@ function _buildScrollTypewriterLines(ov, lines, textDirection, twContext) {
             token.end = writingWindow.start + (token.end - from) * ratio;
         }
     }
+
+    // 6. Finalize wordGroups timing and bridge inter-word pauses so active-word highlight/scale works in char & word modes
+    for (const wg of wordGroups) {
+        const spoken = wg.tokens.filter(t => norm(t.text).length > 0);
+        const src = spoken.length > 0 ? spoken : wg.tokens;
+        if (src.length > 0) {
+            wg.start = src[0].start;
+            wg.end = Math.max(wg.start + 0.04, src[src.length - 1].end);
+        }
+    }
+    for (let wi = 0; wi < wordGroups.length; wi++) {
+        const wg = wordGroups[wi];
+        const nextWg = wordGroups[wi + 1];
+        wg.activeEnd = (nextWg && nextWg.start > wg.end)
+            ? nextWg.start
+            : Math.max(wg.end, wg.start + 0.08);
+        for (const t of wg.tokens) {
+            t.wordStart = wg.start;
+            t.wordEnd = wg.end;
+            t.wordActiveEnd = wg.activeEnd;
+        }
+    }
+
+    const lineTimeRanges = lines.map((_, li) => {
+        const lToks = (lineTokensList[li] || []).filter(t => !/^\s+$/.test(t.text));
+        if (!lToks.length) return null;
+        const lStart = lToks[0].start;
+        const lEnd = Math.max(lStart + 0.05, lToks[lToks.length - 1].end);
+        return { start: lStart, end: lEnd };
+    });
+    lineTokensList._wordGroups = wordGroups;
+    lineTokensList._lineTimeRanges = lineTimeRanges;
+
     if (_scrollTwTokenCache.size > 120) {
         const oldestKey = _scrollTwTokenCache.keys().next().value;
         _scrollTwTokenCache.delete(oldestKey);
@@ -4636,7 +5012,10 @@ function _renderScrollTypewriterBody(ctx, ov, lines, textX, drawY, textW, lineHe
     const currentTime = Number(twContext?.currentTime) || 0;
     const textDirection = ctx.direction || 'ltr';
     const isRtl = textDirection === 'rtl';
+    const rawRevealType = ov.scroll_tw_reveal_type || 'char';
+    const revealType = (isRtl && rawRevealType === 'char') ? 'word' : rawRevealType;
     const lineTokensList = _buildScrollTypewriterLines(ov, lines, textDirection, twContext);
+    const wordGroups = lineTokensList._wordGroups || [];
 
     const hideUnread = ov.scroll_tw_hide_unread !== undefined
         ? Boolean(ov.scroll_tw_hide_unread)
@@ -4656,6 +5035,40 @@ function _renderScrollTypewriterBody(ctx, ov, lines, textX, drawY, textW, lineHe
     const tipKind = ov.scroll_tw_cursor_kind || 'quill';
     const isImageTip = tipKind !== 'char';
 
+    // Resolve the currently active word across both char and word reveal modes
+    let activeWord = null;
+    if (revealType !== 'sentence' && wordGroups.length > 0) {
+        const firstWg = wordGroups[0];
+        const lastWg = wordGroups[wordGroups.length - 1];
+        if (currentTime < firstWg.start) {
+            // In full-text follow mode or live preview at t=0 / during fixed title narration,
+            // highlight the first word so the user always sees immediate highlight feedback.
+            if (!hideUnread || !ov._exporting) {
+                activeWord = firstWg;
+            }
+        } else if (currentTime >= lastWg.activeEnd) {
+            if (!ov._exporting) {
+                activeWord = lastWg;
+            }
+        } else {
+            for (let wi = 0; wi < wordGroups.length; wi++) {
+                const wg = wordGroups[wi];
+                if (currentTime >= wg.start && currentTime < wg.activeEnd) {
+                    activeWord = wg;
+                    break;
+                }
+            }
+            if (!activeWord) {
+                for (let wi = wordGroups.length - 1; wi >= 0; wi--) {
+                    if (currentTime >= wordGroups[wi].start) {
+                        activeWord = wordGroups[wi];
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     const baseColor = ov.color || '#FFFFFF';
     const bodyFamily = ov.font_family || 'Arial';
     const bodyFallback = _resolveOverlayFallback(bodyFamily);
@@ -4672,6 +5085,7 @@ function _renderScrollTypewriterBody(ctx, ov, lines, textX, drawY, textW, lineHe
     let cursorBaselineY = null;
     let hasWritingStarted = false;
 
+    const preparedLines = [];
     for (let li = 0; li < lines.length; li++) {
         const line = lines[li] || '';
         const lineTokens = lineTokensList[li] || [];
@@ -4692,31 +5106,62 @@ function _renderScrollTypewriterBody(ctx, ov, lines, textX, drawY, textW, lineHe
             let color = baseColor;
             let scale = 1.0;
 
-            if (currentTime >= tok.end) {
-                state = 'read';
-                opacity = 1.0;
-            } else if (currentTime >= tok.start && currentTime < tok.end) {
-                state = 'active';
-                opacity = 1.0;
-                if (activeHighlight) color = activeColor;
-                scale = activeScale;
+            if (revealType === 'sentence') {
+                if (currentTime >= tok.end) {
+                    state = 'read';
+                    opacity = 1.0;
+                } else if (currentTime >= tok.start && currentTime < tok.end) {
+                    state = 'active';
+                    opacity = 1.0;
+                    if (activeHighlight) color = activeColor;
+                    scale = activeScale;
+                }
+            } else {
+                const isInActiveWord = Boolean(activeWord && tok.wordId === activeWord.id);
+                const isBeforeActiveWord = Boolean(activeWord && tok.wordId != null && tok.wordId < activeWord.id);
+                if (isInActiveWord) {
+                    const charRevealed = !hideUnread
+                        || revealType === 'word'
+                        || currentTime >= tok.start
+                        || tok === activeWord.tokens[0];
+                    if (charRevealed) {
+                        state = 'active';
+                        opacity = 1.0;
+                        if (activeHighlight) color = activeColor;
+                        scale = activeScale;
+                    } else {
+                        state = 'unread';
+                        opacity = unrevealedOpacity;
+                    }
+                } else if (isBeforeActiveWord || currentTime >= tok.end) {
+                    state = 'read';
+                    opacity = 1.0;
+                } else if (currentTime >= tok.start && currentTime < tok.end) {
+                    state = 'active';
+                    opacity = 1.0;
+                    if (activeHighlight && !/^\s+$/.test(tok.text)) color = activeColor;
+                    if (!/^\s+$/.test(tok.text)) scale = activeScale;
+                }
             }
 
-            if (currentTime >= tok.start && !/^\s+$/.test(tok.text)) {
+            const shouldAdvanceCursor = (currentTime >= tok.start && !/^\s+$/.test(tok.text))
+                || (!hasWritingStarted && activeWord && tok === activeWord.tokens[0] && (!hideUnread || !ov._exporting));
+            if (shouldAdvanceCursor) {
                 const prefixW = _measureScrollSubstrWidth(ctx, line, 0, tok.charStart, bLetterSpacing);
                 const nextPrefixW = _measureScrollSubstrWidth(ctx, line, 0, tok.charEnd, bLetterSpacing);
                 const tokW = nextPrefixW - prefixW;
                 const tokenX = isRtl ? (lx + lineW - nextPrefixW) : (lx + prefixW);
-                const p = (isImageTip && !tok._sentenceToken && tok.end > tok.start)
+                const p = (isImageTip && !tok._sentenceToken && tok.end > tok.start && currentTime >= tok.start)
                     ? Math.max(0, Math.min(1, (currentTime - tok.start) / (tok.end - tok.start)))
-                    : 1;
+                    : (currentTime < tok.start ? 0.25 : 1);
                 cursorX = isRtl ? (tokenX + tokW * (1 - p)) : (tokenX + tokW * p);
                 cursorBaselineY = yc;
                 hasWritingStarted = true;
             }
 
             const prevRun = runs[runs.length - 1];
-            if (prevRun && prevRun.state === state && prevRun.opacity === opacity && prevRun.color === color && prevRun.scale === scale && scale === 1.0) {
+            const sameScaleGroup = scale === 1.0 || (tok.wordId != null && prevRun && prevRun.wordId === tok.wordId);
+            if (prevRun && prevRun.state === state && prevRun.opacity === opacity && prevRun.color === color && prevRun.scale === scale && sameScaleGroup) {
                 prevRun.charEnd = tok.charEnd;
                 prevRun.text = line.slice(prevRun.charStart, prevRun.charEnd);
             } else {
@@ -4725,14 +5170,89 @@ function _renderScrollTypewriterBody(ctx, ov, lines, textX, drawY, textW, lineHe
                     opacity,
                     color,
                     scale,
+                    wordId: tok.wordId ?? null,
                     charStart: tok.charStart,
                     charEnd: tok.charEnd,
                     text: line.slice(tok.charStart, tok.charEnd),
                 });
             }
         }
+        preparedLines.push({ li, line, yc, lx, lineW, runs });
+    }
 
-        for (const run of runs) {
+    // Dynamic progressive background / newspaper cutout pre-pass when unread text is hidden
+    const bbgStyle = ov.scroll_body_bg_style || 'solid';
+    const isBackingStyle = typeof ReelsBrushEngine !== 'undefined' && ReelsBrushEngine.isTextBackingStyle && ReelsBrushEngine.isTextBackingStyle(bbgStyle);
+    if (ov.scroll_body_bg_enabled && unrevealedOpacity <= 0.05 && (isBackingStyle || ov.scroll_body_bg_mode === 'inline' || ov.scroll_body_bg_mode === 'inline-joined')) {
+        const bbgAlpha = (ov.scroll_body_bg_opacity ?? (isBackingStyle ? 98 : 60)) / 100;
+        const bbgPadH = parseFloat(ov.scroll_body_bg_pad_h ?? (isBackingStyle ? 16 : 0));
+        const bbgPadTop = parseFloat(ov.scroll_body_bg_pad_top ?? (isBackingStyle ? 10 : 0));
+        const bbgPadBot = parseFloat(ov.scroll_body_bg_pad_bottom ?? (isBackingStyle ? 10 : 0));
+        const bbgRad = parseFloat(ov.scroll_body_bg_radius ?? 12);
+        if (isBackingStyle) {
+            const backingLines = [];
+            for (const pl of preparedLines) {
+                const visRuns = pl.runs.filter(r => r.opacity > 0.05 && r.text && r.text.trim().length > 0);
+                if (!visRuns.length) continue;
+                const firstChar = Math.min(...visRuns.map(r => r.charStart));
+                const lastChar = Math.max(...visRuns.map(r => r.charEnd));
+                const subText = pl.line.slice(firstChar, lastChar);
+                if (!subText.trim()) continue;
+                const prefixW = _measureScrollSubstrWidth(ctx, pl.line, 0, firstChar, bLetterSpacing);
+                const nextPrefixW = _measureScrollSubstrWidth(ctx, pl.line, 0, lastChar, bLetterSpacing);
+                const subW = Math.max(1, nextPrefixW - prefixW);
+                const subX = isRtl ? (pl.lx + pl.lineW - nextPrefixW) : (pl.lx + prefixW);
+                backingLines.push({
+                    text: subText,
+                    x: subX,
+                    y: drawY + pl.li * lineHeight,
+                    textY: pl.yc,
+                    textBaseline: 'alphabetic',
+                    w: subW,
+                    h: lineHeight,
+                    fontSize,
+                    fontStr: ctx.font,
+                    letterSpacing: bLetterSpacing,
+                    lineIndex: pl.li,
+                });
+            }
+            if (backingLines.length > 0) {
+                ReelsBrushEngine.drawTextCutoutBacking(ctx, backingLines, {
+                    style: bbgStyle,
+                    color: ov.scroll_body_bg_color || '#F3EFE6',
+                    opacity: bbgAlpha,
+                    padX: bbgPadH,
+                    padY: (bbgPadTop + bbgPadBot) * 0.5,
+                    padTop: bbgPadTop,
+                    padBottom: bbgPadBot,
+                });
+            }
+        } else {
+            ctx.save();
+            ctx.globalAlpha = bbgAlpha * ctx.globalAlpha;
+            ctx.fillStyle = ov.scroll_body_bg_color || '#000000';
+            for (const pl of preparedLines) {
+                const visRuns = pl.runs.filter(r => r.opacity > 0.05 && r.text && r.text.trim().length > 0);
+                if (!visRuns.length) continue;
+                const firstChar = Math.min(...visRuns.map(r => r.charStart));
+                const lastChar = Math.max(...visRuns.map(r => r.charEnd));
+                const prefixW = _measureScrollSubstrWidth(ctx, pl.line, 0, firstChar, bLetterSpacing);
+                const nextPrefixW = _measureScrollSubstrWidth(ctx, pl.line, 0, lastChar, bLetterSpacing);
+                const subW = Math.max(1, nextPrefixW - prefixW);
+                const subX = isRtl ? (pl.lx + pl.lineW - nextPrefixW) : (pl.lx + prefixW);
+                const by = drawY + pl.li * lineHeight;
+                _roundRect(ctx, subX - bbgPadH, by - bbgPadTop, subW + bbgPadH * 2, lineHeight + bbgPadTop + bbgPadBot, bbgRad);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+    }
+
+    for (const pl of preparedLines) {
+        const { line, yc, lx, lineW, runs } = pl;
+        // Draw non-active runs first, then active runs on top so active word stroke/fill/scale never gets clipped by adjacent run strokes
+        const orderedRuns = runs.filter(r => r.state !== 'active').concat(runs.filter(r => r.state === 'active'));
+        for (const run of orderedRuns) {
             if (run.opacity <= 0.001 || !run.text) continue;
             const prefixW = _measureScrollSubstrWidth(ctx, line, 0, run.charStart, bLetterSpacing);
             const nextPrefixW = _measureScrollSubstrWidth(ctx, line, 0, run.charEnd, bLetterSpacing);
@@ -4827,6 +5347,96 @@ function _renderScrollTypewriterBody(ctx, ov, lines, textX, drawY, textW, lineHe
 }
 
 /**
+ * 绘制滚动字幕标题独立背景（支持纯色、报纸剪报、圣诞节字幕带与主题画板）
+ */
+function _drawScrollTitleBackground(ctx, ov, titleLines, titleDrawX, titleDrawY, tTextW, tLineH, titleBlockH, tSize, tAlign, tLetterSpacing) {
+    if (!ov.scroll_title_bg_enabled || !Array.isArray(titleLines) || titleLines.length === 0) return;
+    const tbgStyle = ov.scroll_title_bg_style || 'solid';
+    const isCardBoard = Boolean(
+        typeof ReelsBrushEngine !== 'undefined'
+        && ReelsBrushEngine.CARD_BACKGROUND_STYLES
+        && ReelsBrushEngine.CARD_BACKGROUND_STYLES[tbgStyle]
+    );
+    const isBacking = typeof ReelsBrushEngine !== 'undefined' && ReelsBrushEngine.isTextBackingStyle && ReelsBrushEngine.isTextBackingStyle(tbgStyle);
+    const tbgAlpha = (ov.scroll_title_bg_opacity ?? (isBacking ? 98 : 60)) / 100;
+    const tbgPadH = parseFloat(ov.scroll_title_bg_pad_h ?? (isBacking ? 18 : 0));
+    const tbgPadTop = parseFloat(ov.scroll_title_bg_pad_top ?? (isBacking ? 10 : 0));
+    const tbgPadBot = parseFloat(ov.scroll_title_bg_pad_bottom ?? (isBacking ? 10 : 0));
+    const tbgRad = parseFloat(ov.scroll_title_bg_radius ?? 12);
+
+    if (isCardBoard && ov.scroll_title_bg_mode !== 'inline' && ov.scroll_title_bg_mode !== 'inline-joined') {
+        ReelsBrushEngine.drawThemedCardBackground(
+            ctx,
+            titleDrawX - tbgPadH,
+            titleDrawY - tbgPadTop,
+            tTextW + tbgPadH * 2,
+            titleBlockH + tbgPadTop + tbgPadBot,
+            tbgRad,
+            {
+                style: tbgStyle,
+                color: ov.scroll_title_bg_color || '#F3EFE6',
+                opacity: tbgAlpha,
+            }
+        );
+        return;
+    }
+
+    if (isBacking) {
+        const backingLines = [];
+        for (let li = 0; li < titleLines.length; li++) {
+            const line = titleLines[li] || '';
+            if (!line.trim()) continue;
+            const lw = ctx.measureText(line).width;
+            const lx = _alignX(ctx, line, titleDrawX, tTextW, tAlign, tLetterSpacing);
+            const ty = titleDrawY + li * tLineH;
+            backingLines.push({
+                text: line,
+                x: lx,
+                y: ty,
+                textY: ty + tSize,
+                textBaseline: 'alphabetic',
+                w: lw,
+                h: tLineH,
+                fontSize: tSize,
+                fontStr: ctx.font,
+                letterSpacing: tLetterSpacing,
+                lineIndex: li,
+            });
+        }
+        if (backingLines.length > 0) {
+            ReelsBrushEngine.drawTextCutoutBacking(ctx, backingLines, {
+                style: tbgStyle,
+                color: ov.scroll_title_bg_color || '#F3EFE6',
+                opacity: tbgAlpha,
+                padX: tbgPadH,
+                padY: (tbgPadTop + tbgPadBot) * 0.5,
+                padTop: tbgPadTop,
+                padBottom: tbgPadBot,
+            });
+        }
+        return;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = tbgAlpha * ctx.globalAlpha;
+    ctx.fillStyle = ov.scroll_title_bg_color || '#000000';
+    if (ov.scroll_title_bg_mode === 'inline' || ov.scroll_title_bg_mode === 'inline-joined') {
+        let ty = titleDrawY;
+        for (const line of titleLines) {
+            const lw = ctx.measureText(line).width;
+            const lx = _alignX(ctx, line, titleDrawX, tTextW, tAlign, tLetterSpacing);
+            _roundRect(ctx, lx - tbgPadH, ty - tbgPadTop, lw + tbgPadH * 2, tLineH + tbgPadTop + tbgPadBot, tbgRad);
+            ctx.fill();
+            ty += tLineH;
+        }
+    } else {
+        _roundRect(ctx, titleDrawX - tbgPadH, titleDrawY - tbgPadTop, tTextW + tbgPadH * 2, titleBlockH + tbgPadTop + tbgPadBot, tbgRad);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+/**
  * 绘制滚动字幕文本块 (内部)。
  */
 function _drawScrollTextBlock(ctx, ov, lines, textX, textY, textW, lineHeight, fontSize, align, twContext = null) {
@@ -4869,6 +5479,10 @@ function _drawScrollTextBlock(ctx, ov, lines, textX, textY, textW, lineHeight, f
             const blockH = titleLines.length * tLineH;
             tSize = trySize;
             if (!ov.scroll_title_auto_fit || !(tMaxH > 0) || blockH <= tMaxH) break;
+        }
+
+        if (ov.scroll_title_bg_enabled && titleLines.length > 0) {
+            _drawScrollTitleBackground(ctx, ov, titleLines, titleTextX, drawY, titleTextW, tLineH, titleLines.length * tLineH, tSize, tAlign, tLetterSpacing);
         }
 
         // 阴影
@@ -4932,35 +5546,103 @@ function _drawScrollTextBlock(ctx, ov, lines, textX, textY, textW, lineHeight, f
         ctx.letterSpacing = bLetterSpacing + 'px';
     }
 
-    // 正文独立背景
-    if (ov.scroll_body_bg_enabled && lines.length > 0) {
-        ctx.save();
-        const bbgAlpha = (ov.scroll_body_bg_opacity ?? 60) / 100;
-        ctx.globalAlpha = bbgAlpha * ctx.globalAlpha;
-        ctx.fillStyle = ov.scroll_body_bg_color || '#000000';
-        const bbgPadH = parseFloat(ov.scroll_body_bg_pad_h ?? 0);
-        const bbgPadTop = parseFloat(ov.scroll_body_bg_pad_top ?? 0);
-        const bbgPadBot = parseFloat(ov.scroll_body_bg_pad_bottom ?? 0);
+    // 正文独立背景（当开启出字效果且未读透明<=5%时，贴字剪报/行内底衬由 _renderScrollTypewriterBody 按已出字区域动态绘制）
+    const shouldRenderScrollTw = ov.scroll_typewriter_enabled === true;
+    const bbgStyle = ov.scroll_body_bg_style || 'solid';
+    const isCardBoardStyle = Boolean(
+        typeof ReelsBrushEngine !== 'undefined'
+        && ReelsBrushEngine.CARD_BACKGROUND_STYLES
+        && ReelsBrushEngine.CARD_BACKGROUND_STYLES[bbgStyle]
+    );
+    const isBackingStyle = typeof ReelsBrushEngine !== 'undefined' && ReelsBrushEngine.isTextBackingStyle && ReelsBrushEngine.isTextBackingStyle(bbgStyle);
+    const useBlockBoardForBodyBg = isCardBoardStyle && ov.scroll_body_bg_mode !== 'inline' && ov.scroll_body_bg_mode !== 'inline-joined';
+    const twHideUnread = ov.scroll_tw_hide_unread !== undefined
+        ? Boolean(ov.scroll_tw_hide_unread)
+        : (Number(ov.scroll_tw_unrevealed_opacity ?? 0) < 100);
+    const twUnrevealedOp = twHideUnread
+        ? Math.max(0, Math.min(1, Number(ov.scroll_tw_unrevealed_opacity ?? 0) / 100))
+        : 1.0;
+    const deferBodyBgToTw = shouldRenderScrollTw
+        && twUnrevealedOp <= 0.05
+        && !useBlockBoardForBodyBg
+        && (isBackingStyle || ov.scroll_body_bg_mode === 'inline' || ov.scroll_body_bg_mode === 'inline-joined');
+
+    if (ov.scroll_body_bg_enabled && lines.length > 0 && !deferBodyBgToTw) {
+        const bbgAlpha = (ov.scroll_body_bg_opacity ?? (isBackingStyle ? 98 : 60)) / 100;
+        const bbgPadH = parseFloat(ov.scroll_body_bg_pad_h ?? (isBackingStyle ? 16 : 0));
+        const bbgPadTop = parseFloat(ov.scroll_body_bg_pad_top ?? (isBackingStyle ? 10 : 0));
+        const bbgPadBot = parseFloat(ov.scroll_body_bg_pad_bottom ?? (isBackingStyle ? 10 : 0));
         const bbgRad = parseFloat(ov.scroll_body_bg_radius ?? 12);
         const bodyBlockH = lines.length * lineHeight;
-        if (ov.scroll_body_bg_mode === 'inline' || ov.scroll_body_bg_mode === 'inline-joined') {
-            let by = drawY;
-            for (const line of lines) {
+        if (useBlockBoardForBodyBg) {
+            ReelsBrushEngine.drawThemedCardBackground(
+                ctx,
+                textX - bbgPadH,
+                drawY - bbgPadTop,
+                textW + bbgPadH * 2,
+                bodyBlockH + bbgPadTop + bbgPadBot,
+                bbgRad,
+                {
+                    style: bbgStyle,
+                    color: ov.scroll_body_bg_color || '#F3EFE6',
+                    opacity: bbgAlpha,
+                }
+            );
+        } else if (isBackingStyle) {
+            const backingLines = [];
+            for (let li = 0; li < lines.length; li++) {
+                const line = lines[li] || '';
+                if (!line.trim()) continue;
                 const lw = ctx.measureText(line).width;
                 const lx = _alignX(ctx, line, textX, textW, align, bLetterSpacing);
-                _roundRect(ctx, lx - bbgPadH, by - bbgPadTop, lw + bbgPadH * 2, lineHeight + bbgPadTop + bbgPadBot, bbgRad);
-                ctx.fill();
-                by += lineHeight;
+                const by = drawY + li * lineHeight;
+                backingLines.push({
+                    text: line,
+                    x: lx,
+                    y: by,
+                    textY: by + fontSize,
+                    textBaseline: 'alphabetic',
+                    w: lw,
+                    h: lineHeight,
+                    fontSize,
+                    fontStr: ctx.font,
+                    letterSpacing: bLetterSpacing,
+                    lineIndex: li,
+                });
+            }
+            if (backingLines.length > 0) {
+                ReelsBrushEngine.drawTextCutoutBacking(ctx, backingLines, {
+                    style: bbgStyle,
+                    color: ov.scroll_body_bg_color || '#F3EFE6',
+                    opacity: bbgAlpha,
+                    padX: bbgPadH,
+                    padY: (bbgPadTop + bbgPadBot) * 0.5,
+                    padTop: bbgPadTop,
+                    padBottom: bbgPadBot,
+                });
             }
         } else {
-            _roundRect(ctx, textX - bbgPadH, drawY - bbgPadTop, textW + bbgPadH * 2, bodyBlockH + bbgPadTop + bbgPadBot, bbgRad);
-            ctx.fill();
+            ctx.save();
+            ctx.globalAlpha = bbgAlpha * ctx.globalAlpha;
+            ctx.fillStyle = ov.scroll_body_bg_color || '#000000';
+            if (ov.scroll_body_bg_mode === 'inline' || ov.scroll_body_bg_mode === 'inline-joined') {
+                let by = drawY;
+                for (const line of lines) {
+                    const lw = ctx.measureText(line).width;
+                    const lx = _alignX(ctx, line, textX, textW, align, bLetterSpacing);
+                    _roundRect(ctx, lx - bbgPadH, by - bbgPadTop, lw + bbgPadH * 2, lineHeight + bbgPadTop + bbgPadBot, bbgRad);
+                    ctx.fill();
+                    by += lineHeight;
+                }
+            } else {
+                _roundRect(ctx, textX - bbgPadH, drawY - bbgPadTop, textW + bbgPadH * 2, bodyBlockH + bbgPadTop + bbgPadBot, bbgRad);
+                ctx.fill();
+            }
+            ctx.restore();
         }
-        ctx.restore();
     }
 
     // ── 出字效果（朗诵打字机/手写跟读模式）──
-    const shouldRenderScrollTw = ov.scroll_typewriter_enabled === true;
     if (shouldRenderScrollTw && lines.length > 0) {
         _renderScrollTypewriterBody(ctx, ov, lines, textX, drawY, textW, lineHeight, fontSize, align, bLetterSpacing, twContext);
         return;
@@ -5945,6 +6627,29 @@ const ReelsBrushEngine = {
     drawBrush(ctx, x, y, w, h, style = 'acrylic', color = '#0D47A1', opacity = 1, colormode = 'tint', direction = 'horizontal', customBrushData = null, solidStrength = 100) {
         if (w <= 0 || h <= 0) return;
         let activeStyle = style || 'acrylic';
+        if (!customBrushData && this.isTextBackingStyle(activeStyle)) {
+            this.drawTextCutoutBacking(ctx, [{
+                text: '████████',
+                isSolidBlock: true,
+                x: x + 6,
+                y: y + 4,
+                w: Math.max(4, w - 12),
+                h: Math.max(8, h - 8),
+                fontSize: Math.max(16, (h - 8) * 0.78),
+                fontStr: `700 ${Math.round(Math.max(16, (h - 8) * 0.78))}px Georgia, serif`,
+                lineIndex: 0,
+            }], {
+                style: activeStyle,
+                color,
+                opacity,
+                colormode,
+                padX: 6,
+                padY: 4,
+                padTop: 4,
+                padBottom: 4,
+            });
+            return;
+        }
         if (customBrushData) {
             const customKey = (activeStyle && activeStyle !== 'custom') ? activeStyle : ('_custom_' + customBrushData.length);
             if (!this._masks[customKey] || !this._rawImages[customKey]) {
@@ -6037,10 +6742,3530 @@ const ReelsBrushEngine = {
         ctx.restore();
     },
 
+    TEXT_BACKING_STYLES: {
+        newspaper_cutout: {
+            label: '📰 复古旧报纸剪报 (爆款同款贴字)',
+            mode: 'cutout',
+            baseColor: '#F3EFE6',
+            rimColor: '#E4DCCD',
+            rimWidth: 1.5,
+            shadowColor: 'rgba(18, 12, 8, 0.34)',
+            shadowBlur: 10,
+            shadowOffsetY: 3,
+            tornEdge: true,
+        },
+        newspaper_sepia: {
+            label: '🗞️ 怀旧泛黄古董报刊 (暖黄剪报)',
+            mode: 'cutout',
+            baseColor: '#E5D5B8',
+            rimColor: '#CDB896',
+            rimWidth: 1.5,
+            shadowColor: 'rgba(28, 16, 6, 0.38)',
+            shadowBlur: 10,
+            shadowOffsetY: 3,
+            tornEdge: true,
+        },
+        torn_cream_paper: {
+            label: '📜 奶油手撕宣纸贴 (纯净纸张轮廓)',
+            mode: 'cutout',
+            baseColor: '#FAF5EC',
+            rimColor: '#EAE1D0',
+            rimWidth: 1.5,
+            shadowColor: 'rgba(20, 14, 8, 0.28)',
+            shadowBlur: 11,
+            shadowOffsetY: 3,
+            tornEdge: true,
+        },
+        kraft_sticker: {
+            label: '🏷️ 手撕牛皮纸贴纸 (复古白边牛皮纸)',
+            mode: 'cutout',
+            baseColor: '#D2AD80',
+            rimColor: '#FCF9F2',
+            rimWidth: 4.5,
+            shadowColor: 'rgba(16, 10, 4, 0.38)',
+            shadowBlur: 11,
+            shadowOffsetY: 4,
+            tornEdge: true,
+        },
+        ransom_magazine: {
+            label: '✂️ 杂志拼贴剪报块 (斜切报刊条)',
+            mode: 'magazine_blocks',
+            baseColor: '#F4F0E6',
+            rimColor: '#DED5C4',
+            rimWidth: 1.5,
+            shadowColor: 'rgba(15, 10, 6, 0.36)',
+            shadowBlur: 9,
+            shadowOffsetY: 3,
+            tornEdge: true,
+        },
+        grid_note: {
+            label: '📓 手账方格便签纸 (清新方格底衬)',
+            mode: 'cutout',
+            baseColor: '#F8FAFC',
+            rimColor: '#D8E4F0',
+            rimWidth: 2.0,
+            shadowColor: 'rgba(15, 25, 40, 0.26)',
+            shadowBlur: 10,
+            shadowOffsetY: 3,
+            tornEdge: false,
+        },
+        gold_parchment: {
+            label: '✨ 圣经烫金羊皮书页 (古典羊皮卷)',
+            mode: 'cutout',
+            baseColor: '#F4E9D2',
+            rimColor: '#C9A23F',
+            rimWidth: 2.2,
+            shadowColor: 'rgba(24, 15, 4, 0.38)',
+            shadowBlur: 12,
+            shadowOffsetY: 3,
+            tornEdge: true,
+        },
+        red_editorial: {
+            label: '🔖 报刊红底白边剪报 (高冲击红底贴)',
+            mode: 'cutout',
+            baseColor: '#A61C1E',
+            rimColor: '#F8F4EC',
+            rimWidth: 4.2,
+            shadowColor: 'rgba(15, 5, 5, 0.42)',
+            shadowBlur: 11,
+            shadowOffsetY: 4,
+            tornEdge: true,
+        },
+        dark_film_matte: {
+            label: '🎬 暗夜胶片磨砂贴纸 (黑金胶片底)',
+            mode: 'cutout',
+            baseColor: '#191A20',
+            rimColor: '#D6C6A5',
+            rimWidth: 2.2,
+            shadowColor: 'rgba(0, 0, 0, 0.48)',
+            shadowBlur: 12,
+            shadowOffsetY: 4,
+            tornEdge: false,
+        },
+        bottom_gold_bar: {
+            label: '🌟 鎏金半高文字底条 (文字下半部金底)',
+            mode: 'bottom_strip',
+            baseColor: '#E5A93C',
+        },
+        bottom_rose_brush: {
+            label: '🌸 莫兰迪玫瑰手绘底条 (文字底部温柔笔触)',
+            mode: 'bottom_strip',
+            baseColor: '#D96B66',
+        },
+        bottom_neon_marker: {
+            label: '🖍️ 荧光马克笔手绘底条 (重点荧光半高托底)',
+            mode: 'bottom_strip',
+            baseColor: '#FFE600',
+        },
+        xmas_candy_ribbon: {
+            label: '🍬 圣诞红白拐杖糖字幕带 (斜纹糖果框+冬青红果)',
+            mode: 'xmas_ribbon',
+            baseColor: '#88131B',
+            rimColor: '#FFFDF9',
+            rimWidth: 5.0,
+            shadowColor: 'rgba(18, 4, 6, 0.46)',
+            shadowBlur: 12,
+            shadowOffsetY: 4,
+        },
+        xmas_velvet_gold: {
+            label: '🎅 圣诞红丝绒烫金挂旗带 (金线缝边+伯利恒金星)',
+            mode: 'xmas_ribbon',
+            baseColor: '#7A111A',
+            rimColor: '#F5D061',
+            rimWidth: 2.5,
+            shadowColor: 'rgba(15, 3, 5, 0.48)',
+            shadowBlur: 12,
+            shadowOffsetY: 4,
+        },
+        xmas_pine_snow: {
+            label: '🎄 圣诞松林绿覆雪字幕带 (积雪顶边+冬青彩球)',
+            mode: 'xmas_ribbon',
+            baseColor: '#124229',
+            rimColor: '#F8FAFC',
+            rimWidth: 3.0,
+            shadowColor: 'rgba(6, 20, 12, 0.46)',
+            shadowBlur: 12,
+            shadowOffsetY: 4,
+        },
+        xmas_gingerbread_tag: {
+            label: '🍪 圣诞姜饼屋糖霜礼物签 (白糖霜花边+红绿糖豆)',
+            mode: 'cutout',
+            baseColor: '#7C3F1C',
+            rimColor: '#FFFDF9',
+            rimWidth: 4.6,
+            shadowColor: 'rgba(24, 10, 4, 0.45)',
+            shadowBlur: 11,
+            shadowOffsetY: 4,
+            tornEdge: true,
+        },
+        xmas_frost_ice: {
+            label: '❄️ 圣诞冰雪极光半高底条 (冰晶蓝底+六角雪花)',
+            mode: 'bottom_strip',
+            baseColor: '#0EA5E9',
+        },
+    },
+
+    CARD_BACKGROUND_STYLES: {
+        newspaper_page: {
+            label: '📰 复古旧报纸整版画板 (报刊分栏纹+报头双线+手撕纸边)',
+            tileStyle: 'newspaper_cutout',
+            baseColor: '#F3EFE6',
+            tornEdge: true,
+        },
+        newspaper_sepia_page: {
+            label: '🗞️ 怀旧泛黄古董报刊板 (暖黄旧报+古典双线内框+手撕边)',
+            tileStyle: 'newspaper_sepia',
+            baseColor: '#EADBC2',
+            tornEdge: true,
+        },
+        torn_parchment_board: {
+            label: '📜 圣经烫金羊皮书卷板 (古典羊皮纸+四角星芒烫金双框)',
+            tileStyle: 'gold_parchment',
+            baseColor: '#F7F1E3',
+            tornEdge: true,
+        },
+        kraft_clipboard: {
+            label: '🏷️ 手撕牛皮纸剪贴画板 (复古白边牛皮纸卡+半透明胶带贴角)',
+            tileStyle: 'kraft_sticker',
+            baseColor: '#C8A276',
+            tornEdge: true,
+        },
+        grid_notebook_page: {
+            label: '📓 手账方格笔记本页 (清新方格信纸+红蓝手账线+胶带贴)',
+            tileStyle: 'grid_note',
+            baseColor: '#FAF8F2',
+            tornEdge: false,
+        },
+        dark_film_board: {
+            label: '🎬 暗夜黑金胶片画板 (深邃磨砂底+复古暗金双线角框)',
+            tileStyle: 'dark_film_matte',
+            baseColor: '#15171E',
+            tornEdge: false,
+        },
+        xmas_candy_frame: {
+            label: '🍬 圣诞红白拐杖糖画框板 (红白斜纹糖果外框+深红丝绒底+四角冬青)',
+            tileStyle: null,
+            baseColor: '#6E0B14',
+            tornEdge: false,
+        },
+        xmas_velvet_gold_board: {
+            label: '🎅 圣诞红丝绒烫金贺卡板 (皇家红丝绒+双层金线缝边+伯利恒八角金星)',
+            tileStyle: null,
+            baseColor: '#7A0F1A',
+            tornEdge: false,
+        },
+        xmas_pine_snow_board: {
+            label: '🎄 圣诞松林覆雪木牌板 (森林松绿+顶部厚积雪波浪层+雪花冬青装饰)',
+            tileStyle: null,
+            baseColor: '#123F28',
+            tornEdge: false,
+        },
+        xmas_gingerbread_card: {
+            label: '🍪 圣诞姜饼屋糖霜贺卡 (暖棕姜饼纹理+白糖霜波浪裱花框+冬青果)',
+            tileStyle: 'xmas_gingerbread_tag',
+            baseColor: '#7C3F1C',
+            tornEdge: false,
+        },
+        xmas_starry_snow_night: {
+            label: '❄️ 圣诞极光飘雪夜空板 (冰晶深蓝极光渐变+漫天雪花星芒+覆雪边)',
+            tileStyle: null,
+            baseColor: '#0E243F',
+            tornEdge: false,
+        },
+        xmas_cream_holly_letter: {
+            label: '🦌 圣诞暖白信纸冬青贺卡 (奶油羊皮信纸+红绿金双色线框+四角冬青果)',
+            tileStyle: 'torn_cream_paper',
+            baseColor: '#FCF8EE',
+            tornEdge: false,
+        },
+    },
+
+    _backingTileCache: {},
+    _candyStripePatternCache: null,
+    _cutoutScratchCanvas: null,
+
+    _drawHollyOrnament(ctx, cx, cy, scale = 1, flipX = false) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        if (flipX) ctx.scale(-scale, scale);
+        else ctx.scale(scale, scale);
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 1.5;
+
+        // Left holly leaf
+        ctx.fillStyle = '#15803D';
+        ctx.strokeStyle = '#052E16';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-8, -10, -20, -12, -26, -6);
+        ctx.bezierCurveTo(-20, 2, -10, 6, 0, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Lower holly leaf
+        ctx.fillStyle = '#16A34A';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-4, 10, -12, 20, -6, 25);
+        ctx.bezierCurveTo(4, 19, 8, 9, 0, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Leaf veins
+        ctx.strokeStyle = '#86EFAC';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(-2, -1);
+        ctx.lineTo(-20, -6);
+        ctx.moveTo(-1, 2);
+        ctx.lineTo(-5, 19);
+        ctx.stroke();
+
+        // Three glossy crimson holly berries
+        const berries = [[-3, -3, 4.6, '#DC2626'], [4, -1, 4.2, '#EF4444'], [0, 5, 4.2, '#B91C1C']];
+        for (const [bx, by, br, col] of berries) {
+            ctx.fillStyle = col;
+            ctx.strokeStyle = '#7F1D1D';
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.arc(bx, by, br, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(bx - br * 0.3, by - br * 0.3, br * 0.28, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    },
+
+    _drawGoldStarOrnament(ctx, cx, cy, r = 10, fillColor = '#FDE047') {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.fillStyle = fillColor || '#FDE047';
+        ctx.strokeStyle = '#B45309';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+            const ang = (i * Math.PI) / 4;
+            const rad = (i % 2 === 0) ? r : r * 0.34;
+            const px = Math.cos(ang) * rad;
+            const py = Math.sin(ang) * rad;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    },
+
+    _drawStar8(ctx, cx, cy, r = 10, fillColor = '#FDE047') {
+        this._drawGoldStarOrnament(ctx, cx, cy, r, fillColor);
+    },
+
+    _drawSnowflakeOrnament(ctx, cx, cy, r = 10, strokeColor = '#FFFFFF') {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.strokeStyle = strokeColor || '#FFFFFF';
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 6; i++) {
+            const ang = (i * Math.PI) / 3;
+            const ex = Math.cos(ang) * r;
+            const ey = Math.sin(ang) * r;
+            const mx = Math.cos(ang) * (r * 0.56);
+            const my = Math.sin(ang) * (r * 0.56);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(ex, ey);
+            ctx.moveTo(mx, my);
+            ctx.lineTo(mx + Math.cos(ang + 0.6) * (r * 0.34), my + Math.sin(ang + 0.6) * (r * 0.34));
+            ctx.moveTo(mx, my);
+            ctx.lineTo(mx + Math.cos(ang - 0.6) * (r * 0.34), my + Math.sin(ang - 0.6) * (r * 0.34));
+            ctx.stroke();
+        }
+        ctx.fillStyle = '#FEF08A';
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    },
+
+    _drawSnowflake(ctx, cx, cy, r = 10, strokeColor = '#FFFFFF') {
+        this._drawSnowflakeOrnament(ctx, cx, cy, r, strokeColor);
+    },
+
+    _getCandyStripePattern(ctx) {
+        if (!this._candyStripePatternCache && typeof document !== 'undefined') {
+            const tile = document.createElement('canvas');
+            tile.width = 48;
+            tile.height = 48;
+            const tctx = tile.getContext('2d');
+            tctx.fillStyle = '#FFFDF9';
+            tctx.fillRect(0, 0, 48, 48);
+            tctx.strokeStyle = '#DC2626';
+            tctx.lineWidth = 11;
+            for (let offset = -48; offset <= 96; offset += 24) {
+                tctx.beginPath();
+                tctx.moveTo(offset, 0);
+                tctx.lineTo(offset + 48, 48);
+                tctx.stroke();
+            }
+            this._candyStripePatternCache = tile;
+        }
+        return this._candyStripePatternCache ? ctx.createPattern(this._candyStripePatternCache, 'repeat') : '#DC2626';
+    },
+
+    isTextBackingStyle(style) {
+        return Boolean(style && ((this.TEXT_BACKING_STYLES && this.TEXT_BACKING_STYLES[style]) || (this.CARD_BACKGROUND_STYLES && this.CARD_BACKGROUND_STYLES[style])));
+    },
+
+    isCardBackgroundStyle(style) {
+        return Boolean(style && ((this.CARD_BACKGROUND_STYLES && this.CARD_BACKGROUND_STYLES[style]) || (this.TEXT_BACKING_STYLES && this.TEXT_BACKING_STYLES[style])));
+    },
+
+    _resolveCutoutStyleId(style) {
+        if (!style) return 'newspaper_cutout';
+        if (this.TEXT_BACKING_STYLES && this.TEXT_BACKING_STYLES[style]) return style;
+        const map = {
+            newspaper_page: 'newspaper_cutout',
+            newspaper_sepia_page: 'newspaper_sepia',
+            torn_parchment_board: 'gold_parchment',
+            kraft_clipboard: 'kraft_sticker',
+            grid_notebook_page: 'grid_note',
+            dark_film_board: 'dark_film_matte',
+            xmas_candy_frame: 'xmas_candy_ribbon',
+            xmas_velvet_gold_board: 'xmas_velvet_gold',
+            xmas_pine_snow_board: 'xmas_pine_snow',
+            xmas_gingerbread_card: 'xmas_gingerbread_tag',
+            xmas_starry_snow_night: 'xmas_frost_ice',
+            xmas_cream_holly_letter: 'torn_cream_paper',
+        };
+        return map[style] || 'newspaper_cutout';
+    },
+
+    _resolveCardStyleId(style) {
+        if (!style) return 'newspaper_page';
+        if (this.CARD_BACKGROUND_STYLES && this.CARD_BACKGROUND_STYLES[style]) return style;
+        const map = {
+            newspaper_cutout: 'newspaper_page',
+            newspaper_sepia: 'newspaper_sepia_page',
+            torn_cream_paper: 'xmas_cream_holly_letter',
+            gold_parchment: 'torn_parchment_board',
+            kraft_sticker: 'kraft_clipboard',
+            grid_note: 'grid_notebook_page',
+            dark_film_matte: 'dark_film_board',
+            red_editorial: 'xmas_velvet_gold_board',
+            ransom_magazine: 'newspaper_page',
+            xmas_candy_ribbon: 'xmas_candy_frame',
+            xmas_velvet_gold: 'xmas_velvet_gold_board',
+            xmas_pine_snow: 'xmas_pine_snow_board',
+            xmas_gingerbread_tag: 'xmas_gingerbread_card',
+            xmas_frost_ice: 'xmas_starry_snow_night',
+        };
+        return map[style] || 'newspaper_page';
+    },
+
+    _traceHandTornCardPath(ctx, rx, ry, rw, rh, amp = 4.5, seedBase = 101, scrollOffsetY = 0) {
+        const step = 18;
+        const jit = (idx, salt) => {
+            const h = Math.sin((idx * 127.1 + seedBase * 311.7 + salt * 74.7)) * 43758.5453;
+            return ((h - Math.floor(h)) - 0.5) * 2 * amp;
+        };
+        const smoothJit = (coord, period, salt) => {
+            const u = coord / period;
+            const i0 = Math.floor(u);
+            const f = u - i0;
+            const s = f * f * (3 - 2 * f);
+            return jit(i0, salt) * (1 - s) + jit(i0 + 1, salt) * s;
+        };
+        const vScroll = Number.isFinite(Number(scrollOffsetY)) ? Number(scrollOffsetY) : 0;
+        ctx.beginPath();
+        ctx.moveTo(rx + jit(0, 1) * 0.4, ry + jit(0, 2) * 0.4);
+        const topSteps = Math.max(4, Math.round(rw / step));
+        for (let i = 1; i <= topSteps; i++) {
+            const px = rx + (rw * i) / topSteps;
+            const py = ry + jit(i, 3);
+            ctx.lineTo(px, py);
+        }
+        const rightSteps = Math.max(4, Math.round(rh / step));
+        for (let i = 1; i <= rightSteps; i++) {
+            const frac = i / rightSteps;
+            const py = ry + rh * frac;
+            const edgeTaper = Math.min(1, Math.min(frac, 1 - frac) * 5);
+            const tearX = Math.abs(vScroll) > 0.01
+                ? smoothJit((py - ry) - vScroll, step, 4) * edgeTaper + jit(i, 4) * (1 - edgeTaper)
+                : jit(i, 4);
+            const px = rx + rw + tearX;
+            ctx.lineTo(px, py);
+        }
+        for (let i = topSteps - 1; i >= 0; i--) {
+            const px = rx + (rw * i) / topSteps;
+            const py = ry + rh + jit(i, 5);
+            ctx.lineTo(px, py);
+        }
+        for (let i = rightSteps - 1; i >= 1; i--) {
+            const frac = i / rightSteps;
+            const py = ry + rh * frac;
+            const edgeTaper = Math.min(1, Math.min(frac, 1 - frac) * 5);
+            const tearX = Math.abs(vScroll) > 0.01
+                ? smoothJit((py - ry) - vScroll, step, 6) * edgeTaper + jit(i, 6) * (1 - edgeTaper)
+                : jit(i, 6);
+            const px = rx + tearX;
+            ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+    },
+
+    /**
+     * 绘制滚动字幕 / 文字卡片的整块主题背景画板（旧报纸整版、羊皮卷、牛皮纸画板、圣诞拐杖糖框、圣诞红丝绒贺卡、松林覆雪板、姜饼屋糖霜卡、飘雪夜空等）
+     * 支持 opts.scrollOffsetY 让报纸版面、纹理、折痕与内嵌装饰跟随字幕向上循环卷动。
+     */
+    drawThemedCardBackground(ctx, rx, ry, rw, rh, rad = 16, opts = {}) {
+        if (!ctx || rw <= 2 || rh <= 2) return;
+        const rawStyle = opts.style || 'newspaper_page';
+        const styleId = this._resolveCardStyleId(rawStyle);
+        const cfg = this.CARD_BACKGROUND_STYLES[styleId] || this.CARD_BACKGROUND_STYLES.newspaper_page;
+        const opacity = opts.opacity != null ? Math.max(0, Math.min(1, Number(opts.opacity))) : 1;
+        if (opacity <= 0.001) return;
+
+        const rawScrollY = Number.isFinite(Number(opts.scrollOffsetY)) ? Number(opts.scrollOffsetY) : 0;
+        const r = Math.max(0, Math.min(rad, rw / 2, rh / 2));
+        ctx.save();
+        try {
+            ctx.globalAlpha = opacity * ctx.globalAlpha;
+
+            // 1. Drop shadow & base card silhouette
+            ctx.save();
+            try {
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.38)';
+                ctx.shadowBlur = 18;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 6;
+
+                if (styleId === 'kraft_clipboard') {
+                    // Outer white die-cut sticker rim for kraft clipboard
+                    this._traceHandTornCardPath(ctx, rx - 6, ry - 6, rw + 12, rh + 12, 4.0, 202, rawScrollY);
+                    ctx.fillStyle = '#FAF5EB';
+                    ctx.fill();
+                    ctx.shadowColor = 'transparent';
+                    this._traceHandTornCardPath(ctx, rx, ry, rw, rh, 3.5, 101, rawScrollY);
+                } else if (cfg.tornEdge) {
+                    this._traceHandTornCardPath(ctx, rx, ry, rw, rh, 4.2, styleId.length * 37, rawScrollY);
+                } else {
+                    _roundRect(ctx, rx, ry, rw, rh, r);
+                }
+                ctx.fillStyle = cfg.baseColor || '#F3EFE6';
+                ctx.fill();
+            } finally {
+                ctx.restore();
+            }
+
+            // 2. Clip to the card shape for interior textures & patterns
+            ctx.save();
+            try {
+                if (cfg.tornEdge) {
+                    this._traceHandTornCardPath(ctx, rx, ry, rw, rh, 4.2, styleId.length * 37, rawScrollY);
+                } else {
+                    _roundRect(ctx, rx, ry, rw, rh, r);
+                }
+                ctx.clip();
+
+                // Fill tiled paper/newspaper/gingerbread texture with upward looping scroll translation
+                if (cfg.tileStyle) {
+                    const tile = this.getBackingTileCanvas(cfg.tileStyle);
+                    if (tile) {
+                        const pat = ctx.createPattern(tile, 'repeat');
+                        if (pat) {
+                            const tileH = tile.height || 512;
+                            const modTileY = ((rawScrollY % tileH) + tileH) % tileH;
+                            ctx.save();
+                            ctx.translate(rx, ry + modTileY);
+                            ctx.fillStyle = pat;
+                            ctx.fillRect(-16, -tileH - 16, rw + 32, rh + tileH * 2 + 32);
+                            ctx.restore();
+                        }
+                    }
+                }
+
+                // Style-specific interior gradients, scrolling sections, borders, and ornaments
+                if (styleId === 'newspaper_page' || styleId === 'newspaper_sepia_page') {
+                    const isSepia = styleId === 'newspaper_sepia_page';
+                    const inkColor = isSepia ? 'rgba(72, 44, 22, 0.46)' : 'rgba(38, 32, 26, 0.40)';
+                    const faintInk = isSepia ? 'rgba(72, 44, 22, 0.18)' : 'rgba(38, 32, 26, 0.15)';
+                    const inset = Math.max(12, Math.min(22, rw * 0.025));
+                    const innerW = Math.max(40, rw - inset * 2);
+
+                    // Looping newspaper sections (masthead headers, horizontal fold seams, column rules, halftone photo boxes)
+                    const sectionH = 320;
+                    const modSecY = ((rawScrollY % sectionH) + sectionH) % sectionH;
+                    const baseSecIdx = Math.floor(-rawScrollY / sectionH);
+                    const mastheads = [
+                        'THE DAILY CHRONICLE   •   MORNING EDITION',
+                        'THE SUNDAY HERALD   •   SPECIAL ARCHIVE',
+                        'TIMES GAZETTE   •   FAITH & CHRONICLE',
+                    ];
+                    const subHeads = [
+                        'SPECIAL EDITORIAL REPORT',
+                        'CHRONICLE ARCHIVE DISPATCH',
+                        'MORNING TESTIMONY & GRACE',
+                        'HISTORICAL PRESS FEATURE',
+                    ];
+
+                    ctx.save();
+                    for (let k = -1; k <= Math.ceil(rh / sectionH) + 1; k++) {
+                        const sy = ry + modSecY + k * sectionH;
+                        if (sy + sectionH < ry - 20 || sy > ry + rh + 20) continue;
+                        const secId = Math.abs(baseSecIdx + k);
+
+                        // 1) Horizontal paper-fold crease shadow & highlight
+                        const foldGrad = ctx.createLinearGradient(rx, sy - 6, rx, sy + 8);
+                        foldGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                        foldGrad.addColorStop(0.45, isSepia ? 'rgba(68, 40, 16, 0.14)' : 'rgba(40, 34, 28, 0.11)');
+                        foldGrad.addColorStop(0.6, 'rgba(255, 252, 245, 0.36)');
+                        foldGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                        ctx.fillStyle = foldGrad;
+                        ctx.fillRect(rx + 4, sy - 6, rw - 8, 14);
+
+                        // 2) Editorial masthead double-rule & banner text
+                        ctx.strokeStyle = inkColor;
+                        ctx.lineWidth = 2.2;
+                        ctx.beginPath();
+                        ctx.moveTo(rx + inset, sy + 10);
+                        ctx.lineTo(rx + rw - inset, sy + 10);
+                        ctx.stroke();
+
+                        ctx.lineWidth = 1.0;
+                        ctx.beginPath();
+                        ctx.moveTo(rx + inset, sy + 14.5);
+                        ctx.lineTo(rx + rw - inset, sy + 14.5);
+                        ctx.moveTo(rx + inset, sy + 32);
+                        ctx.lineTo(rx + rw - inset, sy + 32);
+                        ctx.stroke();
+
+                        if (innerW >= 140 && typeof ctx.fillText === 'function') {
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.rect(rx + inset, sy + 15, innerW, 16);
+                            ctx.clip();
+                            ctx.fillStyle = isSepia ? 'rgba(68, 40, 18, 0.42)' : 'rgba(36, 30, 24, 0.36)';
+                            ctx.font = '700 10.5px Georgia, "Times New Roman", serif';
+                            ctx.textBaseline = 'middle';
+                            const mhText = mastheads[secId % mastheads.length];
+                            ctx.textAlign = 'center';
+                            ctx.fillText(mhText, rx + rw * 0.5, sy + 23.5);
+                            if (innerW >= 280) {
+                                ctx.font = '600 8.5px Georgia, "Times New Roman", serif';
+                                ctx.textAlign = 'left';
+                                ctx.fillText(`VOL. CXIV — NO. ${104 + (secId % 89)}`, rx + inset + 4, sy + 23.5);
+                                ctx.textAlign = 'right';
+                                ctx.fillText(`PAGE ${(secId % 8) + 1}`, rx + rw - inset - 4, sy + 23.5);
+                            }
+                            ctx.restore();
+                        }
+
+                        // 3) 3-column vertical divider rules & faux vintage photo/headline blocks inside section
+                        const colCount = innerW >= 320 ? 3 : 2;
+                        const colW = innerW / colCount;
+                        ctx.strokeStyle = faintInk;
+                        ctx.lineWidth = 1.0;
+                        ctx.beginPath();
+                        for (let c = 1; c < colCount; c++) {
+                            const cx = rx + inset + c * colW;
+                            ctx.moveTo(cx, sy + 36);
+                            ctx.lineTo(cx, sy + sectionH - 6);
+                        }
+                        ctx.stroke();
+
+                        // Faux halftone vintage illustration box in one column per section
+                        const photoCol = secId % colCount;
+                        const px = rx + inset + photoCol * colW + 8;
+                        const py = sy + 44 + (secId % 2) * 36;
+                        const pw = Math.max(24, colW - 16);
+                        const ph = 74;
+                        if (pw >= 36 && py + ph < sy + sectionH - 16) {
+                            ctx.fillStyle = isSepia ? 'rgba(82, 52, 24, 0.11)' : 'rgba(44, 38, 32, 0.09)';
+                            ctx.fillRect(px, py, pw, ph);
+                            ctx.strokeStyle = inkColor;
+                            ctx.lineWidth = 1.1;
+                            ctx.strokeRect(px, py, pw, ph);
+                            // Inner vintage cross-hatch lines
+                            ctx.strokeStyle = faintInk;
+                            ctx.lineWidth = 0.7;
+                            ctx.beginPath();
+                            for (let d = 8; d < pw + ph; d += 10) {
+                                const x1 = px + Math.max(0, d - ph);
+                                const y1 = py + Math.min(ph, d);
+                                const x2 = px + Math.min(pw, d);
+                                const y2 = py + Math.max(0, d - pw);
+                                ctx.moveTo(x1, y1);
+                                ctx.lineTo(x2, y2);
+                            }
+                            ctx.stroke();
+                            // Caption bar under photo
+                            ctx.fillStyle = faintInk;
+                            ctx.fillRect(px, py + ph + 4, pw * 0.78, 3.5);
+                        }
+
+                        // Faux editorial sub-headline block in adjacent column
+                        const hlCol = (photoCol + 1) % colCount;
+                        const hx = rx + inset + hlCol * colW + 8;
+                        const hy = sy + 48 + ((secId + 1) % 2) * 52;
+                        const hw = Math.max(24, colW - 16);
+                        if (hw >= 40) {
+                            ctx.fillStyle = isSepia ? 'rgba(72, 44, 22, 0.24)' : 'rgba(38, 32, 26, 0.20)';
+                            ctx.fillRect(hx, hy, hw, 2);
+                            ctx.fillRect(hx, hy + 18, hw * 0.65, 1.2);
+                            if (typeof ctx.fillText === 'function') {
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.rect(hx, hy + 3, hw, 14);
+                                ctx.clip();
+                                ctx.font = '700 9.5px Georgia, "Times New Roman", serif';
+                                ctx.fillStyle = isSepia ? 'rgba(68, 40, 18, 0.34)' : 'rgba(36, 30, 24, 0.30)';
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'top';
+                                ctx.fillText(subHeads[secId % subHeads.length], hx, hy + 4);
+                                ctx.restore();
+                            }
+                        }
+                    }
+                    ctx.restore();
+
+                    // Soft aged edge vignette so center text stands out clearly
+                    const vig = ctx.createRadialGradient(
+                        rx + rw * 0.5, ry + rh * 0.5, Math.min(rw, rh) * 0.2,
+                        rx + rw * 0.5, ry + rh * 0.5, Math.max(rw, rh) * 0.72
+                    );
+                    vig.addColorStop(0, isSepia ? 'rgba(245, 234, 212, 0.44)' : 'rgba(248, 245, 238, 0.48)');
+                    vig.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
+                    vig.addColorStop(1, isSepia ? 'rgba(92, 58, 24, 0.22)' : 'rgba(60, 48, 36, 0.16)');
+                    ctx.fillStyle = vig;
+                    ctx.fillRect(rx, ry, rw, rh);
+
+                    if (isSepia) {
+                        // Antique double-line inner frame
+                        ctx.strokeStyle = inkColor;
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(rx + 12, ry + 12, rw - 24, rh - 24);
+                        ctx.strokeStyle = faintInk;
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(rx + 17, ry + 17, rw - 34, rh - 34);
+                    }
+                } else if (styleId === 'torn_parchment_board' || styleId === 'kraft_clipboard') {
+                    // Scrolling horizontal parchment / kraft fold creases & manuscript rules
+                    const creaseStep = 180;
+                    const modCreaseY = ((rawScrollY % creaseStep) + creaseStep) % creaseStep;
+                    ctx.save();
+                    for (let cy = ry + modCreaseY - creaseStep; cy < ry + rh + creaseStep; cy += creaseStep) {
+                        if (cy < ry + 12 || cy > ry + rh - 12) continue;
+                        const cg = ctx.createLinearGradient(rx, cy - 4, rx, cy + 5);
+                        cg.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                        cg.addColorStop(0.45, 'rgba(90, 62, 28, 0.11)');
+                        cg.addColorStop(0.65, 'rgba(255, 250, 235, 0.28)');
+                        cg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                        ctx.fillStyle = cg;
+                        ctx.fillRect(rx + 10, cy - 4, rw - 20, 9);
+                    }
+                    ctx.restore();
+
+                    if (styleId === 'torn_parchment_board') {
+                        // Warm radial parchment glow + double antique gold frame + 8-point stars
+                        const inset = 14;
+                        ctx.strokeStyle = '#C59B27';
+                        ctx.lineWidth = 2.5;
+                        ctx.strokeRect(rx + inset, ry + inset, rw - inset * 2, rh - inset * 2);
+                        ctx.strokeStyle = 'rgba(197, 155, 39, 0.55)';
+                        ctx.lineWidth = 1.2;
+                        ctx.strokeRect(rx + inset + 6, ry + inset + 6, rw - (inset + 6) * 2, rh - (inset + 6) * 2);
+                        const starR = Math.max(8, Math.min(14, Math.min(rw, rh) * 0.025));
+                        this._drawStar8(ctx, rx + inset + 16, ry + inset + 16, starR, '#C59B27');
+                        this._drawStar8(ctx, rx + rw - inset - 16, ry + inset + 16, starR, '#C59B27');
+                        this._drawStar8(ctx, rx + inset + 16, ry + rh - inset - 16, starR, '#C59B27');
+                        this._drawStar8(ctx, rx + rw - inset - 16, ry + rh - inset - 16, starR, '#C59B27');
+                    }
+                } else if (styleId === 'grid_notebook_page') {
+                    // Scrolling horizontal ruled lines & binder punch holes + red margin line
+                    const lineStep = 32;
+                    const modLineY = ((rawScrollY % lineStep) + lineStep) % lineStep;
+                    ctx.strokeStyle = 'rgba(100, 149, 237, 0.24)';
+                    ctx.lineWidth = 1.1;
+                    ctx.beginPath();
+                    for (let ly = ry + modLineY; ly < ry + rh; ly += lineStep) {
+                        if (ly < ry + 42) continue;
+                        ctx.moveTo(rx + 8, ly);
+                        ctx.lineTo(rx + rw - 8, ly);
+                    }
+                    ctx.stroke();
+
+                    // Scrolling binder holes along left margin
+                    const holeStep = 96;
+                    const modHoleY = ((rawScrollY % holeStep) + holeStep) % holeStep;
+                    ctx.fillStyle = 'rgba(120, 115, 108, 0.22)';
+                    for (let hy = ry + modHoleY; hy < ry + rh; hy += holeStep) {
+                        if (hy < ry + 20 || hy > ry + rh - 20) continue;
+                        ctx.beginPath();
+                        ctx.arc(rx + 18, hy, 5.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // Red notebook header double line & left margin line
+                    ctx.strokeStyle = 'rgba(220, 53, 69, 0.42)';
+                    ctx.lineWidth = 1.8;
+                    ctx.beginPath();
+                    ctx.moveTo(rx, ry + 34);
+                    ctx.lineTo(rx + rw, ry + 34);
+                    ctx.moveTo(rx, ry + 38);
+                    ctx.lineTo(rx + rw, ry + 38);
+                    ctx.stroke();
+                    ctx.strokeStyle = 'rgba(220, 53, 69, 0.28)';
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.moveTo(rx + 36, ry);
+                    ctx.lineTo(rx + 36, ry + rh);
+                    ctx.stroke();
+                } else if (styleId === 'dark_film_board') {
+                    // Double champagne gold cinema frame
+                    const inset = 12;
+                    ctx.strokeStyle = '#D4AF37';
+                    ctx.lineWidth = 2.2;
+                    _roundRect(ctx, rx + inset, ry + inset, rw - inset * 2, rh - inset * 2, Math.max(4, r - 6));
+                    ctx.stroke();
+                    ctx.strokeStyle = 'rgba(212, 175, 55, 0.45)';
+                    ctx.lineWidth = 1;
+                    _roundRect(ctx, rx + inset + 6, ry + inset + 6, rw - (inset + 6) * 2, rh - (inset + 6) * 2, Math.max(2, r - 10));
+                    ctx.stroke();
+                } else if (styleId === 'xmas_candy_frame') {
+                    // Outer candy-cane striped frame (scrolls upward with rawScrollY) + deep crimson velvet interior + gold rule
+                    const borderW = Math.max(12, Math.min(22, Math.min(rw, rh) * 0.032));
+                    const modCandyY = ((rawScrollY % 48) + 48) % 48;
+                    ctx.save();
+                    ctx.translate(rx, ry + modCandyY);
+                    ctx.fillStyle = this._getCandyStripePattern(ctx);
+                    ctx.fillRect(-10, -64, rw + 20, rh + 128);
+                    ctx.restore();
+
+                    const irx = rx + borderW;
+                    const iry = ry + borderW;
+                    const irw = Math.max(10, rw - borderW * 2);
+                    const irh = Math.max(10, rh - borderW * 2);
+                    const irad = Math.max(4, r - borderW * 0.6);
+
+                    const vg = ctx.createLinearGradient(irx, iry, irx, iry + irh);
+                    vg.addColorStop(0, '#7C0D18');
+                    vg.addColorStop(0.5, '#590710');
+                    vg.addColorStop(1, '#3D040A');
+                    _roundRect(ctx, irx, iry, irw, irh, irad);
+                    ctx.fillStyle = vg;
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#FFD700';
+                    ctx.lineWidth = 2.4;
+                    _roundRect(ctx, irx, iry, irw, irh, irad);
+                    ctx.stroke();
+
+                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
+                    ctx.lineWidth = 1.2;
+                    ctx.setLineDash([7, 5]);
+                    _roundRect(ctx, irx + 7, iry + 7, irw - 14, irh - 14, Math.max(2, irad - 4));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                } else if (styleId === 'xmas_velvet_gold_board') {
+                    // Royal crimson velvet + gold double embroidery + Bethlehem stars
+                    const vg = ctx.createRadialGradient(
+                        rx + rw * 0.5, ry + rh * 0.45, Math.min(rw, rh) * 0.08,
+                        rx + rw * 0.5, ry + rh * 0.5, Math.max(rw, rh) * 0.75
+                    );
+                    vg.addColorStop(0, '#991524');
+                    vg.addColorStop(0.6, '#6E0B16');
+                    vg.addColorStop(1, '#42050B');
+                    ctx.fillStyle = vg;
+                    ctx.fillRect(rx, ry, rw, rh);
+
+                    // Subtle diagonal velvet sheen lines that scroll upward in a loop
+                    const sheenPeriod = 22;
+                    const modSheen = ((rawScrollY % sheenPeriod) + sheenPeriod) % sheenPeriod;
+                    ctx.strokeStyle = 'rgba(255, 230, 180, 0.05)';
+                    ctx.lineWidth = 2;
+                    for (let d = -rh - sheenPeriod; d < rw + rh + sheenPeriod; d += sheenPeriod) {
+                        ctx.beginPath();
+                        ctx.moveTo(rx + d + modSheen * 0.5, ry);
+                        ctx.lineTo(rx + d + modSheen * 0.5 - rh * 0.5, ry + rh);
+                        ctx.stroke();
+                    }
+
+                    const inset = 12;
+                    ctx.strokeStyle = '#F5D061';
+                    ctx.lineWidth = 3;
+                    _roundRect(ctx, rx + inset, ry + inset, rw - inset * 2, rh - inset * 2, Math.max(4, r - 6));
+                    ctx.stroke();
+
+                    ctx.strokeStyle = 'rgba(245, 208, 97, 0.72)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([8, 6]);
+                    _roundRect(ctx, rx + inset + 8, ry + inset + 8, rw - (inset + 8) * 2, rh - (inset + 8) * 2, Math.max(2, r - 10));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                } else if (styleId === 'xmas_pine_snow_board') {
+                    // Deep forest pine green + golden inner border + scrolling snow sparkles + thick snowdrift cap
+                    const pg = ctx.createLinearGradient(rx, ry, rx, ry + rh);
+                    pg.addColorStop(0, '#1B5E3A');
+                    pg.addColorStop(0.55, '#113E25');
+                    pg.addColorStop(1, '#092415');
+                    ctx.fillStyle = pg;
+                    ctx.fillRect(rx, ry, rw, rh);
+
+                    // Snow dots inside the pine board that loop smoothly with rawScrollY
+                    const spanH = Math.max(20, Math.floor(rh - 24));
+                    for (let i = 0; i < 36; i++) {
+                        const sx = rx + ((i * 97 + 31) % Math.max(20, Math.floor(rw - 24))) + 12;
+                        const baseOffY = (i * 151 + 47) % spanH;
+                        const loopedY = (((baseOffY + rawScrollY) % spanH) + spanH) % spanH;
+                        const sy = ry + loopedY + 12;
+                        const sr = 1.5 + (i % 3) * 1.1;
+                        ctx.fillStyle = `rgba(255, 255, 255, ${(0.12 + (i % 4) * 0.06).toFixed(2)})`;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    const inset = 12;
+                    ctx.strokeStyle = '#E5C158';
+                    ctx.lineWidth = 2.4;
+                    _roundRect(ctx, rx + inset, ry + inset, rw - inset * 2, rh - inset * 2, Math.max(4, r - 6));
+                    ctx.stroke();
+
+                    // Thick organic white snowdrift along the top edge
+                    const snowBaseH = Math.max(18, Math.min(34, rh * 0.055));
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(rx, ry);
+                    ctx.lineTo(rx + rw, ry);
+                    ctx.lineTo(rx + rw, ry + snowBaseH);
+                    const waves = Math.max(5, Math.round(rw / 65));
+                    const segW = rw / waves;
+                    for (let w = waves; w >= 1; w--) {
+                        const xEnd = rx + (w - 1) * segW;
+                        const xMid = rx + (w - 0.5) * segW;
+                        const swell = snowBaseH + ((w % 2 === 0) ? 9 : -4);
+                        ctx.quadraticCurveTo(xMid, ry + swell, xEnd, ry + snowBaseH * 0.85);
+                    }
+                    ctx.closePath();
+                    ctx.fillStyle = '#F8FAFC';
+                    ctx.shadowColor = 'rgba(14, 165, 233, 0.32)';
+                    ctx.shadowBlur = 6;
+                    ctx.shadowOffsetY = 3;
+                    ctx.fill();
+                    ctx.restore();
+                } else if (styleId === 'xmas_gingerbread_card') {
+                    // Warm baked gingerbread vignette + royal white icing wavy border + dashed stitch
+                    const gg = ctx.createRadialGradient(
+                        rx + rw * 0.5, ry + rh * 0.5, Math.min(rw, rh) * 0.2,
+                        rx + rw * 0.5, ry + rh * 0.5, Math.max(rw, rh) * 0.72
+                    );
+                    gg.addColorStop(0, 'rgba(156, 85, 38, 0.25)');
+                    gg.addColorStop(1, 'rgba(54, 22, 6, 0.45)');
+                    ctx.fillStyle = gg;
+                    ctx.fillRect(rx, ry, rw, rh);
+
+                    // White royal icing scalloped outer border
+                    ctx.strokeStyle = '#FFFDF9';
+                    ctx.lineWidth = 5;
+                    _roundRect(ctx, rx + 8, ry + 8, rw - 16, rh - 16, Math.max(6, r - 4));
+                    ctx.stroke();
+
+                    // Inner dashed icing stitch
+                    ctx.strokeStyle = 'rgba(255, 253, 249, 0.85)';
+                    ctx.lineWidth = 2.2;
+                    ctx.setLineDash([10, 8]);
+                    ctx.lineDashOffset = -rawScrollY * 0.5;
+                    _roundRect(ctx, rx + 18, ry + 18, rw - 36, rh - 36, Math.max(4, r - 10));
+                    ctx.stroke();
+                    ctx.lineDashOffset = 0;
+                    ctx.setLineDash([]);
+                } else if (styleId === 'xmas_starry_snow_night') {
+                    // Winter midnight-blue aurora gradient + scrolling snowflakes & golden stars + frosted snow rims
+                    const ng = ctx.createLinearGradient(rx, ry, rx + rw * 0.3, ry + rh);
+                    ng.addColorStop(0, '#091526');
+                    ng.addColorStop(0.45, '#143356');
+                    ng.addColorStop(0.8, '#1B4B6B');
+                    ng.addColorStop(1, '#0D223A');
+                    ctx.fillStyle = ng;
+                    ctx.fillRect(rx, ry, rw, rh);
+
+                    // Soft aurora glow near top
+                    const ag = ctx.createRadialGradient(
+                        rx + rw * 0.5, ry + rh * 0.18, 10,
+                        rx + rw * 0.5, ry + rh * 0.18, Math.max(rw, rh) * 0.55
+                    );
+                    ag.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+                    ag.addColorStop(0.5, 'rgba(16, 185, 129, 0.08)');
+                    ag.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = ag;
+                    ctx.fillRect(rx, ry, rw, rh);
+
+                    // Scattered snowflakes & golden stars that loop upward with rawScrollY
+                    const spanH = Math.max(20, Math.floor(rh - 28));
+                    for (let i = 0; i < 42; i++) {
+                        const sx = rx + ((i * 113 + 29) % Math.max(20, Math.floor(rw - 28))) + 14;
+                        const baseOffY = (i * 163 + 41) % spanH;
+                        const loopedY = (((baseOffY + rawScrollY) % spanH) + spanH) % spanH;
+                        const sy = ry + loopedY + 14;
+                        if (i % 7 === 0) {
+                            this._drawSnowflake(ctx, sx, sy, 6 + (i % 3) * 2.5, 'rgba(186, 230, 253, 0.45)');
+                        } else if (i % 9 === 0) {
+                            this._drawStar8(ctx, sx, sy, 6 + (i % 2) * 3, 'rgba(253, 224, 71, 0.52)');
+                        } else {
+                            ctx.fillStyle = `rgba(240, 249, 255, ${(0.20 + (i % 4) * 0.10).toFixed(2)})`;
+                            ctx.beginPath();
+                            ctx.arc(sx, sy, 1.3 + (i % 3) * 0.9, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+
+                    // Frosted ice-blue double frame
+                    const inset = 12;
+                    ctx.strokeStyle = 'rgba(125, 211, 252, 0.78)';
+                    ctx.lineWidth = 2.4;
+                    _roundRect(ctx, rx + inset, ry + inset, rw - inset * 2, rh - inset * 2, Math.max(4, r - 6));
+                    ctx.stroke();
+                    ctx.strokeStyle = 'rgba(224, 242, 254, 0.35)';
+                    ctx.lineWidth = 1;
+                    _roundRect(ctx, rx + inset + 6, ry + inset + 6, rw - (inset + 6) * 2, rh - (inset + 6) * 2, Math.max(2, r - 10));
+                    ctx.stroke();
+                } else if (styleId === 'xmas_cream_holly_letter') {
+                    // Warm cream parchment letter + scrolling faint stationery lines + festive crimson & pine-green double border
+                    const ruleStep = 36;
+                    const modRuleY = ((rawScrollY % ruleStep) + ruleStep) % ruleStep;
+                    ctx.strokeStyle = 'rgba(180, 140, 95, 0.16)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    for (let ly = ry + modRuleY; ly < ry + rh; ly += ruleStep) {
+                        if (ly < ry + 24 || ly > ry + rh - 24) continue;
+                        ctx.moveTo(rx + 26, ly);
+                        ctx.lineTo(rx + rw - 26, ly);
+                    }
+                    ctx.stroke();
+
+                    const inset = 12;
+                    ctx.strokeStyle = '#C92A2A';
+                    ctx.lineWidth = 3.2;
+                    _roundRect(ctx, rx + inset, ry + inset, rw - inset * 2, rh - inset * 2, Math.max(4, r - 6));
+                    ctx.stroke();
+
+                    ctx.strokeStyle = '#1E5631';
+                    ctx.lineWidth = 1.6;
+                    _roundRect(ctx, rx + inset + 7, ry + inset + 7, rw - (inset + 7) * 2, rh - (inset + 7) * 2, Math.max(2, r - 10));
+                    ctx.stroke();
+                }
+            } finally {
+                ctx.restore(); // end clip
+            }
+
+            // 3. Exterior / corner 3D ornaments (masking tape, holly berries, Bethlehem stars)
+            if (styleId === 'kraft_clipboard' || styleId === 'grid_notebook_page') {
+                // Semi-transparent masking tape strips at top center or top corners
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 248, 225, 0.72)';
+                ctx.strokeStyle = 'rgba(180, 160, 120, 0.35)';
+                ctx.lineWidth = 1;
+                const tapeW = Math.min(110, rw * 0.24);
+                const tapeH = 22;
+                ctx.translate(rx + rw * 0.5, ry + 2);
+                ctx.rotate(-0.03);
+                ctx.fillRect(-tapeW / 2, -tapeH / 2, tapeW, tapeH);
+                ctx.strokeRect(-tapeW / 2, -tapeH / 2, tapeW, tapeH);
+                ctx.restore();
+            } else if (
+                styleId === 'xmas_candy_frame' ||
+                styleId === 'xmas_velvet_gold_board' ||
+                styleId === 'xmas_pine_snow_board' ||
+                styleId === 'xmas_gingerbread_card' ||
+                styleId === 'xmas_cream_holly_letter'
+            ) {
+                const ornScale = Math.max(0.85, Math.min(1.45, Math.min(rw, rh) / 480));
+                const padCorner = styleId === 'xmas_candy_frame' ? 20 : 18;
+                this._drawHollyOrnament(ctx, rx + padCorner, ry + padCorner, ornScale, false);
+                this._drawHollyOrnament(ctx, rx + rw - padCorner, ry + padCorner, ornScale, true);
+                this._drawHollyOrnament(ctx, rx + padCorner, ry + rh - padCorner, ornScale, false);
+                this._drawHollyOrnament(ctx, rx + rw - padCorner, ry + rh - padCorner, ornScale, true);
+                if (styleId === 'xmas_velvet_gold_board') {
+                    const starR = 12 * ornScale;
+                    this._drawStar8(ctx, rx + rw * 0.5, ry + 16, starR, '#FFF3B0');
+                    this._drawStar8(ctx, rx + rw * 0.5, ry + rh - 16, starR, '#FFF3B0');
+                }
+            }
+        } finally {
+            ctx.restore();
+        }
+    },
+
+    /**
+     * 生成并缓存高分辨率纸张/旧报纸/方格/羊皮纸纹理平铺图块
+     */
+    getBackingTileCanvas(styleId = 'newspaper_cutout') {
+        if (this._backingTileCache[styleId]) return this._backingTileCache[styleId];
+        if (typeof document === 'undefined') return null;
+
+        const size = 512;
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+        if (!ctx || typeof ctx.fillRect !== 'function') return null;
+        const cfg = this.TEXT_BACKING_STYLES[styleId] || this.TEXT_BACKING_STYLES.newspaper_cutout;
+
+        // Deterministic PRNG for procedural texture
+        let seed = 1337;
+        for (let i = 0; i < styleId.length; i++) seed = (seed * 31 + styleId.charCodeAt(i)) >>> 0;
+        const rand = () => {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            return (seed >>> 8) / 16777216;
+        };
+
+        // 1. Base paper fill
+        ctx.fillStyle = cfg.baseColor || '#F3EFE6';
+        ctx.fillRect(0, 0, size, size);
+
+        // 2. Subtle organic paper mottling / clouds
+        const cloudCount = (styleId === 'newspaper_sepia' || styleId === 'gold_parchment' || styleId === 'kraft_sticker') ? 28 : 16;
+        for (let i = 0; i < cloudCount; i++) {
+            const cx = rand() * size;
+            const cy = rand() * size;
+            const r = 40 + rand() * 90;
+            const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            if (styleId === 'newspaper_sepia' || styleId === 'gold_parchment') {
+                g.addColorStop(0, `rgba(165, 128, 72, ${(0.04 + rand() * 0.05).toFixed(3)})`);
+                g.addColorStop(1, 'rgba(165, 128, 72, 0)');
+            } else if (styleId === 'kraft_sticker') {
+                g.addColorStop(0, `rgba(110, 75, 38, ${(0.05 + rand() * 0.06).toFixed(3)})`);
+                g.addColorStop(1, 'rgba(110, 75, 38, 0)');
+            } else if (styleId === 'red_editorial') {
+                g.addColorStop(0, `rgba(40, 5, 5, ${(0.06 + rand() * 0.06).toFixed(3)})`);
+                g.addColorStop(1, 'rgba(40, 5, 5, 0)');
+            } else if (styleId === 'dark_film_matte') {
+                g.addColorStop(0, `rgba(255, 248, 230, ${(0.02 + rand() * 0.03).toFixed(3)})`);
+                g.addColorStop(1, 'rgba(255, 248, 230, 0)');
+            } else {
+                g.addColorStop(0, `rgba(180, 165, 140, ${(0.035 + rand() * 0.035).toFixed(3)})`);
+                g.addColorStop(1, 'rgba(180, 165, 140, 0)');
+            }
+            ctx.fillStyle = g;
+            ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+        }
+
+        // 3. Newspaper print columns & dense micro-typography for newspaper styles
+        if (styleId === 'newspaper_cutout' || styleId === 'newspaper_sepia' || styleId === 'ransom_magazine') {
+            const isSepia = styleId === 'newspaper_sepia';
+            const inkRgb = isSepia ? '58, 38, 20' : '38, 32, 28';
+            const colCount = 4;
+            const colGap = 10;
+            const margin = 8;
+            const colW = (size - margin * 2 - colGap * (colCount - 1)) / colCount;
+
+            // Vertical column rules
+            ctx.strokeStyle = `rgba(${inkRgb}, 0.28)`;
+            ctx.lineWidth = 0.9;
+            for (let col = 1; col < colCount; col++) {
+                const ruleX = margin + col * colW + (col - 0.5) * colGap;
+                ctx.beginPath();
+                ctx.moveTo(ruleX, 0);
+                ctx.lineTo(ruleX, size);
+                ctx.stroke();
+            }
+
+            // Horizontal masthead rule band across top & middle of tile so scrolling motion is clearly visible
+            for (const bandY of [6, 262]) {
+                ctx.fillStyle = `rgba(${inkRgb}, 0.34)`;
+                ctx.fillRect(margin, bandY, size - margin * 2, 1.6);
+                ctx.fillStyle = `rgba(${inkRgb}, 0.20)`;
+                ctx.fillRect(margin, bandY + 3.5, size - margin * 2, 0.8);
+            }
+
+            const snippets = [
+                'faith grace light hope truth spirit peace mercy',
+                'morning prayer blessing promise eternal word',
+                'chronicle daily edition column report gazette',
+                'scripturechapter verse testimony wisdom strength',
+                'providence guidance miracle journey heart soul',
+                'editorial feature dispatch archive journal press',
+                'steadfast devotion courage renewal gratitude',
+            ];
+            const headlines = [
+                'THE DAILY CHRONICLE', 'MORNING EDITION', 'FAITH & GRACE',
+                'SPECIAL REPORT', 'TIMES GAZETTE', 'SUNDAY HERALD',
+            ];
+
+            ctx.textBaseline = 'top';
+            for (let col = 0; col < colCount; col++) {
+                const colX = margin + col * (colW + colGap);
+                let y = 14;
+                let lineCounter = 0;
+                while (y < size - 4) {
+                    const isHeadline = (lineCounter % 15 === (col * 4) % 15);
+                    const isParagraphEnd = !isHeadline && (lineCounter % 7 === (col * 3) % 7);
+                    if (isHeadline && y < size - 18) {
+                        // Horizontal editorial rule above headline
+                        ctx.fillStyle = `rgba(${inkRgb}, 0.38)`;
+                        ctx.fillRect(colX, y, colW, 1.2);
+                        y += 2.8;
+                        ctx.font = '700 8.2px Georgia, "Times New Roman", serif';
+                        ctx.fillStyle = `rgba(${inkRgb}, ${isSepia ? 0.62 : 0.56})`;
+                        const hl = headlines[(lineCounter + col * 2) % headlines.length];
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(colX, y, colW, 9.5);
+                        ctx.clip();
+                        ctx.fillText(hl, colX + 1, y);
+                        ctx.restore();
+                        y += 10;
+                        ctx.fillStyle = `rgba(${inkRgb}, 0.28)`;
+                        ctx.fillRect(colX, y, colW, 0.8);
+                        y += 2.8;
+                    } else {
+                        ctx.font = '600 5.8px Georgia, "Times New Roman", serif';
+                        const indent = (lineCounter % 7 === ((col * 3 + 1) % 7)) ? 7 : 0;
+                        const targetW = isParagraphEnd ? colW * (0.45 + rand() * 0.35) : colW;
+                        const snip = snippets[(lineCounter + col * 3) % snippets.length];
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(colX + indent, y, Math.max(4, targetW - indent), 6.5);
+                        ctx.clip();
+                        ctx.fillStyle = `rgba(${inkRgb}, ${(0.44 + rand() * 0.18).toFixed(2)})`;
+                        ctx.fillText(snip + ' ' + snip, colX + indent, y);
+                        // Add subtle halftone micro-dots along the baseline so the print texture feels tactile even at high zoom
+                        let dx = colX + indent;
+                        while (dx < colX + targetW - 2) {
+                            const wLen = 4 + rand() * 14;
+                            if (rand() > 0.22) {
+                                ctx.fillStyle = `rgba(${inkRgb}, ${(0.26 + rand() * 0.22).toFixed(2)})`;
+                                ctx.fillRect(dx, y + 1.5 + (rand() > 0.5 ? 1.8 : 0), Math.min(wLen, colX + targetW - dx), 1.2);
+                            }
+                            dx += wLen + 1.8 + rand() * 2.2;
+                        }
+                        ctx.restore();
+                        y += 6.2;
+                    }
+                    lineCounter++;
+                }
+            }
+        } else if (styleId === 'grid_note') {
+            // Fine stationery graph grid
+            const step = 16;
+            ctx.strokeStyle = 'rgba(130, 170, 210, 0.36)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x <= size; x += step) {
+                ctx.moveTo(x + 0.5, 0);
+                ctx.lineTo(x + 0.5, size);
+            }
+            for (let y = 0; y <= size; y += step) {
+                ctx.moveTo(0, y + 0.5);
+                ctx.lineTo(size, y + 0.5);
+            }
+            ctx.stroke();
+        } else if (styleId === 'gold_parchment') {
+            // Subtle metallic gold-leaf flecks and parchment fibers
+            for (let i = 0; i < 160; i++) {
+                const fx = rand() * size;
+                const fy = rand() * size;
+                const fw = 1.2 + rand() * 3.2;
+                const fh = 1.0 + rand() * 2.4;
+                ctx.fillStyle = rand() > 0.4
+                    ? `rgba(212, 175, 55, ${(0.22 + rand() * 0.35).toFixed(2)})`
+                    : `rgba(255, 242, 175, ${(0.35 + rand() * 0.40).toFixed(2)})`;
+                ctx.fillRect(fx, fy, fw, fh);
+            }
+        } else if (styleId === 'xmas_gingerbread_tag') {
+            // Spiced gingerbread cookie crumb & sugar crystal speckles
+            for (let i = 0; i < 220; i++) {
+                const fx = rand() * size;
+                const fy = rand() * size;
+                const r = 0.8 + rand() * 1.8;
+                ctx.fillStyle = rand() > 0.35
+                    ? `rgba(58, 24, 8, ${(0.18 + rand() * 0.22).toFixed(2)})`
+                    : `rgba(255, 250, 240, ${(0.22 + rand() * 0.30).toFixed(2)})`;
+                ctx.beginPath();
+                ctx.arc(fx, fy, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 4. Organic paper fibers & vintage speckle noise
+        const fiberCount = (styleId === 'kraft_sticker' || styleId === 'torn_cream_paper' || styleId === 'gold_parchment') ? 260 : 180;
+        for (let i = 0; i < fiberCount; i++) {
+            const fx = rand() * size;
+            const fy = rand() * size;
+            const len = 3 + rand() * 10;
+            const ang = rand() * Math.PI * 2;
+            ctx.strokeStyle = (styleId === 'dark_film_matte' || styleId === 'red_editorial' || styleId === 'xmas_gingerbread_tag')
+                ? `rgba(255, 250, 240, ${(0.06 + rand() * 0.09).toFixed(2)})`
+                : `rgba(90, 70, 48, ${(0.06 + rand() * 0.09).toFixed(2)})`;
+            ctx.lineWidth = 0.6 + rand() * 0.6;
+            ctx.beginPath();
+            ctx.moveTo(fx, fy);
+            ctx.lineTo(fx + Math.cos(ang) * len, fy + Math.sin(ang) * len);
+            ctx.stroke();
+        }
+
+        this._backingTileCache[styleId] = c;
+        return c;
+    },
+
+    /**
+     * 绘制贴字剪报轮廓 / 杂志拼贴块 / 文字底部半高托底条 / 圣诞节装饰字幕带
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {Array<{text:string, x:number, y:number, textY?:number, textBaseline?:string, w:number, h:number, fontSize:number, fontStr:string, letterSpacing?:number, lineIndex?:number, words?:Array}>} lineItems
+     * @param {Object} opts
+     */
+    drawTextCutoutBacking(ctx, lineItems, opts = {}) {
+        if (!ctx || !Array.isArray(lineItems) || lineItems.length === 0) return;
+        const activeLines = lineItems.filter(ln => ln && ln.w > 0.5 && ln.text && ln.text.trim().length > 0);
+        if (activeLines.length === 0) return;
+
+        const styleId = this._resolveCutoutStyleId(opts.style || 'newspaper_cutout');
+        const cfg = this.TEXT_BACKING_STYLES[styleId] || this.TEXT_BACKING_STYLES.newspaper_cutout;
+        const opacity = opts.opacity != null ? Math.max(0, Math.min(1, Number(opts.opacity))) : 1;
+        if (opacity <= 0.001) return;
+
+        const padX = Number.isFinite(Number(opts.padX)) ? Number(opts.padX) : 14;
+        const padY = Number.isFinite(Number(opts.padY)) ? Number(opts.padY) : 8;
+        const padTop = Number.isFinite(Number(opts.padTop)) ? Number(opts.padTop) : padY;
+        const padBottom = Number.isFinite(Number(opts.padBottom)) ? Number(opts.padBottom) : padY;
+        const avgPadY = (padTop + padBottom) * 0.5;
+
+        // 锚定平铺纹理原点到滚动文本坐标系，使报纸/纸张纹理跟随字幕一起向上移动
+        const firstLn = activeLines[0];
+        const anchorX = Number.isFinite(Number(opts.scrollAnchorX)) ? Number(opts.scrollAnchorX) : 0;
+        const anchorY = Number.isFinite(Number(opts.scrollAnchorY))
+            ? Number(opts.scrollAnchorY)
+            : ((firstLn.y || 0) - (firstLn.lineIndex || 0) * (firstLn.h || firstLn.fontSize || 60));
+
+        ctx.save();
+        ctx.globalAlpha *= opacity;
+
+        // ── Mode 1: 文字底部半高托底条 (Bottom Half-Height Strip) ──
+        if (cfg.mode === 'bottom_strip') {
+            for (let i = 0; i < activeLines.length; i++) {
+                const ln = activeLines[i];
+                const fs = ln.fontSize || 60;
+                const stripH = Math.max(4, fs * 0.46 + (avgPadY - 8) * 0.75);
+                const stripY = ln.y + fs * 0.54 - (padTop - padBottom) * 0.35;
+                const extX = Math.max(-fs * 0.15, fs * 0.16 + (padX - 12) * 0.85);
+                const stripX = ln.x - extX;
+                const stripW = Math.max(8, ln.w + extX * 2);
+
+                ctx.save();
+                if (styleId === 'bottom_gold_bar') {
+                    ctx.shadowColor = 'rgba(212, 165, 40, 0.38)';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowOffsetY = 2;
+                    const grad = ctx.createLinearGradient(stripX, stripY, stripX + stripW, stripY + stripH);
+                    grad.addColorStop(0, '#F7D66A');
+                    grad.addColorStop(0.5, '#E2A234');
+                    grad.addColorStop(1, '#F9DE7E');
+                    ctx.fillStyle = grad;
+                    const r = Math.min(stripH * 0.48, stripW / 2);
+                    _roundRect(ctx, stripX, stripY, stripW, stripH, r);
+                    ctx.fill();
+                    ctx.shadowColor = 'transparent';
+                    ctx.strokeStyle = 'rgba(255, 250, 220, 0.72)';
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.moveTo(stripX + r, stripY + 1);
+                    ctx.lineTo(stripX + stripW - r, stripY + 1);
+                    ctx.stroke();
+                } else if (styleId === 'bottom_rose_brush') {
+                    ctx.shadowColor = 'rgba(80, 20, 20, 0.28)';
+                    ctx.shadowBlur = 8;
+                    ctx.shadowOffsetY = 2;
+                    const grad = ctx.createLinearGradient(stripX, stripY, stripX + stripW, stripY);
+                    grad.addColorStop(0, 'rgba(217, 107, 102, 0.88)');
+                    grad.addColorStop(0.15, '#D96B66');
+                    grad.addColorStop(0.85, '#E4837C');
+                    grad.addColorStop(1, 'rgba(217, 107, 102, 0.88)');
+                    ctx.fillStyle = grad;
+                    const skew = stripH * 0.22;
+                    ctx.beginPath();
+                    ctx.moveTo(stripX + skew, stripY + 1);
+                    ctx.quadraticCurveTo(stripX + stripW * 0.5, stripY - 2, stripX + stripW, stripY + 1.5);
+                    ctx.lineTo(stripX + stripW - skew, stripY + stripH - 1);
+                    ctx.quadraticCurveTo(stripX + stripW * 0.5, stripY + stripH + 2, stripX, stripY + stripH - 1.5);
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (styleId === 'xmas_frost_ice') {
+                    // ❄️ 圣诞冰雪极光半高底条 (冰晶蓝渐变 + 雪白亮边 + 六角雪花装饰)
+                    ctx.shadowColor = 'rgba(14, 165, 233, 0.45)';
+                    ctx.shadowBlur = 12;
+                    ctx.shadowOffsetY = 2;
+                    const grad = ctx.createLinearGradient(stripX, stripY, stripX + stripW, stripY + stripH);
+                    grad.addColorStop(0, 'rgba(3, 105, 161, 0.92)');
+                    grad.addColorStop(0.5, 'rgba(14, 165, 233, 0.92)');
+                    grad.addColorStop(1, 'rgba(56, 189, 248, 0.92)');
+                    ctx.fillStyle = grad;
+                    const r = Math.min(stripH * 0.48, stripW / 2);
+                    _roundRect(ctx, stripX, stripY, stripW, stripH, r);
+                    ctx.fill();
+                    ctx.shadowColor = 'transparent';
+                    ctx.strokeStyle = 'rgba(240, 249, 255, 0.90)';
+                    ctx.lineWidth = 1.8;
+                    ctx.beginPath();
+                    ctx.moveTo(stripX + r * 0.7, stripY + 1);
+                    ctx.lineTo(stripX + stripW - r * 0.7, stripY + 1);
+                    ctx.stroke();
+                    const flakeR = Math.max(6, Math.min(13, stripH * 0.36));
+                    this._drawSnowflakeOrnament(ctx, stripX + flakeR * 0.6, stripY + stripH * 0.5, flakeR);
+                    this._drawSnowflakeOrnament(ctx, stripX + stripW - flakeR * 0.6, stripY + stripH * 0.5, flakeR * 0.85);
+                } else {
+                    // bottom_neon_marker
+                    const customC = (opts.color && opts.color !== '#000000' && opts.color !== '#F3EFE6') ? opts.color : '#FFE600';
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
+                    ctx.shadowBlur = 6;
+                    ctx.shadowOffsetY = 2;
+                    ctx.fillStyle = customC;
+                    const skew = stripH * 0.26;
+                    ctx.beginPath();
+                    ctx.moveTo(stripX + skew, stripY);
+                    ctx.lineTo(stripX + stripW + 2, stripY - 1);
+                    ctx.lineTo(stripX + stripW - skew, stripY + stripH);
+                    ctx.lineTo(stripX - 2, stripY + stripH + 1);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+            return;
+        }
+
+        // ── Mode 1.5: 圣诞节装饰字幕带 (Christmas Festive Ribbon Bands & Ornaments) ──
+        if (cfg.mode === 'xmas_ribbon') {
+            for (let i = 0; i < activeLines.length; i++) {
+                const ln = activeLines[i];
+                const fs = ln.fontSize || 60;
+                const px = Math.max(-12, padX);
+                const pt = Math.max(-10, padTop * 0.75);
+                const pb = Math.max(-10, padBottom * 0.75);
+                const bx = ln.x - px;
+                const by = ln.y - pt * 0.65;
+                const bw = Math.max(12, ln.w + px * 2);
+                const bh = Math.max(12, Math.max(fs * 1.06, ln.h) + pt * 0.75 + pb * 0.75);
+                const r = Math.min(18, bh * 0.30, bw / 2);
+
+                ctx.save();
+                ctx.shadowColor = cfg.shadowColor || 'rgba(0,0,0,0.45)';
+                ctx.shadowBlur = cfg.shadowBlur ?? 12;
+                ctx.shadowOffsetY = cfg.shadowOffsetY ?? 4;
+
+                if (styleId === 'xmas_candy_ribbon') {
+                    // 🍬 外层红白斜纹拐杖糖边框 + 内层圣诞深红丝绒底 + 金线内衬 + 冬青果角饰
+                    const stripePat = this._getCandyStripePattern(ctx);
+                    ctx.save();
+                    ctx.translate(anchorX, anchorY);
+                    ctx.fillStyle = stripePat;
+                    _roundRect(ctx, bx - anchorX, by - anchorY, bw, bh, r);
+                    ctx.fill();
+                    ctx.restore();
+                    ctx.shadowColor = 'transparent';
+
+                    const borderW = Math.max(5.5, Math.min(10, fs * 0.11));
+                    const inX = bx + borderW;
+                    const inY = by + borderW;
+                    const inW = Math.max(4, bw - borderW * 2);
+                    const inH = Math.max(4, bh - borderW * 2);
+                    const inR = Math.max(4, r - borderW * 0.65);
+
+                    const innerGrad = ctx.createLinearGradient(inX, inY, inX, inY + inH);
+                    innerGrad.addColorStop(0, '#991B1B');
+                    innerGrad.addColorStop(0.5, '#7F1D1D');
+                    innerGrad.addColorStop(1, '#580D11');
+                    ctx.fillStyle = innerGrad;
+                    _roundRect(ctx, inX, inY, inW, inH, inR);
+                    ctx.fill();
+
+                    ctx.strokeStyle = 'rgba(253, 224, 71, 0.85)';
+                    ctx.lineWidth = 1.5;
+                    _roundRect(ctx, inX + 2, inY + 2, Math.max(2, inW - 4), Math.max(2, inH - 4), Math.max(2, inR - 1));
+                    ctx.stroke();
+
+                    const ornScale = Math.max(0.75, Math.min(1.35, fs / 58));
+                    if (i === 0) {
+                        this._drawHollyOrnament(ctx, bx + 6, by + 6, ornScale, false);
+                    }
+                    if (i === activeLines.length - 1) {
+                        this._drawHollyOrnament(ctx, bx + bw - 6, by + bh - 6, ornScale, true);
+                    }
+                } else if (styleId === 'xmas_velvet_gold') {
+                    // 🎅 圣诞红丝绒燕尾挂旗带 + 双层烫金缝线 + 伯利恒八角金星与冬青角饰
+                    const notch = Math.min(16, bh * 0.22);
+                    const vGrad = ctx.createLinearGradient(bx, by, bx, by + bh);
+                    vGrad.addColorStop(0, '#9B1321');
+                    vGrad.addColorStop(0.5, '#740C16');
+                    vGrad.addColorStop(1, '#4C060D');
+                    ctx.fillStyle = vGrad;
+
+                    ctx.beginPath();
+                    ctx.moveTo(bx - notch * 0.4, by);
+                    ctx.lineTo(bx + bw + notch * 0.4, by);
+                    ctx.lineTo(bx + bw - notch * 0.55, by + bh * 0.5);
+                    ctx.lineTo(bx + bw + notch * 0.4, by + bh);
+                    ctx.lineTo(bx - notch * 0.4, by + bh);
+                    ctx.lineTo(bx + notch * 0.55, by + bh * 0.5);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.shadowColor = 'transparent';
+                    ctx.strokeStyle = '#FACC15';
+                    ctx.lineWidth = 2.4;
+                    ctx.stroke();
+
+                    // 内部金色虚线缝边
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(254, 240, 138, 0.78)';
+                    ctx.lineWidth = 1.3;
+                    ctx.setLineDash([6, 4]);
+                    ctx.strokeRect(bx + notch * 0.65, by + 5, Math.max(4, bw - notch * 1.3), Math.max(4, bh - 10));
+                    ctx.restore();
+
+                    const starR = Math.max(7, Math.min(13, fs * 0.16));
+                    this._drawGoldStarOrnament(ctx, bx + notch * 0.8 + 6, by + 5, starR);
+                    this._drawGoldStarOrnament(ctx, bx + bw - notch * 0.8 - 6, by + bh - 5, starR * 0.9);
+                    if (i === 0) {
+                        this._drawHollyOrnament(ctx, bx + bw - 4, by + 4, Math.max(0.7, Math.min(1.25, fs / 62)), true);
+                    }
+                } else {
+                    // 🎄 xmas_pine_snow: 松林绿覆雪字幕带 (森林绿底 + 顶部积雪波浪边 + 冬青红果)
+                    const pGrad = ctx.createLinearGradient(bx, by, bx, by + bh);
+                    pGrad.addColorStop(0, '#165B36');
+                    pGrad.addColorStop(0.55, '#0F4226');
+                    pGrad.addColorStop(1, '#082916');
+                    ctx.fillStyle = pGrad;
+                    _roundRect(ctx, bx, by, bw, bh, r);
+                    ctx.fill();
+
+                    ctx.shadowColor = 'transparent';
+                    ctx.strokeStyle = '#F59E0B';
+                    ctx.lineWidth = 2.0;
+                    _roundRect(ctx, bx, by, bw, bh, r);
+                    ctx.stroke();
+
+                    // 顶部厚实积雪波浪层
+                    const snowH = Math.max(7, Math.min(15, bh * 0.20));
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.moveTo(bx + r * 0.4, by + snowH * 0.55);
+                    ctx.quadraticCurveTo(bx + r, by - 3, bx + r * 1.6, by - 1);
+                    const waveStep = Math.max(22, fs * 0.42);
+                    for (let sx = bx + r * 1.6; sx < bx + bw - r * 1.2; sx += waveStep) {
+                        const nextX = Math.min(bx + bw - r * 0.5, sx + waveStep);
+                        const midX = (sx + nextX) * 0.5;
+                        ctx.quadraticCurveTo(midX, by - 3.5, nextX, by + 1);
+                    }
+                    ctx.lineTo(bx + bw - r * 0.3, by + snowH * 0.75);
+                    for (let sx = bx + bw - r * 0.3; sx > bx + r * 0.4; sx -= waveStep) {
+                        const prevX = Math.max(bx + r * 0.4, sx - waveStep);
+                        const midX = (sx + prevX) * 0.5;
+                        ctx.quadraticCurveTo(midX, by + snowH * 1.25, prevX, by + snowH * 0.62);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+
+                    const ornScale = Math.max(0.72, Math.min(1.25, fs / 60));
+                    this._drawHollyOrnament(ctx, bx + 8, by + 4, ornScale, false);
+                    this._drawSnowflakeOrnament(ctx, bx + bw - 12, by + bh - 10, Math.max(6, Math.min(11, fs * 0.14)));
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+            return;
+        }
+
+        const tileCanvas = this.getBackingTileCanvas(styleId);
+        const pattern = tileCanvas ? ctx.createPattern(tileCanvas, 'repeat') : null;
+
+        // ── Mode 2: 杂志拼贴剪报块 (Angled Magazine Clipping Blocks per Line) ──
+        if (cfg.mode === 'magazine_blocks') {
+            for (let i = 0; i < activeLines.length; i++) {
+                const ln = activeLines[i];
+                const fs = ln.fontSize || 60;
+                const lIdx = ln.lineIndex ?? i;
+                const px = Math.max(-12, padX);
+                const pt = Math.max(-10, padTop * 0.65);
+                const pb = Math.max(-10, padBottom * 0.65);
+                const bx = ln.x - px;
+                const by = ln.y - pt;
+                const bw = Math.max(12, ln.w + px * 2);
+                const bh = Math.max(12, Math.max(fs * 1.06, ln.h) + pt + pb);
+                const cx = bx + bw / 2;
+                const cy = by + bh / 2;
+                const tilt = ((lIdx % 3) - 1) * 0.013;
+
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(tilt);
+                ctx.translate(-cx, -cy);
+
+                ctx.shadowColor = cfg.shadowColor;
+                ctx.shadowBlur = cfg.shadowBlur;
+                ctx.shadowOffsetY = cfg.shadowOffsetY;
+                ctx.beginPath();
+                ctx.moveTo(bx + 3, by + 1);
+                ctx.lineTo(bx + bw - 2, by - 1);
+                ctx.lineTo(bx + bw + 1, by + bh - 2);
+                ctx.lineTo(bx - 2, by + bh + 1);
+                ctx.closePath();
+                if (pattern) {
+                    ctx.save();
+                    ctx.translate(anchorX, anchorY);
+                    ctx.fillStyle = pattern;
+                    ctx.fill();
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = cfg.baseColor;
+                    ctx.fill();
+                }
+
+                ctx.shadowColor = 'transparent';
+                ctx.strokeStyle = cfg.rimColor || '#DCD3C2';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Editorial accent rule on alternating sides
+                ctx.fillStyle = (lIdx % 2 === 0) ? 'rgba(168, 28, 30, 0.78)' : 'rgba(40, 35, 32, 0.65)';
+                ctx.fillRect(bx + 4, by + 3, 4, bh - 6);
+                ctx.restore();
+            }
+            ctx.restore();
+            return;
+        }
+
+        // ── Mode 3: 贴字连体剪报轮廓 (Glyph-Hugging Cutout Silhouette — 爆款同款) ──
+        if (typeof document === 'undefined') {
+            ctx.restore();
+            return;
+        }
+
+        let maxFs = 48;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const ln of activeLines) {
+            const fs = ln.fontSize || 60;
+            if (fs > maxFs) maxFs = fs;
+            if (ln.x < minX) minX = ln.x;
+            if (ln.y < minY) minY = ln.y;
+            if (ln.x + ln.w > maxX) maxX = ln.x + ln.w;
+            if (ln.y + Math.max(ln.h, fs * 1.18) > maxY) maxY = ln.y + Math.max(ln.h, fs * 1.18);
+        }
+
+        const margin = Math.ceil(maxFs * 0.72 + Math.max(0, padX, padTop, padBottom) + (cfg.rimWidth || 2) + 20);
+        const canvasW = ctx.canvas ? ctx.canvas.width : 1080;
+        const canvasH = ctx.canvas ? ctx.canvas.height : 1920;
+        const boxX = Math.max(-80, Math.floor(minX - margin));
+        const boxY = Math.max(-80, Math.floor(minY - margin));
+        const boxRight = Math.min(canvasW + 80, Math.ceil(maxX + margin));
+        const boxBottom = Math.min(canvasH + 80, Math.ceil(maxY + margin));
+        const boxW = Math.max(1, boxRight - boxX);
+        const boxH = Math.max(1, boxBottom - boxY);
+
+        if (!this._cutoutScratchCanvas) {
+            this._cutoutScratchCanvas = document.createElement('canvas');
+        }
+        const off = this._cutoutScratchCanvas;
+        if (off.width < boxW || off.height < boxH || off.width > boxW + 400 || off.height > boxH + 400) {
+            off.width = boxW;
+            off.height = boxH;
+        }
+        const octx = off.getContext('2d');
+        octx.clearRect(0, 0, off.width, off.height);
+
+        octx.save();
+        octx.translate(-boxX, -boxY);
+        octx.globalCompositeOperation = 'source-over';
+        const maskColor = cfg.rimColor || cfg.baseColor || '#EAE2D3';
+        octx.fillStyle = maskColor;
+        octx.strokeStyle = maskColor;
+        octx.lineJoin = 'round';
+        octx.lineCap = 'round';
+
+        const scaleY = Math.max(0.35, Math.min(2.6, 1 + (avgPadY - 8) / 26));
+        const scaleX = Math.max(0.42, Math.min(2.6, 1 + (padX - 12) / 34));
+        const extX = (padX - 12) * 0.90;
+        const extTop = (padTop - 8) * 0.85;
+        const extBot = (padBottom - 8) * 0.85;
+
+        // Pass A: Core solid line bridges + inter-line vertical bridges so there are ZERO interior holes
+        const lineCores = [];
+        for (let i = 0; i < activeLines.length; i++) {
+            const ln = activeLines[i];
+            const fs = ln.fontSize || 60;
+            const cutoutR = Math.max(6, fs * 0.35 * Math.min(scaleX, scaleY));
+            const coreLeft = ln.x - cutoutR * 0.36 - extX;
+            const coreRight = Math.max(coreLeft + 8, ln.x + ln.w + cutoutR * 0.36 + extX);
+            const coreTop = ln.y + fs * 0.08 - extTop;
+            const coreBottom = Math.max(coreTop + 8, ln.y + Math.max(ln.h * 0.92, fs * 1.04) + extBot);
+            const coreR = Math.min(cutoutR * 0.72, (coreRight - coreLeft) / 2, (coreBottom - coreTop) / 2);
+            lineCores.push({ left: coreLeft, right: coreRight, top: coreTop, bottom: coreBottom, r: Math.max(3, coreR), fs, cutoutR });
+            _roundRect(octx, coreLeft, coreTop, Math.max(2, coreRight - coreLeft), Math.max(2, coreBottom - coreTop), Math.max(3, coreR));
+            octx.fill();
+        }
+
+        // Connect adjacent lines vertically where their spans overlap or are close
+        for (let i = 0; i < lineCores.length - 1; i++) {
+            const cur = lineCores[i];
+            const nxt = lineCores[i + 1];
+            const vGap = nxt.top - cur.bottom;
+            if (vGap < Math.max(cur.fs, nxt.fs) * 0.95) {
+                const bridgeLeft = Math.max(cur.left, nxt.left) - Math.min(cur.cutoutR, nxt.cutoutR) * 0.18;
+                const bridgeRight = Math.min(cur.right, nxt.right) + Math.min(cur.cutoutR, nxt.cutoutR) * 0.18;
+                if (bridgeRight > bridgeLeft + 4) {
+                    const bridgeTop = cur.top + (cur.bottom - cur.top) * 0.35;
+                    const bridgeBot = nxt.top + (nxt.bottom - nxt.top) * 0.65;
+                    _roundRect(octx, bridgeLeft, bridgeTop, bridgeRight - bridgeLeft, Math.max(2, bridgeBot - bridgeTop), Math.min(cur.r, nxt.r) * 0.6);
+                    octx.fill();
+                }
+            }
+        }
+
+        // Pass B: Thick glyph-hugging stroke around every character/word + torn-paper edge nibs
+        for (let i = 0; i < activeLines.length; i++) {
+            const ln = activeLines[i];
+            const fs = ln.fontSize || 60;
+            const cutoutR = lineCores[i].cutoutR;
+            const strokeW = cutoutR * 2.02;
+            const ls = Number(ln.letterSpacing) || 0;
+
+            if (!ln.isSolidBlock) {
+                octx.font = ln.fontStr || `700 ${fs}px Georgia, serif`;
+                octx.textBaseline = ln.textBaseline || 'top';
+                octx.lineWidth = strokeW;
+                octx.lineJoin = 'round';
+                octx.lineCap = 'round';
+
+                const drawYCoord = ln.textY !== undefined ? ln.textY : ln.y;
+                if (Array.isArray(ln.words) && ln.words.length > 0) {
+                    for (const wItem of ln.words) {
+                        if (!wItem || !wItem.text) continue;
+                        const wy = wItem.textY !== undefined ? wItem.textY : (wItem.y !== undefined ? wItem.y : drawYCoord);
+                        if (ls !== 0 && typeof _strokeTextWithLetterSpacing === 'function') {
+                            _strokeTextWithLetterSpacing(octx, wItem.text, wItem.x, wy, ls);
+                        } else {
+                            octx.strokeText(wItem.text, wItem.x, wy);
+                        }
+                    }
+                } else {
+                    if (ls !== 0 && typeof _strokeTextWithLetterSpacing === 'function') {
+                        _strokeTextWithLetterSpacing(octx, ln.text, ln.x, drawYCoord, ls);
+                    } else {
+                        octx.strokeText(ln.text, ln.x, drawYCoord);
+                    }
+                }
+            }
+
+            // Deterministic hand-torn paper edge nibs along the top, bottom, and side edges
+            if (cfg.tornEdge) {
+                const core = lineCores[i];
+                const lSeedBase = ((ln.lineIndex ?? i) + 1) * 97 + ln.text.length * 13;
+                const step = Math.max(14, fs * 0.28);
+                const nibScale = Math.max(0.5, Math.min(1.4, scaleY));
+                let nibIdx = 0;
+                for (let nx = core.left + 6; nx <= core.right - 6; nx += step) {
+                    nibIdx++;
+                    const h1 = Math.sin(lSeedBase + nibIdx * 12.9898) * 43758.5453;
+                    const r1 = h1 - Math.floor(h1);
+                    const h2 = Math.sin(lSeedBase + nibIdx * 78.233) * 43758.5453;
+                    const r2 = h2 - Math.floor(h2);
+                    const radTop = fs * (0.10 + r1 * 0.11) * nibScale;
+                    const radBot = fs * (0.10 + r2 * 0.11) * nibScale;
+                    octx.beginPath();
+                    octx.arc(nx, core.top + (r1 - 0.5) * fs * 0.08 * nibScale, radTop, 0, Math.PI * 2);
+                    octx.arc(nx + step * 0.35, core.bottom + (r2 - 0.5) * fs * 0.08 * nibScale, radBot, 0, Math.PI * 2);
+                    octx.fill();
+                }
+            }
+        }
+
+        // Step 1 on main ctx: Draw drop shadow and outer paper/sticker rim using the solid silhouette
+        ctx.save();
+        ctx.shadowColor = cfg.shadowColor || 'rgba(0,0,0,0.32)';
+        ctx.shadowBlur = cfg.shadowBlur ?? 10;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = cfg.shadowOffsetY ?? 3;
+        ctx.drawImage(off, 0, 0, boxW, boxH, boxX, boxY, boxW, boxH);
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
+        const rimW = cfg.rimWidth || 0;
+        if (rimW > 0.5) {
+            const dirs = [
+                [-rimW, 0], [rimW, 0], [0, -rimW], [0, rimW],
+                [-rimW * 0.72, -rimW * 0.72], [rimW * 0.72, -rimW * 0.72],
+                [-rimW * 0.72, rimW * 0.72], [rimW * 0.72, rimW * 0.72],
+            ];
+            for (const [dx, dy] of dirs) {
+                ctx.drawImage(off, 0, 0, boxW, boxH, boxX + dx, boxY + dy, boxW, boxH);
+            }
+        }
+        ctx.restore();
+
+        // Step 2 on offscreen: Fill the unified silhouette mask with our procedural texture pattern anchored to scrolling text coordinates
+        octx.globalCompositeOperation = 'source-in';
+        const pat = octx.createPattern(tileCanvas, 'repeat');
+        if (opts.colormode === 'tint' && opts.color && opts.color !== '#000000' && opts.color !== cfg.baseColor) {
+            octx.fillStyle = opts.color;
+            octx.fillRect(boxX, boxY, boxW, boxH);
+            if (pat) {
+                octx.globalCompositeOperation = 'multiply';
+                octx.save();
+                octx.translate(anchorX, anchorY);
+                octx.fillStyle = pat;
+                octx.fillRect(boxX - anchorX, boxY - anchorY, boxW, boxH);
+                octx.restore();
+            }
+        } else if (pat) {
+            octx.save();
+            octx.translate(anchorX, anchorY);
+            octx.fillStyle = pat;
+            octx.fillRect(boxX - anchorX, boxY - anchorY, boxW, boxH);
+            octx.restore();
+        } else {
+            octx.fillStyle = cfg.baseColor;
+            octx.fillRect(boxX, boxY, boxW, boxH);
+        }
+        octx.restore();
+
+        // Step 3: Composite the textured cutout silhouette onto main ctx
+        ctx.drawImage(off, 0, 0, boxW, boxH, boxX, boxY, boxW, boxH);
+        if (styleId === 'xmas_gingerbread_tag' && lineCores.length > 0) {
+            const firstCore = lineCores[0];
+            const lastCore = lineCores[lineCores.length - 1];
+            const ornScale = Math.max(0.75, Math.min(1.3, maxFs / 58));
+            this._drawHollyOrnament(ctx, firstCore.left + 8, firstCore.top + 8, ornScale, false);
+            this._drawHollyOrnament(ctx, lastCore.right - 8, lastCore.bottom - 8, ornScale, true);
+        }
+        ctx.restore();
+    },
+
     getBrushSvg(style, color) {
         return '';
     }
 };
+
+// ═══════════════════════════════════════════════════════
+// 点缀装饰覆层 (Decor Overlay: 边缘点缀 / 圣诞装饰 / 发光星星 / 复古角框)
+// ═══════════════════════════════════════════════════════
+
+const DECOR_OVERLAY_CATEGORIES = [
+    { id: 'dark_particles', name: '🖤 黑色氛围模板 & 飘浮粒子 (7款)' },
+    { id: 'film_grain',     name: '🎞️ 电影颗粒 & 回忆质感 (7款)' },
+    { id: 'stars',          name: '🌟 发光星芒 & 梦幻光斑 (6款)' },
+    { id: 'xmas',           name: '🎄 圣诞节限定点缀 (5款)' },
+    { id: 'frame',          name: '⚜️ 复古画框 & 边缘装饰 (5款)' },
+];
+
+const DECOR_OVERLAY_STYLES = {
+    // ── A. 🖤 黑色氛围模板 & 飘浮粒子 (7款) ──
+    dark_floating_dust: {
+        name: '🖤 暗黑深邃模板 + 悬浮微尘',
+        category: 'dark_particles',
+        color1: '#E2E8F0',
+        color2: '#FFFDF5',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: false,
+        dark_vignette: 78,
+        vignette_spread: 62,
+        dark_tint: '#05070C',
+        floating_particles: true,
+        particle_mode: 'dust',
+        grain_intensity: 24,
+        grain_size: 100,
+        grain_warmth: 0,
+        film_scratches: false,
+        light_leak: false,
+        layout: 'full_scatter',
+        density: 75,
+        center_clear: 35,
+    },
+    dark_gold_embers: {
+        name: '🔥 黑金暗夜模板 + 升腾火星余烬',
+        category: 'dark_particles',
+        color1: '#F97316',
+        color2: '#FDE047',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: false,
+        dark_vignette: 82,
+        vignette_spread: 65,
+        dark_tint: '#0B0503',
+        floating_particles: true,
+        particle_mode: 'embers',
+        grain_intensity: 20,
+        grain_size: 100,
+        grain_warmth: 25,
+        film_scratches: false,
+        light_leak: false,
+        layout: 'full_scatter',
+        density: 80,
+        center_clear: 35,
+    },
+    dark_starlight_mist: {
+        name: '🌌 暗夜星空黑底 + 呼吸星芒微粒',
+        category: 'dark_particles',
+        color1: '#93C5FD',
+        color2: '#FFFFFF',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: false,
+        dark_vignette: 76,
+        vignette_spread: 60,
+        dark_tint: '#040814',
+        floating_particles: true,
+        particle_mode: 'dust',
+        grain_intensity: 18,
+        grain_size: 95,
+        grain_warmth: 0,
+        film_scratches: false,
+        light_leak: false,
+        layout: 'edges_and_float',
+        density: 65,
+        center_clear: 48,
+    },
+    dark_firefly_woods: {
+        name: '✨ 暗调森林黑底 + 萤火虫漂浮',
+        category: 'dark_particles',
+        color1: '#A3E635',
+        color2: '#FEF08A',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: false,
+        dark_vignette: 75,
+        vignette_spread: 60,
+        dark_tint: '#040C08',
+        floating_particles: true,
+        particle_mode: 'fireflies',
+        grain_intensity: 16,
+        grain_size: 100,
+        grain_warmth: 15,
+        film_scratches: false,
+        light_leak: false,
+        layout: 'full_scatter',
+        density: 60,
+        center_clear: 40,
+    },
+    dark_silver_snow_ash: {
+        name: '🌨️ 暗黑冰原模板 + 银白灰烬细雪',
+        category: 'dark_particles',
+        color1: '#CBD5E1',
+        color2: '#F8FAFC',
+        glow_stars: false,
+        snowflakes: true,
+        corner_ornaments: false,
+        edge_garland: false,
+        dark_vignette: 78,
+        vignette_spread: 62,
+        dark_tint: '#06090F',
+        floating_particles: true,
+        particle_mode: 'ash',
+        grain_intensity: 28,
+        grain_size: 105,
+        grain_warmth: 0,
+        film_scratches: false,
+        light_leak: false,
+        layout: 'full_scatter',
+        density: 75,
+        center_clear: 35,
+    },
+    dark_holy_halo_dust: {
+        name: '🕯️ 暗夜烛光圣殿 + 鎏金圣尘',
+        category: 'dark_particles',
+        color1: '#F59E0B',
+        color2: '#FFFBEB',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+        dark_vignette: 80,
+        vignette_spread: 64,
+        dark_tint: '#0E0804',
+        floating_particles: true,
+        particle_mode: 'dust',
+        grain_intensity: 22,
+        grain_size: 100,
+        grain_warmth: 35,
+        film_scratches: false,
+        light_leak: true,
+        layout: 'edges_and_float',
+        density: 68,
+        center_clear: 50,
+    },
+    dark_cyber_neon_sparks: {
+        name: '⚡ 暗黑赛博黑底 + 霓虹微光粒子',
+        category: 'dark_particles',
+        color1: '#22D3EE',
+        color2: '#F472B6',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: false,
+        dark_vignette: 78,
+        vignette_spread: 58,
+        dark_tint: '#06030F',
+        floating_particles: true,
+        particle_mode: 'neon',
+        grain_intensity: 20,
+        grain_size: 95,
+        grain_warmth: 0,
+        film_scratches: false,
+        light_leak: false,
+        layout: 'full_scatter',
+        density: 70,
+        center_clear: 40,
+    },
+
+    // ── B. 🎞️ 电影颗粒 & 回忆质感 (7款) ──
+    cinema_35mm_grain: {
+        name: '🎞️ 35mm 经典电影颗粒 + 宽银幕暗角',
+        category: 'film_grain',
+        color1: '#E5E7EB',
+        color2: '#FFFDF5',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: true,
+        dark_vignette: 52,
+        vignette_spread: 48,
+        dark_tint: '#060709',
+        floating_particles: true,
+        particle_mode: 'dust',
+        grain_intensity: 62,
+        grain_size: 105,
+        grain_warmth: 12,
+        film_scratches: false,
+        light_leak: false,
+        layout: 'full_scatter',
+        density: 32,
+        center_clear: 45,
+    },
+    memory_sepia_grain: {
+        name: '🕰️ 怀旧泛黄回忆颗粒 + 老照片柔光',
+        category: 'film_grain',
+        color1: '#D97706',
+        color2: '#FEF3C7',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: false,
+        dark_vignette: 58,
+        vignette_spread: 54,
+        dark_tint: '#261507',
+        floating_particles: true,
+        particle_mode: 'dust',
+        grain_intensity: 65,
+        grain_size: 118,
+        grain_warmth: 78,
+        film_scratches: false,
+        light_leak: true,
+        layout: 'full_scatter',
+        density: 45,
+        center_clear: 40,
+    },
+    vintage_8mm_scratches: {
+        name: '📽️ 8mm 老电影划痕 + 闪烁噪点颗粒',
+        category: 'film_grain',
+        color1: '#FBBF24',
+        color2: '#FFFBEB',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: true,
+        dark_vignette: 64,
+        vignette_spread: 56,
+        dark_tint: '#181008',
+        floating_particles: true,
+        particle_mode: 'dust',
+        grain_intensity: 75,
+        grain_size: 138,
+        grain_warmth: 55,
+        film_scratches: true,
+        light_leak: false,
+        layout: 'full_scatter',
+        density: 40,
+        center_clear: 35,
+    },
+    noir_bw_high_grain: {
+        name: '🎬 黑白胶片高反差粗颗粒',
+        category: 'film_grain',
+        color1: '#D4D4D8',
+        color2: '#FFFFFF',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: true,
+        dark_vignette: 74,
+        vignette_spread: 60,
+        dark_tint: '#030303',
+        floating_particles: true,
+        particle_mode: 'ash',
+        grain_intensity: 82,
+        grain_size: 150,
+        grain_warmth: 0,
+        film_scratches: true,
+        light_leak: false,
+        layout: 'full_scatter',
+        density: 38,
+        center_clear: 40,
+    },
+    dreamy_light_leak_grain: {
+        name: '🌅 复古胶片漏光 + 柔焦回忆颗粒',
+        category: 'film_grain',
+        color1: '#FB923C',
+        color2: '#FDE68A',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: false,
+        dark_vignette: 38,
+        vignette_spread: 42,
+        dark_tint: '#1E0D06',
+        floating_particles: true,
+        particle_mode: 'sunset_bokeh',
+        grain_intensity: 50,
+        grain_size: 100,
+        grain_warmth: 62,
+        film_scratches: false,
+        light_leak: true,
+        layout: 'edges_and_float',
+        density: 48,
+        center_clear: 45,
+    },
+    vhs_retro_scanlines: {
+        name: '📼 90年代 VHS 扫描线 + 磁带噪点',
+        category: 'film_grain',
+        color1: '#38BDF8',
+        color2: '#F43F5E',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+        dark_vignette: 46,
+        vignette_spread: 45,
+        dark_tint: '#070913',
+        floating_particles: false,
+        particle_mode: 'dust',
+        grain_intensity: 58,
+        grain_size: 125,
+        grain_warmth: 18,
+        film_scratches: true,
+        light_leak: false,
+        layout: 'edges_only',
+        density: 35,
+        center_clear: 65,
+    },
+    cinema_vignette_grain: {
+        name: '🎥 电影取景框暗角 + 胶片星尘',
+        category: 'film_grain',
+        color1: '#F59E0B',
+        color2: '#FFFBEB',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+        dark_vignette: 56,
+        vignette_spread: 50,
+        dark_tint: '#080A0F',
+        floating_particles: true,
+        particle_mode: 'dust',
+        grain_intensity: 52,
+        grain_size: 108,
+        grain_warmth: 22,
+        film_scratches: false,
+        light_leak: false,
+        layout: 'edges_and_float',
+        density: 45,
+        center_clear: 60,
+    },
+
+    // ── C. 🌟 发光星芒 & 梦幻光斑 (6款) ──
+    glowing_starfield: {
+        name: '🌟 璀璨发光星芒点缀',
+        category: 'stars',
+        color1: '#FFD700',
+        color2: '#FFFDF5',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    fairy_bokeh_lights: {
+        name: '💡 梦幻暖金串灯与光斑',
+        category: 'stars',
+        color1: '#FBBF24',
+        color2: '#FEF3C7',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    golden_meteor_dust: {
+        name: '✨ 圣光鎏金星尘飘落',
+        category: 'stars',
+        color1: '#F5D061',
+        color2: '#FFFBEB',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: true,
+        floating_particles: true,
+        particle_mode: 'dust',
+    },
+    angelic_rays_stars: {
+        name: '🕊️ 圣洁光芒与四角星辉',
+        category: 'stars',
+        color1: '#FDE68A',
+        color2: '#FFFFFF',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    diamond_prism_sparkles: {
+        name: '💎 钻石棱镜十字星芒闪烁',
+        category: 'stars',
+        color1: '#A5F3FC',
+        color2: '#FFFFFF',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: false,
+        floating_particles: true,
+        particle_mode: 'prism',
+        density: 65,
+    },
+    warm_sunset_bokeh: {
+        name: '🌇 落日暖阳大光斑漂浮',
+        category: 'stars',
+        color1: '#FB923C',
+        color2: '#FEF08A',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: false,
+        floating_particles: true,
+        particle_mode: 'sunset_bokeh',
+        light_leak: true,
+        grain_warmth: 35,
+        density: 55,
+    },
+
+    // ── D. 🎄 圣诞节限定点缀 (5款) ──
+    xmas_holly_pine_garland: {
+        name: '🎄 圣诞松枝冬青花环框',
+        category: 'xmas',
+        color1: '#DC2626',
+        color2: '#FFD700',
+        glow_stars: true,
+        snowflakes: true,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    xmas_snowfall_frost: {
+        name: '❄️ 圣诞漫天飘雪与冰晶边',
+        category: 'xmas',
+        color1: '#E0F2FE',
+        color2: '#7DD3FC',
+        glow_stars: true,
+        snowflakes: true,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    xmas_hanging_baubles: {
+        name: '🎅 圣诞顶部挂球与金星吊坠',
+        category: 'xmas',
+        color1: '#EF4444',
+        color2: '#FDE047',
+        glow_stars: true,
+        snowflakes: true,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    xmas_candy_corner_ribbons: {
+        name: '🍬 圣诞拐杖糖与蝴蝶结角花',
+        category: 'xmas',
+        color1: '#DC2626',
+        color2: '#FFFFFF',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    xmas_golden_bells_reindeer: {
+        name: '🔔 圣诞金铃铛与雪花金框',
+        category: 'xmas',
+        color1: '#F59E0B',
+        color2: '#DC2626',
+        glow_stars: true,
+        snowflakes: true,
+        corner_ornaments: true,
+        edge_garland: true,
+        dark_vignette: 28,
+        dark_tint: '#0A0604',
+    },
+
+    // ── E. ⚜️ 复古画框 & 边缘装饰 (5款) ──
+    vintage_gold_filigree: {
+        name: '⚜️ 古典烫金巴洛克雕花角框',
+        category: 'frame',
+        color1: '#D4AF37',
+        color2: '#FFF6D6',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    newspaper_torn_tape_frame: {
+        name: '📰 复古报刊手撕边与胶带点缀',
+        category: 'frame',
+        color1: '#E6DEC8',
+        color2: '#8B1E1E',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+        grain_intensity: 30,
+        grain_warmth: 30,
+    },
+    rose_botanical_vine: {
+        name: '🌹 复古玫瑰藤蔓边缘点缀',
+        category: 'frame',
+        color1: '#E11D48',
+        color2: '#FDE68A',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+    },
+    sacred_cathedral_arch: {
+        name: '⛪ 圣经哥特拱窗烫金边框',
+        category: 'frame',
+        color1: '#D4AF37',
+        color2: '#FEF3C7',
+        glow_stars: true,
+        snowflakes: false,
+        corner_ornaments: true,
+        edge_garland: true,
+        dark_vignette: 42,
+        dark_tint: '#0B0704',
+        floating_particles: true,
+        particle_mode: 'dust',
+    },
+    polaroid_memory_border: {
+        name: '🖼️ 拍立得回忆相纸框 + 胶片颗粒',
+        category: 'frame',
+        color1: '#FAF6EE',
+        color2: '#D97706',
+        glow_stars: false,
+        snowflakes: false,
+        corner_ornaments: false,
+        edge_garland: true,
+        grain_intensity: 46,
+        grain_size: 110,
+        grain_warmth: 52,
+        light_leak: true,
+        floating_particles: true,
+        particle_mode: 'dust',
+    },
+};
+
+ReelsBrushEngine.DECOR_OVERLAY_CATEGORIES = DECOR_OVERLAY_CATEGORIES;
+ReelsBrushEngine.DECOR_OVERLAY_STYLES = DECOR_OVERLAY_STYLES;
+
+function _decorHash(n) {
+    const s = Math.sin(n * 127.1 + 311.7) * 43758.5453123;
+    return s - Math.floor(s);
+}
+
+/**
+ * 绘制一颗带柔和放射光晕与十字/八角星芒的发光星星
+ */
+function _drawGlowingStar(ctx, cx, cy, radius, colorCore, colorHalo, glowMul, points = 4, rot = 0) {
+    if (radius <= 0.5) return;
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (rot) ctx.rotate(rot);
+
+    // 1. 柔和放射光晕 (Radial Halo)
+    if (glowMul > 0.02 && typeof ctx.createRadialGradient === 'function') {
+        const haloR = radius * (1.8 + glowMul * 1.6);
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, haloR);
+        grad.addColorStop(0, colorCore || '#FFFDF5');
+        grad.addColorStop(0.28, colorHalo || '#FFD700');
+        grad.addColorStop(1, 'rgba(255, 215, 0, 0)');
+        ctx.save();
+        ctx.globalAlpha *= Math.min(1, 0.55 * glowMul);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, haloR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // 2. 四角或八角星芒尖刺
+    ctx.fillStyle = colorHalo || '#FFD700';
+    const drawFourPoint = (rOuter, rInner) => {
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+            const a = (i * Math.PI) / 4;
+            const r = (i % 2 === 0) ? rOuter : rInner;
+            const px = Math.cos(a) * r;
+            const py = Math.sin(a) * r;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+    };
+    drawFourPoint(radius * 1.35, radius * 0.22);
+    if (points >= 8) {
+        ctx.save();
+        ctx.rotate(Math.PI / 4);
+        ctx.globalAlpha *= 0.78;
+        drawFourPoint(radius * 0.92, radius * 0.16);
+        ctx.restore();
+    }
+
+    // 3. 高亮白金星核
+    ctx.fillStyle = colorCore || '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(1.2, radius * 0.26), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+/**
+ * 绘制圣诞蝴蝶结与松枝角花
+ */
+function _drawXmasCornerBowAndPine(ctx, cx, cy, scale, rotRad, colorRibbon = '#DC2626', colorGold = '#FFD700') {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotRad);
+    ctx.scale(scale, scale);
+
+    // 1. 两侧松枝 (Pine boughs)
+    ctx.strokeStyle = '#14532D';
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    for (const dir of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(dir * 38, -8, dir * 78, dir === 1 ? 18 : -18);
+        ctx.stroke();
+        // 松针簇
+        ctx.strokeStyle = '#15803D';
+        ctx.lineWidth = 1.8;
+        for (let step = 12; step <= 72; step += 10) {
+            const bx = dir * step;
+            const by = (step / 78) * (dir === 1 ? 10 : -10);
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            ctx.lineTo(bx + dir * 8, by - 11);
+            ctx.moveTo(bx, by);
+            ctx.lineTo(bx + dir * 10, by + 9);
+            ctx.stroke();
+        }
+    }
+
+    // 2. 蝴蝶结双耳与飘带 (Festive Ribbon Bow)
+    ctx.fillStyle = colorRibbon;
+    ctx.strokeStyle = colorGold;
+    ctx.lineWidth = 1.6;
+    for (const dir of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(dir * 26, -24, dir * 36, 12, 0, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 垂下的飘带尾
+        ctx.beginPath();
+        ctx.moveTo(dir * 4, 4);
+        ctx.quadraticCurveTo(dir * 18, 22, dir * 24, 38);
+        ctx.lineTo(dir * 14, 34);
+        ctx.lineTo(dir * 10, 42);
+        ctx.quadraticCurveTo(dir * 6, 22, 0, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // 3. 中心金结与冬青红果
+    ctx.fillStyle = colorGold;
+    ctx.beginPath();
+    ctx.arc(0, 2, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#EF4444';
+    for (const [bx, by] of [[-6, -5], [6, -5], [0, -8]]) {
+        ctx.beginPath();
+        ctx.arc(bx, by, 3.8, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+/**
+ * 绘制古典巴洛克烫金雕花角饰
+ */
+function _drawBaroqueCornerFlourish(ctx, cx, cy, scale, flipX, flipY, colorGold = '#D4AF37', colorLight = '#FFF6D6') {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(flipX ? -scale : scale, flipY ? -scale : scale);
+
+    ctx.strokeStyle = colorGold;
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // 主L形双轨涡卷
+    ctx.beginPath();
+    ctx.moveTo(6, 78);
+    ctx.bezierCurveTo(6, 26, 26, 6, 78, 6);
+    ctx.stroke();
+
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(14, 62);
+    ctx.bezierCurveTo(14, 30, 30, 14, 62, 14);
+    ctx.stroke();
+
+    // 巴洛克内旋涡卷 (Scroll curls)
+    ctx.beginPath();
+    ctx.moveTo(6, 78);
+    ctx.bezierCurveTo(18, 82, 24, 70, 16, 64);
+    ctx.moveTo(78, 6);
+    ctx.bezierCurveTo(82, 18, 70, 24, 64, 16);
+    ctx.moveTo(22, 22);
+    ctx.bezierCurveTo(38, 22, 44, 36, 32, 42);
+    ctx.bezierCurveTo(24, 46, 20, 36, 28, 32);
+    ctx.stroke();
+
+    // 角顶菱形星花
+    ctx.fillStyle = colorLight;
+    ctx.beginPath();
+    ctx.moveTo(10, 2);
+    ctx.lineTo(16, 10);
+    ctx.lineTo(10, 18);
+    ctx.lineTo(4, 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+/**
+ * 绘制复古玫瑰与藤蔓角饰
+ */
+function _drawRoseCornerVine(ctx, cx, cy, scale, flipX, flipY, colorRose = '#E11D48', colorGold = '#FDE68A') {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(flipX ? -scale : scale, flipY ? -scale : scale);
+
+    // 藤蔓枝条
+    ctx.strokeStyle = '#3F6212';
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(8, 82);
+    ctx.quadraticCurveTo(10, 14, 82, 8);
+    ctx.stroke();
+
+    // 叶片
+    ctx.fillStyle = '#4D7C0F';
+    ctx.strokeStyle = colorGold;
+    ctx.lineWidth = 1;
+    for (const [lx, ly, ang] of [[14, 52, -0.5], [26, 32, -0.8], [52, 14, -1.1], [34, 46, 0.4], [48, 28, 0.2]]) {
+        ctx.save();
+        ctx.translate(lx, ly);
+        ctx.rotate(ang);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 9, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // 玫瑰主花朵 (Layered Rose Blossom)
+    const drawRose = (rx, ry, rSize) => {
+        ctx.save();
+        ctx.translate(rx, ry);
+        ctx.fillStyle = colorRose;
+        ctx.strokeStyle = '#FFF1F2';
+        ctx.lineWidth = 1.1;
+        for (let p = 0; p < 5; p++) {
+            const a = (p * Math.PI * 2) / 5;
+            ctx.beginPath();
+            ctx.arc(Math.cos(a) * rSize * 0.38, Math.sin(a) * rSize * 0.38, rSize * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.fillStyle = '#FB7185';
+        ctx.beginPath();
+        ctx.arc(0, 0, rSize * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = colorGold;
+        ctx.beginPath();
+        ctx.arc(0, 0, rSize * 0.22, 0, Math.PI * 1.5);
+        ctx.stroke();
+        ctx.restore();
+    };
+    drawRose(20, 20, 14);
+    drawRose(44, 14, 8.5);
+    drawRose(14, 44, 8.5);
+    ctx.restore();
+}
+
+const _filmGrainTileCache = new Map();
+
+/**
+ * 获取或生成 240x240 离屏 35mm 胶片颗粒噪点瓦片 (支持暖黄怀旧色调与银盐黑白颗粒)
+ */
+function _getFilmGrainTileCanvas(warmthRatio = 0) {
+    const bucket = Math.round(Math.max(0, Math.min(1, warmthRatio)) * 4);
+    if (_filmGrainTileCache.has(bucket)) return _filmGrainTileCache.get(bucket);
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
+    try {
+        const size = 240;
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const gctx = c.getContext && c.getContext('2d');
+        if (!gctx || typeof gctx.createImageData !== 'function') return null;
+        const img = gctx.createImageData(size, size);
+        const data = img.data;
+        const wMix = bucket / 4;
+        for (let i = 0, p = 0; p < size * size; p++, i += 4) {
+            const n = _decorHash(p * 1.37 + bucket * 97.3);
+            const n2 = _decorHash(p * 3.71 + 19.1);
+            // 模拟银盐胶片双峰微粒：高光亮斑 + 暗部微粒，中间透明不发灰
+            if (n > 0.62) {
+                const intensity = (n - 0.62) / 0.38;
+                data[i] = 255;
+                data[i + 1] = Math.round(252 - wMix * 28);
+                data[i + 2] = Math.round(245 - wMix * 68);
+                data[i + 3] = Math.round((45 + n2 * 115) * intensity);
+            } else if (n < 0.34) {
+                const intensity = (0.34 - n) / 0.34;
+                data[i] = Math.round(24 * wMix);
+                data[i + 1] = Math.round(14 * wMix);
+                data[i + 2] = Math.round(6 * wMix);
+                data[i + 3] = Math.round((42 + n2 * 110) * intensity);
+            } else {
+                data[i + 3] = 0;
+            }
+        }
+        gctx.putImageData(img, 0, 0);
+        _filmGrainTileCache.set(bucket, c);
+        return c;
+    } catch (_) {
+        return null;
+    }
+}
+
+/**
+ * 绘制圣诞金铃铛与冬青红丝带角饰
+ */
+function _drawXmasGoldenBellOrnament(ctx, cx, cy, scale, swayAng = 0, colorGold = '#F59E0B', colorRibbon = '#DC2626') {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(swayAng);
+    ctx.scale(scale, scale);
+
+    // 顶部冬青叶与蝴蝶结
+    ctx.fillStyle = '#15803D';
+    for (const dir of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(dir * 16, -12, 14, 6.5, dir * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.fillStyle = colorRibbon;
+    for (const dir of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.bezierCurveTo(dir * 22, -26, dir * 28, 4, 0, -4);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // 双金铃铛 (Twin Golden Bells)
+    for (const [bx, by, rot] of [[-11, 8, 0.24], [11, 8, -0.24]]) {
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(rot);
+        ctx.fillStyle = colorGold;
+        ctx.strokeStyle = '#FEF08A';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-10, -12);
+        ctx.quadraticCurveTo(-12, 4, -16, 12);
+        ctx.lineTo(16, 12);
+        ctx.quadraticCurveTo(12, 4, 10, -12);
+        ctx.arc(0, -12, 10, 0, Math.PI, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 铃舌圆珠
+        ctx.fillStyle = '#B45309';
+        ctx.beginPath();
+        ctx.arc(0, 14, 4.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // 中心红果
+    ctx.fillStyle = '#EF4444';
+    for (const [rx, ry] of [[-4, -9], [4, -9], [0, -13]]) {
+        ctx.beginPath();
+        ctx.arc(rx, ry, 3.6, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+/**
+ * 渲染点缀装饰覆层 (_drawDecorOverlay)
+ * 支持：黑色氛围模板 / 飘浮粒子 / 电影颗粒 / 回忆颗粒感 / 胶片划痕与漏光 / 发光星芒 / 圣诞装饰 / 复古边框
+ */
+function _drawDecorOverlay(ctx, ov, x, y, w, h, currentTime, canvasW, canvasH) {
+    if (w <= 10 || h <= 10) return;
+    const styleId = ov.decor_style || 'glowing_starfield';
+    const preset = DECOR_OVERLAY_STYLES[styleId] || DECOR_OVERLAY_STYLES.glowing_starfield;
+    const layout = ov.decor_layout || preset.layout || 'edges_and_float';
+    const density = Math.max(5, Math.min(200, Number(ov.decor_density ?? preset.density ?? 55)));
+    const sizeMul = Math.max(0.2, Math.min(3.5, Number(ov.decor_size ?? 100) / 100));
+    const glowMul = Math.max(0, Math.min(2.5, Number(ov.decor_glow ?? 100) / 100));
+    const speedMul = Math.max(0, Math.min(3.5, Number(ov.decor_speed ?? 100) / 100));
+    const margin = Math.max(0, Math.min(Math.min(w, h) * 0.35, Number(ov.decor_margin ?? 36)));
+    const centerClearRatio = Math.max(0, Math.min(0.95, Number(ov.decor_center_clear ?? preset.center_clear ?? 65) / 100));
+    const color1 = ov.decor_color1 || preset.color1 || '#FFD700';
+    const color2 = ov.decor_color2 || preset.color2 || '#FFFDF5';
+
+    const showStars = ov.decor_glow_stars !== undefined ? Boolean(ov.decor_glow_stars) : Boolean(preset.glow_stars);
+    const showSnow = ov.decor_snowflakes !== undefined ? Boolean(ov.decor_snowflakes) : Boolean(preset.snowflakes);
+    const showCorners = ov.decor_corner_ornaments !== undefined ? Boolean(ov.decor_corner_ornaments) : Boolean(preset.corner_ornaments);
+    const showEdgeGarland = ov.decor_edge_garland !== undefined ? Boolean(ov.decor_edge_garland) : Boolean(preset.edge_garland);
+
+    // 黑色模板 / 飘浮粒子 / 电影与回忆颗粒参数
+    const darkVignette = Math.max(0, Math.min(100, Number(ov.decor_dark_vignette ?? preset.dark_vignette ?? 0)));
+    const vignetteSpread = Math.max(10, Math.min(95, Number(ov.decor_vignette_spread ?? preset.vignette_spread ?? 55)));
+    const darkTint = ov.decor_dark_tint || preset.dark_tint || '#05070B';
+    const showDarkTemplate = ov.decor_dark_enabled !== undefined
+        ? Boolean(ov.decor_dark_enabled)
+        : (darkVignette > 0);
+    const showFloatingParticles = ov.decor_floating_particles !== undefined
+        ? Boolean(ov.decor_floating_particles)
+        : Boolean(preset.floating_particles);
+    const particleMode = ov.decor_particle_mode || preset.particle_mode || 'dust';
+    const grainIntensity = Math.max(0, Math.min(100, Number(ov.decor_grain_intensity ?? preset.grain_intensity ?? 0)));
+    const grainSizeMul = Math.max(0.5, Math.min(2.5, Number(ov.decor_grain_size ?? preset.grain_size ?? 100) / 100));
+    const grainWarmth = Math.max(0, Math.min(100, Number(ov.decor_grain_warmth ?? preset.grain_warmth ?? 0)));
+    const showFilmGrain = ov.decor_grain_enabled !== undefined
+        ? Boolean(ov.decor_grain_enabled)
+        : (grainIntensity > 0 || grainWarmth > 0);
+    const showFilmScratches = ov.decor_film_scratches !== undefined
+        ? Boolean(ov.decor_film_scratches)
+        : Boolean(preset.film_scratches);
+    const showLightLeak = ov.decor_light_leak !== undefined
+        ? Boolean(ov.decor_light_leak)
+        : Boolean(preset.light_leak);
+
+    const rawTime = Math.max(0, Number(currentTime) || 0);
+    const t = rawTime * speedMul;
+    const filmFrameIdx = Math.floor(rawTime * 24);
+
+    ov._renderedX = x;
+    ov._renderedY = y;
+    ov._renderedW = w;
+    ov._renderedH = h;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+
+    const bx = x + margin;
+    const by = y + margin;
+    const bw = Math.max(20, w - margin * 2);
+    const bh = Math.max(20, h - margin * 2);
+
+    // ══════════════════════════════════════════════════
+    // 0A. 黑色氛围模板 / 宽银幕暗角 / 怀旧泛黄色调 (Dark Template & Nostalgia Tint)
+    // ══════════════════════════════════════════════════
+    if (showFilmGrain && grainWarmth > 0) {
+        ctx.save();
+        const warmAlpha = (grainWarmth / 100) * 0.24;
+        ctx.fillStyle = `rgba(196, 134, 62, ${warmAlpha.toFixed(3)})`;
+        ctx.fillRect(x, y, w, h);
+        ctx.restore();
+    }
+
+    if (showDarkTemplate && darkVignette > 0) {
+        ctx.save();
+        const vigAlpha = Math.min(0.96, (darkVignette / 100) * 0.94);
+        const spreadFrac = vignetteSpread / 100; // 越大越向中心聚拢
+        const cx = x + w * 0.5;
+        const cy = y + h * 0.5;
+        const rInner = Math.min(w, h) * Math.max(0.08, (1 - spreadFrac) * 0.52);
+        const rOuter = Math.hypot(w, h) * 0.54;
+
+        if (typeof ctx.createRadialGradient === 'function') {
+            const vigGrad = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
+            vigGrad.addColorStop(0, _withAlpha(darkTint, 0));
+            vigGrad.addColorStop(0.55, _withAlpha(darkTint, vigAlpha * 0.48));
+            vigGrad.addColorStop(1, _withAlpha(darkTint, vigAlpha));
+            ctx.fillStyle = vigGrad;
+            ctx.fillRect(x, y, w, h);
+        } else {
+            ctx.fillStyle = _withAlpha(darkTint, vigAlpha * 0.35);
+            ctx.fillRect(x, y, w, h);
+        }
+
+        // 上下暗黑电影遮幅渐变（让顶部标题与底部滚动字幕更醒目深邃）
+        if (typeof ctx.createLinearGradient === 'function') {
+            const matteH = h * (0.16 + spreadFrac * 0.16);
+            const topMatte = ctx.createLinearGradient(0, y, 0, y + matteH);
+            topMatte.addColorStop(0, _withAlpha(darkTint, Math.min(0.95, vigAlpha * 0.85)));
+            topMatte.addColorStop(1, _withAlpha(darkTint, 0));
+            ctx.fillStyle = topMatte;
+            ctx.fillRect(x, y, w, matteH);
+
+            const botMatte = ctx.createLinearGradient(0, y + h, 0, y + h - matteH * 1.15);
+            botMatte.addColorStop(0, _withAlpha(darkTint, Math.min(0.96, vigAlpha * 0.92)));
+            botMatte.addColorStop(1, _withAlpha(darkTint, 0));
+            ctx.fillStyle = botMatte;
+            ctx.fillRect(x, y + h - matteH * 1.15, w, matteH * 1.15);
+
+            // 黑金余烬底部炽热烘托或烛光圣殿顶部暖光
+            if (styleId === 'dark_gold_embers' || particleMode === 'embers') {
+                const emberGlow = ctx.createLinearGradient(0, y + h, 0, y + h * 0.72);
+                emberGlow.addColorStop(0, _withAlpha(color1, 0.28 * glowMul));
+                emberGlow.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = emberGlow;
+                ctx.fillRect(x, y + h * 0.72, w, h * 0.28);
+            } else if (styleId === 'dark_holy_halo_dust') {
+                const haloGlow = ctx.createRadialGradient(cx, y + h * 0.12, 0, cx, y + h * 0.12, w * 0.65);
+                haloGlow.addColorStop(0, _withAlpha(color1, 0.26 * glowMul));
+                haloGlow.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = haloGlow;
+                ctx.fillRect(x, y, w, h * 0.6);
+            }
+        }
+        ctx.restore();
+    }
+
+    // ══════════════════════════════════════════════════
+    // 0B. 复古胶片边缘漏光与柔焦光晕 (Film Light Leaks)
+    // ══════════════════════════════════════════════════
+    if (showLightLeak && typeof ctx.createRadialGradient === 'function') {
+        ctx.save();
+        const leakSpots = [
+            { ux: 0.05 + 0.08 * Math.sin(t * 0.45), uy: 0.22 + 0.12 * Math.cos(t * 0.35), col: '#FB923C', rMul: 0.58 },
+            { ux: 0.94 + 0.06 * Math.cos(t * 0.52), uy: 0.76 + 0.10 * Math.sin(t * 0.4),  col: '#F43F5E', rMul: 0.52 },
+            { ux: 0.18 + 0.10 * Math.sin(t * 0.3 + 2), uy: 0.88, col: '#FBBF24', rMul: 0.45 },
+        ];
+        for (let li = 0; li < leakSpots.length; li++) {
+            const sp = leakSpots[li];
+            const pulse = 0.55 + 0.45 * Math.sin(t * 0.9 + li * 2.1);
+            const lx = x + w * sp.ux;
+            const ly = y + h * sp.uy;
+            const lr = Math.max(w, h) * sp.rMul * sizeMul;
+            const lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
+            lg.addColorStop(0, _withAlpha(sp.col, 0.34 * pulse * glowMul));
+            lg.addColorStop(0.45, _withAlpha('#FDE68A', 0.14 * pulse * glowMul));
+            lg.addColorStop(1, 'rgba(255, 180, 80, 0)');
+            ctx.fillStyle = lg;
+            ctx.fillRect(x, y, w, h);
+        }
+        ctx.restore();
+    }
+
+    // ══════════════════════════════════════════════════
+    // 0C. 电影颗粒 / 回忆颗粒感 / 8mm划痕 / VHS扫描线 (Film Grain & Scratches)
+    // ══════════════════════════════════════════════════
+    if (showFilmGrain && grainIntensity > 0) {
+        ctx.save();
+        const gAlpha = Math.min(0.92, (grainIntensity / 100) * 0.78);
+        const tile = _getFilmGrainTileCanvas(grainWarmth / 100);
+        if (tile && typeof ctx.drawImage === 'function') {
+            ctx.globalAlpha *= gAlpha;
+            const tileDrawSize = Math.max(96, Math.round(220 * grainSizeMul));
+            const jitterX = Math.floor(_decorHash(filmFrameIdx * 17.3 + 3.1) * tileDrawSize);
+            const jitterY = Math.floor(_decorHash(filmFrameIdx * 31.7 + 9.7) * tileDrawSize);
+            for (let gy = y - jitterY; gy < y + h; gy += tileDrawSize) {
+                for (let gx = x - jitterX; gx < x + w; gx += tileDrawSize) {
+                    ctx.drawImage(tile, gx, gy, tileDrawSize, tileDrawSize);
+                }
+            }
+        }
+        // 叠加动态胶片微粒点（同时保证无 DOM 单元测试与高分辨率质感）
+        const speckCount = Math.round((28 + grainIntensity * 0.85) * Math.min(1.6, density / 50));
+        for (let gi = 0; gi < speckCount; gi++) {
+            const gh1 = _decorHash(filmFrameIdx * 43.1 + gi * 7.13);
+            const gh2 = _decorHash(filmFrameIdx * 19.7 + gi * 13.37);
+            const gh3 = _decorHash(filmFrameIdx * 11.3 + gi * 29.1);
+            const gx = x + gh1 * w;
+            const gy = y + gh2 * h;
+            const gr = (0.9 + gh3 * 2.1) * grainSizeMul;
+            ctx.fillStyle = (gi % 3 === 0)
+                ? `rgba(255, 248, 231, ${(0.12 + 0.25 * gh3) * gAlpha})`
+                : `rgba(15, 12, 8, ${(0.14 + 0.28 * gh3) * gAlpha})`;
+            ctx.fillRect(gx, gy, gr, gr);
+        }
+        ctx.restore();
+    }
+
+    if (showFilmScratches) {
+        ctx.save();
+        if (styleId === 'vhs_retro_scanlines') {
+            // VHS CRT 水平扫描线与磁带追踪波纹
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+            const stepY = Math.max(4, Math.round(6 * sizeMul));
+            for (let sy = y; sy < y + h; sy += stepY) {
+                ctx.fillRect(x, sy, w, Math.max(1.5, stepY * 0.42));
+            }
+            const trackY = y + ((rawTime * 160) % h);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.fillRect(x, trackY, w, 14 * sizeMul);
+        } else {
+            // 8mm / 老电影纵向划痕、毛发灰尘与轻微放映机明暗闪烁
+            const flicker = _decorHash(filmFrameIdx * 7.9);
+            if (flicker > 0.78) {
+                ctx.fillStyle = `rgba(255, 245, 220, ${(flicker - 0.78) * 0.18})`;
+                ctx.fillRect(x, y, w, h);
+            }
+            const scratchCount = 3;
+            for (let si = 0; si < scratchCount; si++) {
+                const sVis = _decorHash(filmFrameIdx * 3.1 + si * 41.7);
+                if (sVis > 0.35) {
+                    const sx = x + w * (0.12 + 0.76 * _decorHash(Math.floor(filmFrameIdx / 2) * 13.7 + si * 23.1));
+                    const drift = (_decorHash(filmFrameIdx + si) - 0.5) * 6;
+                    ctx.strokeStyle = (si % 2 === 0)
+                        ? 'rgba(255, 250, 235, 0.28)'
+                        : 'rgba(20, 15, 10, 0.32)';
+                    ctx.lineWidth = (0.9 + (si % 2) * 0.7) * sizeMul;
+                    ctx.beginPath();
+                    ctx.moveTo(sx, y);
+                    ctx.quadraticCurveTo(sx + drift * 2, y + h * 0.5, sx - drift, y + h);
+                    ctx.stroke();
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    // ══════════════════════════════════════════════════
+    // 1. 主题专属边缘底纹 / 光束 / 串灯 / 藤蔓 / 吊球 / 画框 (Edge Garland Layer)
+    // ══════════════════════════════════════════════════
+    if (showEdgeGarland && layout !== 'corners_only') {
+        if (styleId === 'angelic_rays_stars' || styleId === 'golden_meteor_dust' || styleId === 'dark_holy_halo_dust') {
+            // 顶部圣洁光芒束 (Heavenly Light Rays from Top)
+            ctx.save();
+            const rayCount = 7;
+            for (let r = 0; r < rayCount; r++) {
+                const sway = Math.sin(t * 0.7 + r * 1.1) * 0.04;
+                const angle = Math.PI * 0.32 + (r / (rayCount - 1)) * Math.PI * 0.36 + sway;
+                const ox = x + w * (0.2 + 0.6 * (r / (rayCount - 1)));
+                const oy = y - 40;
+                const rayLen = Math.max(w, h) * 0.75;
+                if (typeof ctx.createLinearGradient === 'function') {
+                    const grad = ctx.createLinearGradient(ox, oy, ox + Math.cos(angle) * rayLen, oy + Math.sin(angle) * rayLen);
+                    grad.addColorStop(0, _withAlpha(color1, 0.22 * glowMul));
+                    grad.addColorStop(0.5, _withAlpha(color2, 0.08 * glowMul));
+                    grad.addColorStop(1, 'rgba(255,255,255,0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.moveTo(ox - 28 * sizeMul, oy);
+                    ctx.lineTo(ox + 28 * sizeMul, oy);
+                    ctx.lineTo(ox + Math.cos(angle) * rayLen + 95 * sizeMul, oy + Math.sin(angle) * rayLen);
+                    ctx.lineTo(ox + Math.cos(angle) * rayLen - 95 * sizeMul, oy + Math.sin(angle) * rayLen);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
+        if (styleId === 'fairy_bokeh_lights') {
+            // 顶部与左右边缘梦幻暖金串灯 (Hanging Fairy String Lights)
+            ctx.save();
+            const arches = Math.max(3, Math.round(bw / 210));
+            const archW = bw / arches;
+            ctx.strokeStyle = 'rgba(253, 230, 138, 0.45)';
+            ctx.lineWidth = 1.8 * sizeMul;
+            for (let a = 0; a < arches; a++) {
+                const sx = bx + a * archW;
+                const ex = sx + archW;
+                const sag = (34 + (a % 2) * 14) * sizeMul;
+                ctx.beginPath();
+                ctx.moveTo(sx, by);
+                ctx.quadraticCurveTo((sx + ex) * 0.5, by + sag, ex, by);
+                ctx.stroke();
+
+                const bulbs = 5;
+                for (let b = 0; b <= bulbs; b++) {
+                    const u = b / bulbs;
+                    const lx = sx + (ex - sx) * u;
+                    const ly = by + 4 * u * (1 - u) * sag;
+                    const pulse = 0.65 + 0.35 * Math.sin(t * 3.2 + a * 1.7 + b * 1.3);
+                    _drawGlowingStar(ctx, lx, ly + 4 * sizeMul, (10 + 4 * pulse) * sizeMul, color2, color1, glowMul * pulse, 4, 0);
+                }
+            }
+            ctx.restore();
+        }
+
+        if (styleId === 'xmas_holly_pine_garland' || styleId === 'xmas_golden_bells_reindeer') {
+            // 四周松枝花环与彩灯点缀
+            ctx.save();
+            const step = Math.max(36, 56 * sizeMul);
+            ctx.strokeStyle = '#15803D';
+            ctx.lineWidth = 4.5 * sizeMul;
+            ctx.lineCap = 'round';
+            for (const edgeY of [by, by + bh]) {
+                for (let gx = bx + 20; gx < bx + bw - 20; gx += step) {
+                    const wave = Math.sin(gx * 0.04) * 6 * sizeMul;
+                    ctx.strokeStyle = '#14532D';
+                    ctx.beginPath();
+                    ctx.moveTo(gx - step * 0.5, edgeY + wave);
+                    ctx.lineTo(gx + step * 0.5, edgeY - wave);
+                    ctx.stroke();
+                    ctx.strokeStyle = '#16A34A';
+                    ctx.lineWidth = 2.2 * sizeMul;
+                    for (let k = -2; k <= 2; k++) {
+                        ctx.beginPath();
+                        ctx.moveTo(gx + k * 7 * sizeMul, edgeY);
+                        ctx.lineTo(gx + (k * 7 + 6) * sizeMul, edgeY + (k % 2 === 0 ? -11 : 11) * sizeMul);
+                        ctx.stroke();
+                    }
+                    if (Math.round(gx / step) % 2 === 0) {
+                        ctx.fillStyle = color1;
+                        ctx.beginPath();
+                        ctx.arc(gx, edgeY, 4.5 * sizeMul, 0, Math.PI * 2);
+                        ctx.fill();
+                        const twinkle = 0.6 + 0.4 * Math.sin(t * 3.0 + gx * 0.1);
+                        _drawGlowingStar(ctx, gx + step * 0.45, edgeY, 9 * sizeMul * twinkle, '#FFFBEB', color2, glowMul, 4, 0);
+                    }
+                }
+            }
+            if (styleId === 'xmas_golden_bells_reindeer') {
+                ctx.strokeStyle = _withAlpha(color1, 0.72);
+                ctx.lineWidth = 2.5 * sizeMul;
+                ctx.strokeRect(bx, by, bw, bh);
+                // 顶部中央悬挂双金铃铛
+                const bellSway = Math.sin(t * 2.2) * 0.08;
+                _drawXmasGoldenBellOrnament(ctx, bx + bw * 0.5, by + 10 * sizeMul, 1.25 * sizeMul, bellSway, color1, color2);
+            }
+            ctx.restore();
+        }
+
+        if (styleId === 'xmas_hanging_baubles') {
+            // 顶部垂挂圣诞彩球、八角金星与拐杖糖吊坠
+            ctx.save();
+            const count = Math.max(5, Math.min(16, Math.round(bw / (115 / Math.max(0.6, sizeMul)))));
+            const spacing = bw / count;
+            for (let i = 0; i < count; i++) {
+                const hx = bx + spacing * (i + 0.5);
+                const ropeLen = (55 + ((i * 37) % 75)) * sizeMul;
+                const swayAng = Math.sin(t * 1.8 + i * 1.15) * 0.07;
+                ctx.save();
+                ctx.translate(hx, y);
+                ctx.rotate(swayAng);
+
+                ctx.strokeStyle = color2;
+                ctx.lineWidth = 1.8 * sizeMul;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, ropeLen);
+                ctx.stroke();
+
+                const byBall = ropeLen + 16 * sizeMul;
+                if (i % 3 === 1) {
+                    _drawGlowingStar(ctx, 0, byBall, 20 * sizeMul, '#FFFFFF', color2, glowMul, 8, 0);
+                } else {
+                    const ballR = 16 * sizeMul;
+                    const ballColor = (i % 2 === 0) ? color1 : '#15803D';
+                    ctx.fillStyle = ballColor;
+                    ctx.strokeStyle = color2;
+                    ctx.lineWidth = 2 * sizeMul;
+                    ctx.beginPath();
+                    ctx.arc(0, byBall, ballR, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                    ctx.beginPath();
+                    ctx.arc(-ballR * 0.32, byBall - ballR * 0.32, ballR * 0.28, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        if (styleId === 'xmas_snowfall_frost') {
+            ctx.save();
+            if (typeof ctx.createLinearGradient === 'function') {
+                const frostH = 95 * sizeMul;
+                const topGrad = ctx.createLinearGradient(0, y, 0, y + frostH);
+                topGrad.addColorStop(0, _withAlpha(color1, 0.55));
+                topGrad.addColorStop(1, 'rgba(224, 242, 254, 0)');
+                ctx.fillStyle = topGrad;
+                ctx.fillRect(x, y, w, frostH);
+
+                const botGrad = ctx.createLinearGradient(0, y + h, 0, y + h - frostH);
+                botGrad.addColorStop(0, _withAlpha(color1, 0.55));
+                botGrad.addColorStop(1, 'rgba(224, 242, 254, 0)');
+                ctx.fillStyle = botGrad;
+                ctx.fillRect(x, y + h - frostH, w, frostH);
+            }
+            ctx.restore();
+        }
+
+        if (styleId === 'xmas_candy_corner_ribbons') {
+            ctx.save();
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 5 * sizeMul;
+            ctx.strokeRect(bx, by, bw, bh);
+            ctx.strokeStyle = color1;
+            ctx.lineWidth = 5 * sizeMul;
+            ctx.setLineDash([14 * sizeMul, 14 * sizeMul]);
+            ctx.lineDashOffset = -t * 24;
+            ctx.strokeRect(bx, by, bw, bh);
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+
+        if (styleId === 'vintage_gold_filigree' || styleId === 'rose_botanical_vine') {
+            ctx.save();
+            const frameCol = styleId === 'rose_botanical_vine' ? color2 : color1;
+            ctx.strokeStyle = _withAlpha(frameCol, 0.72);
+            ctx.lineWidth = 2.2 * sizeMul;
+            ctx.strokeRect(bx, by, bw, bh);
+            ctx.strokeStyle = _withAlpha(frameCol, 0.38);
+            ctx.lineWidth = 1.1 * sizeMul;
+            ctx.strokeRect(bx + 8 * sizeMul, by + 8 * sizeMul, Math.max(4, bw - 16 * sizeMul), Math.max(4, bh - 16 * sizeMul));
+
+            for (const [mx, my] of [
+                [bx + bw * 0.5, by],
+                [bx + bw * 0.5, by + bh],
+                [bx, by + bh * 0.5],
+                [bx + bw, by + bh * 0.5],
+            ]) {
+                _drawGlowingStar(ctx, mx, my, 12 * sizeMul, color2, frameCol, glowMul * 0.8, 4, 0);
+            }
+            ctx.restore();
+        }
+
+        if (styleId === 'sacred_cathedral_arch') {
+            // 圣经哥特尖拱窗烫金边框与顶部玫瑰花窗纹
+            ctx.save();
+            ctx.strokeStyle = _withAlpha(color1, 0.85);
+            ctx.lineWidth = 3.2 * sizeMul;
+            ctx.strokeRect(bx, by, bw, bh);
+            const archTopY = by + 18 * sizeMul;
+            const archSpringY = by + Math.min(bh * 0.28, 260 * sizeMul);
+            ctx.beginPath();
+            ctx.moveTo(bx + 12 * sizeMul, by + bh - 12 * sizeMul);
+            ctx.lineTo(bx + 12 * sizeMul, archSpringY);
+            ctx.quadraticCurveTo(bx + 12 * sizeMul, archTopY + 24 * sizeMul, bx + bw * 0.5, archTopY);
+            ctx.quadraticCurveTo(bx + bw - 12 * sizeMul, archTopY + 24 * sizeMul, bx + bw - 12 * sizeMul, archSpringY);
+            ctx.lineTo(bx + bw - 12 * sizeMul, by + bh - 12 * sizeMul);
+            ctx.closePath();
+            ctx.stroke();
+            _drawGlowingStar(ctx, bx + bw * 0.5, archTopY + 28 * sizeMul, 18 * sizeMul, color2, color1, glowMul, 8, t * 0.2);
+            ctx.restore();
+        }
+
+        if (styleId === 'polaroid_memory_border') {
+            // 拍立得复古相纸边框（上左右窄白边 + 底部宽留白相纸框）
+            ctx.save();
+            const sideB = Math.max(18, margin * 0.85);
+            const topB = Math.max(22, margin * 1.0);
+            const botB = Math.max(68, margin * 2.5);
+            ctx.fillStyle = color1 || '#FAF6EE';
+            // 顶部、底部、左侧、右侧相纸遮罩条
+            ctx.fillRect(x, y, w, topB);
+            ctx.fillRect(x, y + h - botB, w, botB);
+            ctx.fillRect(x, y + topB, sideB, Math.max(0, h - topB - botB));
+            ctx.fillRect(x + w - sideB, y + topB, sideB, Math.max(0, h - topB - botB));
+            // 相纸内框细微暗影边
+            ctx.strokeStyle = 'rgba(60, 45, 30, 0.35)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + sideB, y + topB, Math.max(10, w - sideB * 2), Math.max(10, h - topB - botB));
+            ctx.restore();
+        }
+
+        if (styleId === 'newspaper_torn_tape_frame') {
+            ctx.save();
+            ctx.strokeStyle = color1;
+            ctx.lineWidth = 4 * sizeMul;
+            ReelsBrushEngine._traceHandTornCardPath(ctx, bx, by, bw, bh, 12, 4.5 * sizeMul, t * 40);
+            ctx.stroke();
+            ctx.strokeStyle = color2;
+            ctx.lineWidth = 1.8 * sizeMul;
+            ctx.strokeRect(bx + 10 * sizeMul, by + 10 * sizeMul, Math.max(4, bw - 20 * sizeMul), Math.max(4, bh - 20 * sizeMul));
+            ctx.restore();
+        }
+
+        if (
+            styleId === 'cinema_vignette_grain' ||
+            styleId === 'cinema_35mm_grain' ||
+            styleId === 'vintage_8mm_scratches' ||
+            styleId === 'noir_bw_high_grain'
+        ) {
+            // 电影感取景细框线
+            ctx.save();
+            ctx.strokeStyle = _withAlpha(color1, 0.36);
+            ctx.lineWidth = 1.4 * sizeMul;
+            ctx.strokeRect(bx, by, bw, bh);
+            ctx.restore();
+        }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 2. 四角主题精致挂饰 (Corner Ornaments Layer)
+    // ══════════════════════════════════════════════════
+    if (showCorners && layout !== 'full_scatter') {
+        const cScale = 1.15 * sizeMul;
+        const corners = [
+            { cx: bx, cy: by, fx: false, fy: false, rot: -Math.PI * 0.25 },
+            { cx: bx + bw, cy: by, fx: true, fy: false, rot: Math.PI * 0.25 },
+            { cx: bx, cy: by + bh, fx: false, fy: true, rot: -Math.PI * 0.75 },
+            { cx: bx + bw, cy: by + bh, fx: true, fy: true, rot: Math.PI * 0.75 },
+        ];
+        for (let ci = 0; ci < corners.length; ci++) {
+            const c = corners[ci];
+            if (
+                styleId === 'xmas_holly_pine_garland' ||
+                styleId === 'xmas_candy_corner_ribbons' ||
+                styleId === 'xmas_hanging_baubles'
+            ) {
+                _drawXmasCornerBowAndPine(ctx, c.cx, c.cy, cScale, c.rot + Math.PI * 0.25, color1, color2);
+            } else if (styleId === 'xmas_golden_bells_reindeer') {
+                const bellSway = Math.sin(t * 2.1 + ci) * 0.08;
+                _drawXmasGoldenBellOrnament(
+                    ctx,
+                    c.cx + (c.fx ? -24 : 24) * sizeMul,
+                    c.cy + (c.fy ? -24 : 24) * sizeMul,
+                    0.95 * sizeMul,
+                    bellSway,
+                    color1,
+                    color2
+                );
+            } else if (styleId === 'xmas_snowfall_frost') {
+                ReelsBrushEngine._drawSnowflakeOrnament(ctx, c.cx + (c.fx ? -16 : 16) * sizeMul, c.cy + (c.fy ? -16 : 16) * sizeMul, 20 * sizeMul, color1);
+                ReelsBrushEngine._drawHollyOrnament(ctx, c.cx + (c.fx ? -36 : 36) * sizeMul, c.cy + (c.fy ? -12 : 12) * sizeMul, 0.95 * sizeMul, c.fx);
+            } else if (
+                styleId === 'vintage_gold_filigree' ||
+                styleId === 'angelic_rays_stars' ||
+                styleId === 'sacred_cathedral_arch' ||
+                styleId === 'dark_holy_halo_dust'
+            ) {
+                _drawBaroqueCornerFlourish(ctx, c.cx, c.cy, cScale, c.fx, c.fy, color1, color2);
+            } else if (styleId === 'rose_botanical_vine') {
+                _drawRoseCornerVine(ctx, c.cx, c.cy, cScale, c.fx, c.fy, color1, color2);
+            } else if (styleId === 'newspaper_torn_tape_frame') {
+                ctx.save();
+                ctx.translate(c.cx + (c.fx ? -22 : 22) * sizeMul, c.cy + (c.fy ? -22 : 22) * sizeMul);
+                ctx.rotate((c.fx === c.fy) ? -Math.PI / 4 : Math.PI / 4);
+                ctx.fillStyle = 'rgba(245, 236, 212, 0.78)';
+                ctx.strokeStyle = 'rgba(180, 160, 125, 0.65)';
+                ctx.lineWidth = 1.2;
+                ctx.fillRect(-38 * sizeMul, -11 * sizeMul, 76 * sizeMul, 22 * sizeMul);
+                ctx.strokeRect(-38 * sizeMul, -11 * sizeMul, 76 * sizeMul, 22 * sizeMul);
+                ctx.restore();
+            } else if (styleId === 'vhs_retro_scanlines' || styleId === 'cinema_vignette_grain') {
+                // 电影/摄像机取景框直角折线 + REC 闪烁红点
+                ctx.save();
+                const arm = 36 * sizeMul;
+                const dx = c.fx ? -1 : 1;
+                const dy = c.fy ? -1 : 1;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.78)';
+                ctx.lineWidth = 2.6 * sizeMul;
+                ctx.beginPath();
+                ctx.moveTo(c.cx, c.cy + dy * arm);
+                ctx.lineTo(c.cx, c.cy);
+                ctx.lineTo(c.cx + dx * arm, c.cy);
+                ctx.stroke();
+                if (ci === 0 && Math.floor(rawTime * 2) % 2 === 0) {
+                    ctx.fillStyle = '#EF4444';
+                    ctx.beginPath();
+                    ctx.arc(c.cx + 22 * sizeMul, c.cy + 22 * sizeMul, 6 * sizeMul, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            } else {
+                const pulse = 0.8 + 0.2 * Math.sin(t * 2.5 + ci);
+                const sx = c.cx + (c.fx ? -18 : 18) * sizeMul;
+                const sy = c.cy + (c.fy ? -18 : 18) * sizeMul;
+                _drawGlowingStar(ctx, sx, sy, 22 * sizeMul * pulse, color2, color1, glowMul, 8, t * 0.25);
+                _drawGlowingStar(ctx, sx + (c.fx ? -28 : 28) * sizeMul, sy + (c.fy ? 10 : -10) * sizeMul, 11 * sizeMul, color2, color1, glowMul * 0.8, 4, 0);
+                _drawGlowingStar(ctx, sx + (c.fx ? 10 : -10) * sizeMul, sy + (c.fy ? -28 : 28) * sizeMul, 11 * sizeMul, color2, color1, glowMul * 0.8, 4, 0);
+            }
+        }
+    }
+
+    // 辅助函数：根据 layout 与 centerClearRatio 将 [0..1, 0..1] 映射到边缘或全屏坐标
+    const mapParticlePos = (uRaw, vRaw, idx) => {
+        if (layout === 'full_scatter') {
+            return [bx + uRaw * bw, by + vRaw * bh];
+        }
+        if (layout === 'corners_only') {
+            const cornerIdx = idx % 4;
+            const spreadX = bw * Math.max(0.12, (1 - centerClearRatio) * 0.45);
+            const spreadY = bh * Math.max(0.12, (1 - centerClearRatio) * 0.45);
+            const cx = (cornerIdx % 2 === 0) ? (bx + uRaw * spreadX) : (bx + bw - uRaw * spreadX);
+            const cy = (cornerIdx < 2) ? (by + vRaw * spreadY) : (by + bh - vRaw * spreadY);
+            return [cx, cy];
+        }
+        if (layout === 'top_bottom') {
+            const bandH = bh * Math.max(0.08, (1 - centerClearRatio) * 0.42);
+            const px = bx + uRaw * bw;
+            const py = (idx % 2 === 0) ? (by + vRaw * bandH) : (by + bh - vRaw * bandH);
+            return [px, py];
+        }
+        // 'edges_only' 或 'edges_and_float'
+        const isFloatInCenter = (layout === 'edges_and_float') && (idx % 5 === 0);
+        if (isFloatInCenter) {
+            return [bx + uRaw * bw, by + vRaw * bh];
+        }
+        const side = idx % 4;
+        const bandW = bw * Math.max(0.06, (1 - centerClearRatio) * 0.35);
+        const bandH = bh * Math.max(0.06, (1 - centerClearRatio) * 0.35);
+        if (side === 0) return [bx + uRaw * bw, by + vRaw * bandH]; // top
+        if (side === 1) return [bx + uRaw * bw, by + bh - vRaw * bandH]; // bottom
+        if (side === 2) return [bx + uRaw * bandW, by + vRaw * bh]; // left
+        return [bx + bw - uRaw * bandW, by + vRaw * bh]; // right
+    };
+
+    // ══════════════════════════════════════════════════
+    // 2.5 飘浮微尘 / 升腾火星余烬 / 森林萤火虫 / 灰烬 / 霓虹微粒层 (Floating Particles Layer)
+    // ══════════════════════════════════════════════════
+    if (showFloatingParticles) {
+        const pCount = Math.max(10, Math.round(density * 0.95));
+        for (let i = 0; i < pCount; i++) {
+            const h1 = _decorHash(i * 5.17 + 17.3);
+            const h2 = _decorHash(i * 9.43 + 53.1);
+            const h3 = _decorHash(i * 15.89 + 91.7);
+            const h4 = _decorHash(i * 27.61 + 143.9);
+
+            const [baseX, baseY] = mapParticlePos(h1, h2, i);
+            let px = baseX;
+            let py = baseY;
+            const pulse = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * (1.4 + h3 * 2.1) + h4 * Math.PI * 2));
+
+            ctx.save();
+            if (particleMode === 'embers') {
+                // 🔥 升腾火星余烬：从下往上热流飘升 + 橘金火核与尾晕
+                const riseDist = t * (48 + h3 * 65);
+                const swayX = Math.sin(t * (1.5 + h2 * 1.3) + i * 1.9) * (18 + h4 * 24) * sizeMul;
+                px = baseX + swayX;
+                py = y + ((baseY - y - riseDist) % h + h) % h;
+                const emberR = (2.2 + h3 * 5.8) * sizeMul;
+                ctx.globalAlpha *= (0.45 + 0.55 * pulse);
+                if (typeof ctx.createRadialGradient === 'function' && glowMul > 0.05) {
+                    const hr = emberR * (2.6 + glowMul * 1.4);
+                    const eg = ctx.createRadialGradient(px, py, 0, px, py, hr);
+                    eg.addColorStop(0, color2 || '#FDE047');
+                    eg.addColorStop(0.35, color1 || '#F97316');
+                    eg.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                    ctx.fillStyle = eg;
+                    ctx.beginPath();
+                    ctx.arc(px, py, hr, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.fillStyle = '#FFFBEB';
+                ctx.beginPath();
+                ctx.arc(px, py, emberR * 0.55, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (particleMode === 'fireflies') {
+                // ✨ 森林萤火虫：有机曲线游走 + 暖黄绿生物荧光呼吸
+                const wanderX = Math.sin(t * (0.8 + h3 * 0.9) + i * 2.3) * 32 * sizeMul;
+                const wanderY = Math.cos(t * (0.65 + h4 * 0.85) + i * 1.7) * 28 * sizeMul;
+                px = ((baseX + wanderX - x) % w + w) % w + x;
+                py = ((baseY + wanderY - y) % h + h) % h + y;
+                const flyR = (3.5 + h3 * 6.5) * sizeMul * (0.6 + 0.4 * pulse);
+                ctx.globalAlpha *= (0.2 + 0.8 * pulse);
+                _drawGlowingStar(ctx, px, py, flyR * 1.3, color2 || '#FEF08A', color1 || '#A3E635', glowMul * 1.35 * pulse, 4, 0);
+            } else if (particleMode === 'ash') {
+                // 🌨️ 银白灰烬：斜向缓慢飘落与翻转微粒
+                const driftX = t * (16 + h2 * 22) + Math.sin(t * 1.2 + i) * 14 * sizeMul;
+                const fallY = t * (32 + h3 * 44);
+                px = x + ((baseX - x + driftX) % w + w) % w;
+                py = y + ((baseY - y + fallY) % h + h) % h;
+                const ashR = (1.8 + h3 * 4.5) * sizeMul;
+                ctx.globalAlpha *= (0.35 + 0.55 * h4);
+                ctx.fillStyle = (i % 2 === 0) ? (color2 || '#F8FAFC') : (color1 || '#CBD5E1');
+                ctx.beginPath();
+                ctx.ellipse(px, py, ashR, ashR * (0.45 + 0.45 * Math.abs(Math.sin(t * 2 + i))), t + i, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (particleMode === 'neon') {
+                // ⚡ 赛博霓虹微光：青蓝/洋红/鎏金悬浮闪烁微粒
+                const driftX = Math.sin(t * (0.9 + h3) + i) * 18 * sizeMul;
+                const driftY = -((t * (22 + h4 * 30)) % h);
+                px = baseX + driftX;
+                py = y + ((baseY - y + driftY) % h + h) % h;
+                const neonCol = (i % 3 === 0) ? (color1 || '#22D3EE') : ((i % 3 === 1) ? (color2 || '#F472B6') : '#A855F7');
+                const nr = (3 + h3 * 8) * sizeMul;
+                ctx.globalAlpha *= (0.35 + 0.65 * pulse);
+                _drawGlowingStar(ctx, px, py, nr, '#FFFFFF', neonCol, glowMul * pulse, 4, Math.PI * 0.25);
+            } else if (particleMode === 'sunset_bokeh') {
+                // 🌇 落日暖阳大光斑：柔焦大圆景深光斑缓缓漂浮
+                const driftX = Math.sin(t * 0.45 + i * 1.3) * 24 * sizeMul;
+                const driftY = Math.cos(t * 0.38 + i * 1.7) * 24 * sizeMul;
+                px = baseX + driftX;
+                py = baseY + driftY;
+                const bokehR = (16 + h3 * 36) * sizeMul;
+                ctx.globalAlpha *= (0.18 + 0.34 * pulse);
+                if (typeof ctx.createRadialGradient === 'function') {
+                    const bg = ctx.createRadialGradient(px, py, 0, px, py, bokehR);
+                    bg.addColorStop(0, _withAlpha(color2 || '#FEF08A', 0.65));
+                    bg.addColorStop(0.65, _withAlpha(color1 || '#FB923C', 0.35));
+                    bg.addColorStop(1, 'rgba(255,255,255,0)');
+                    ctx.fillStyle = bg;
+                } else {
+                    ctx.fillStyle = _withAlpha(color1 || '#FB923C', 0.25);
+                }
+                ctx.beginPath();
+                ctx.arc(px, py, bokehR, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (particleMode === 'prism') {
+                // 💎 钻石棱镜十字星芒
+                const driftX = Math.sin(t * 0.55 + i) * 10 * sizeMul;
+                const driftY = Math.cos(t * 0.5 + i * 1.4) * 10 * sizeMul;
+                px = baseX + driftX;
+                py = baseY + driftY;
+                const pr = (7 + h3 * 15) * sizeMul * (0.5 + 0.5 * pulse);
+                ctx.globalAlpha *= (0.3 + 0.7 * pulse);
+                _drawGlowingStar(ctx, px, py, pr, '#FFFFFF', (i % 2 === 0) ? color1 : '#F0ABFC', glowMul * 1.25 * pulse, 8, t * 0.4);
+            } else {
+                // 🖤 默认 'dust' 悬浮微尘：远近景深双层微粒缓慢漂移
+                const driftX = Math.sin(t * (0.5 + h3 * 0.7) + i * 1.7) * 20 * sizeMul;
+                const driftY = -((t * (14 + h4 * 22)) % h);
+                px = ((baseX + driftX - x) % w + w) % w + x;
+                py = y + ((baseY - y + driftY) % h + h) % h;
+                const isBokehMote = (i % 5 === 0);
+                const moteR = (isBokehMote ? (6 + h3 * 12) : (1.5 + h3 * 3.4)) * sizeMul;
+                ctx.globalAlpha *= (isBokehMote ? (0.14 + 0.22 * pulse) : (0.32 + 0.58 * pulse));
+                if (isBokehMote && typeof ctx.createRadialGradient === 'function') {
+                    const mg = ctx.createRadialGradient(px, py, 0, px, py, moteR);
+                    mg.addColorStop(0, _withAlpha(color2 || '#FFFDF5', 0.75));
+                    mg.addColorStop(0.6, _withAlpha(color1 || '#E2E8F0', 0.35));
+                    mg.addColorStop(1, 'rgba(255,255,255,0)');
+                    ctx.fillStyle = mg;
+                } else {
+                    ctx.fillStyle = (i % 2 === 0) ? (color2 || '#FFFDF5') : (color1 || '#E2E8F0');
+                }
+                ctx.beginPath();
+                ctx.arc(px, py, moteR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 3. 发光闪烁星星与梦幻光斑层 (Glowing Twinkling Stars & Bokeh Layer)
+    // ══════════════════════════════════════════════════
+    if (showStars) {
+        const starCount = Math.round(density);
+        for (let i = 0; i < starCount; i++) {
+            const h1 = _decorHash(i * 3.17 + 1.1);
+            const h2 = _decorHash(i * 7.31 + 2.3);
+            const h3 = _decorHash(i * 13.7 + 5.9);
+            const h4 = _decorHash(i * 19.3 + 8.7);
+
+            const driftX = Math.sin(t * (0.6 + h3 * 0.8) + i) * 14 * sizeMul;
+            const driftY = styleId === 'golden_meteor_dust'
+                ? -((t * (28 + h4 * 35)) % Math.max(120, bh * 0.35))
+                : Math.cos(t * (0.5 + h4 * 0.7) + i * 1.3) * 14 * sizeMul;
+
+            const [baseX, baseY] = mapParticlePos(h1, h2, i);
+            const px = baseX + driftX;
+            const py = ((baseY + driftY - y) % h + h) % h + y;
+
+            const twinkle = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * (1.8 + h3 * 2.6) + h4 * Math.PI * 2));
+            const rBase = (6 + h3 * 16) * sizeMul * (0.65 + 0.35 * twinkle);
+
+            ctx.save();
+            ctx.globalAlpha *= (0.35 + 0.65 * twinkle);
+            if ((styleId === 'fairy_bokeh_lights' || styleId === 'warm_sunset_bokeh') && i % 2 === 1) {
+                const bokehR = rBase * 1.45;
+                if (typeof ctx.createRadialGradient === 'function') {
+                    const g = ctx.createRadialGradient(px, py, 0, px, py, bokehR);
+                    g.addColorStop(0, _withAlpha(color2, 0.55));
+                    g.addColorStop(0.65, _withAlpha(color1, 0.28));
+                    g.addColorStop(1, 'rgba(255,255,255,0)');
+                    ctx.fillStyle = g;
+                } else {
+                    ctx.fillStyle = _withAlpha(color1, 0.3);
+                }
+                ctx.beginPath();
+                ctx.arc(px, py, bokehR, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                const pts = (i % 4 === 0) ? 8 : 4;
+                const rot = (i % 5 === 0) ? (t * 0.35 * (i % 2 === 0 ? 1 : -1)) : 0;
+                _drawGlowingStar(ctx, px, py, rBase, color2, color1, glowMul * twinkle, pts, rot);
+            }
+            ctx.restore();
+        }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 4. 圣诞飘雪与冰晶层 (Falling Snowflakes Layer)
+    // ══════════════════════════════════════════════════
+    if (showSnow) {
+        const snowCount = Math.max(8, Math.round(density * 0.65));
+        for (let i = 0; i < snowCount; i++) {
+            const h1 = _decorHash(i * 11.3 + 101.5);
+            const h2 = _decorHash(i * 23.7 + 203.1);
+            const h3 = _decorHash(i * 37.9 + 307.7);
+
+            const fallDist = t * (42 + h3 * 55);
+            const swayX = Math.sin(t * (1.1 + h2) + i * 2.1) * 22 * sizeMul;
+            const [baseX, baseY] = mapParticlePos(h1, h2, i + 1);
+            const sx = baseX + swayX;
+            const sy = y + ((baseY - y + fallDist) % h + h) % h;
+            const flakeR = (5 + h3 * 11) * sizeMul;
+
+            ctx.save();
+            ctx.globalAlpha *= (0.45 + 0.5 * h2);
+            if (i % 3 === 0) {
+                ReelsBrushEngine._drawSnowflakeOrnament(ctx, sx, sy, flakeR, '#FFFFFF');
+            } else {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(sx, sy, flakeR * 0.45, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+    }
+
+    ctx.restore();
+}
 
 // 页面/脚本解析时自启动预加载
 if (typeof ReelsBrushEngine !== 'undefined' && ReelsBrushEngine.init) {
@@ -6048,9 +10273,10 @@ if (typeof ReelsBrushEngine !== 'undefined' && ReelsBrushEngine.init) {
 }
 
 function _withAlpha(hexColor, alpha) {
-    const r = parseInt(hexColor.slice(1, 3), 16);
-    const g = parseInt(hexColor.slice(3, 5), 16);
-    const b = parseInt(hexColor.slice(5, 7), 16);
+    const safe = (typeof hexColor === 'string' && hexColor.startsWith('#') && hexColor.length >= 7) ? hexColor : '#05070B';
+    const r = parseInt(safe.slice(1, 3), 16) || 0;
+    const g = parseInt(safe.slice(3, 5), 16) || 0;
+    const b = parseInt(safe.slice(5, 7), 16) || 0;
     return `rgba(${r},${g},${b},${alpha})`;
 }
 
@@ -6070,6 +10296,10 @@ const ReelsOverlay = {
     createTextCardOverlay,
     createSolidMaskOverlay,
     createScrollOverlay,
+    createDecorOverlay,
+    applyDecorStylePreset,
+    DECOR_OVERLAY_CATEGORIES,
+    DECOR_OVERLAY_STYLES,
     measureScrollMotion,
     drawOverlay,
     prepareScrollWritingCursorImage,

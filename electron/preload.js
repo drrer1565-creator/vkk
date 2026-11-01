@@ -6,6 +6,7 @@ const { contextBridge, ipcRenderer, webUtils, webFrame, clipboard } = require('e
 const _persistentPresetKey = (key) => /(?:preset|template|watermark|brush)/i.test(String(key || ''));
 const _persistentPresetOverrides = new Map();
 let _workspaceLastHash='',_workspaceLastBackupAt=0;
+const _sharedProjectLastHashes = new Map();
 const _readPersistentPresetValues = () => {
     const values = {};
     try {
@@ -693,6 +694,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveSharedProjectFile: (fileName, content, customDir = '') => {
         try {
             const safeName = path.basename(String(fileName || 'UntitledProject.json').trim() || 'UntitledProject.json');
+            const contentHash = require('crypto').createHash('sha256').update(String(content || '').replace(/"timestamp":"[^"]*",?/, '')).digest('hex');
+            const cacheKey = `${safeName}|${customDir || ''}`;
+            const defaultCheckDir = _getDefaultProjectDir();
+            if (_sharedProjectLastHashes.get(cacheKey) === contentHash && (!defaultCheckDir || fs.existsSync(path.join(defaultCheckDir, safeName)))) return true;
             const primaryDir = _getDefaultProjectDir();
             const targetDirs = [...new Set([
                 ...(customDir ? [path.resolve(customDir)] : []),
@@ -713,6 +718,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     }
                 } catch (_) { }
             }
+            if (savedPrimary) _sharedProjectLastHashes.set(cacheKey, contentHash);
             return savedPrimary;
         } catch (e) {
             console.error('[Projects] saveSharedProjectFile failed:', e.message);

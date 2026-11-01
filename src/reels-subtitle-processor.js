@@ -184,6 +184,7 @@ function wrapTextByPixelWidth(text, maxWidthPx, fontOpts) {
  */
 function mergeShortSegments(segments, shortDur = 0.35, maxGap = 0.25, minDur = 0.25) {
     const segs = segments.slice().sort((a, b) => (a.start || 0) - (b.start || 0));
+    const endsWithSentencePunct = (txt) => /[.!?。！？]+['"\u201D\u2019）)】\]》」]*$/.test(String(txt || '').trim());
     let i = 0;
     while (i < segs.length) {
         const s = segs[i].start;
@@ -195,16 +196,16 @@ function mergeShortSegments(segments, shortDur = 0.35, maxGap = 0.25, minDur = 0
         let bestIdx = null;
         let bestGap = null;
 
-        // 尝试右邻
-        if (i + 1 < segs.length) {
+        // 尝试右邻 (若当前片段已经是句尾标点结束，则绝不跨越句号合并到下一句)
+        if (i + 1 < segs.length && !endsWithSentencePunct(segs[i].text)) {
             const rs = segs[i + 1].start;
             if (typeof rs === 'number') {
                 const gapR = rs - e;
                 if (gapR <= maxGap) { bestIdx = i + 1; bestGap = gapR; }
             }
         }
-        // 尝试左邻 (选更近的)
-        if (i - 1 >= 0) {
+        // 尝试左邻 (选更近的；若左邻已经是句尾标点结束，则绝不跨越句号合并到上一句)
+        if (i - 1 >= 0 && !endsWithSentencePunct(segs[i - 1].text)) {
             const le = segs[i - 1].end;
             if (typeof le === 'number') {
                 const gapL = s - le;
@@ -360,8 +361,14 @@ function resegmentWordsByStyle(allWords, style, videoW) {
         letterSpacing: s.letter_spacing || 0,
     };
 
-    // 标点断句正则
-    const hardBreakRe = /[。！？!?；;：:]+$|[\"'\u201D\u2019）)】\]》」]$/;
+    // 标点断句正则与词数限制
+    const maxWordsPerSeg = Math.max(0, parseInt(s.max_words_per_segment, 10) || 0);
+    const maxWordsPerLine = Math.max(0, parseInt(s.max_words_per_line, 10) || 0);
+    const hardBreakRe = maxWordsPerSeg > 0
+        ? /[.!?。！？；;]+['"\u201D\u2019）)】\]》」]*$/
+        : /[.。！？!?；;：:]+['"\u201D\u2019）)】\]》」]*$|[\"'\u201D\u2019）)】\]》」]$/;
+    const isAbbrevToken = (tok) => /^(mr|mrs|ms|dr|st|prof|sr|jr|vs|etc|no)\.$/i.test(String(tok || '').trim());
+    const commaBreakRe = /[，,;；]['"\u201D\u2019）)】\]》」]*$/;
     const gapThreshold = parseFloat(s.segment_gap_sec) || 0.45;
 
     function packEventWords(words) {
@@ -379,6 +386,11 @@ function resegmentWordsByStyle(allWords, style, videoW) {
         const tokens = currentWords.map(w => w.word || '').filter(Boolean);
         if (nextToken) tokens.push(nextToken);
         if (tokens.length === 0) return true;
+        if (maxWordsPerSeg > 0 && tokens.length > maxWordsPerSeg) return false;
+        if (maxWordsPerLine > 0 && tokens.length > maxLines * maxWordsPerLine) return false;
+        if (maxWordsPerSeg > 0 && s.balanced_two_line_wrap && tokens.length <= maxWordsPerSeg) {
+            return true;
+        }
         const [toks, joiner] = tokenizeForWrap(tokens.join(' '));
         const lines = wrapTokensByPixelWidth(toks, maxWidthPx, joiner, fontOpts);
         return lines.length <= maxLines;
@@ -386,6 +398,7 @@ function resegmentWordsByStyle(allWords, style, videoW) {
 
     const events = [];
     let currentWords = [];
+    let clauseWordCount = 0;
     let prevEnd = null;
     let prevToken = null;
 
@@ -394,10 +407,16 @@ function resegmentWordsByStyle(allWords, style, videoW) {
         if (!token) continue;
 
         // 标点断句
-        if (currentWords.length > 0 && prevToken && hardBreakRe.test(prevToken)) {
+        if (currentWords.length > 0 && prevToken && hardBreakRe.test(prevToken) && !isAbbrevToken(prevToken)) {
             const packed = packEventWords(currentWords);
             if (packed) events.push(packed);
             currentWords = [];
+            clauseWordCount = 0;
+        } else if (maxWordsPerSeg > 0 && currentWords.length > 0 && prevToken && commaBreakRe.test(prevToken) && clauseWordCount > maxWordsPerSeg) {
+            const packed = packEventWords(currentWords);
+            if (packed) events.push(packed);
+            currentWords = [];
+            clauseWordCount = 0;
         }
 
         // 间隔断句
@@ -406,17 +425,19 @@ function resegmentWordsByStyle(allWords, style, videoW) {
                 const packed = packEventWords(currentWords);
                 if (packed) events.push(packed);
                 currentWords = [];
+                clauseWordCount = 0;
             }
         }
 
-        // 宽度断句
-        if (currentWords.length > 0 && !wouldFit(currentWords, token)) {
+        // 每屏词数上限或宽度断句
+        if (currentWords.length > 0 && ((maxWordsPerSeg > 0 && currentWords.length >= maxWordsPerSeg) || !wouldFit(currentWords, token))) {
             const packed = packEventWords(currentWords);
             if (packed) events.push(packed);
             currentWords = [];
         }
 
         currentWords.push({ word: token, start: w.start, end: w.end, wid: w.wid });
+        clauseWordCount++;
         prevEnd = w.end;
         prevToken = token;
     }

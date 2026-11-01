@@ -1232,10 +1232,11 @@ function normalizedDirectBackgroundFilter(inputIndex, scaleCropFilter, ptsFilter
         ? `,tpad=stop_mode=clone:stop_duration=${Number(stopPadSeconds).toFixed(2)}`
         : '';
     const isImageSource = typeof sourcePathOrProfile === 'string' && isImageMedia(sourcePathOrProfile);
-    const inputColorFilter = isImageSource
-        ? ''
-        : `${buildInputBt709ConvertFilter(sourcePathOrProfile)},`;
-    return `[${inputIndex}:v]${inputColorFilter}${scaleCropFilter},${ptsFilter},fps=${safeFps},scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,sidedata=mode=delete:type=MASTERING_DISPLAY_METADATA,sidedata=mode=delete:type=CONTENT_LIGHT_LEVEL,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,settb=AVTB,setpts=PTS-STARTPTS${padFilter}[${outputLabel}]`;
+    // Downscale & normalize FPS first so 4K/60fps sources process 4x fewer pixels during BT.709 / HDR tone-mapping
+    const postScaleColorFilter = isImageSource
+        ? 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,sidedata=mode=delete:type=MASTERING_DISPLAY_METADATA,sidedata=mode=delete:type=CONTENT_LIGHT_LEVEL,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv'
+        : buildInputBt709ConvertFilter(sourcePathOrProfile);
+    return `[${inputIndex}:v]${scaleCropFilter},${ptsFilter},fps=${safeFps},${postScaleColorFilter},settb=AVTB,setpts=PTS-STARTPTS${padFilter}[${outputLabel}]`;
 }
 
 // A GIF is a short repeating animation. Decode one complete cycle once, even

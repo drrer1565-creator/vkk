@@ -1150,6 +1150,10 @@ function _initReelsModule() {
             };
         }
         _reelsState.overlayPanel = new ReelsOverlayPanel(ovPanelRoot, _reelsState.overlayProxy);
+        const decorPanelRoot = document.getElementById('reels-decor-panel-root');
+        if (decorPanelRoot && typeof window.ReelsDecorPanel === 'function') {
+            _reelsState.decorPanel = new window.ReelsDecorPanel(decorPanelRoot, _reelsState.overlayProxy, _reelsState.overlayPanel);
+        }
     }
 
     reelsUpdatePreview();
@@ -1768,12 +1772,17 @@ function _clientToCanvas(clientX, clientY) {
 
 /** Get the bounding box of an overlay in canvas coords */
 function _ovGetBounds(ov) {
-    const w = parseFloat(ov.w || 100);
+    let w = parseFloat(ov.w || 100);
     let x = parseFloat(ov.x || 0);
     let y, h;
     if (ov.type === 'textcard' && ov._renderedY != null) {
         y = ov._renderedY;
         h = ov._renderedH || 100;
+    } else if (ov.type === 'scroll' && ov._renderedW > 0 && ov._renderedH > 0) {
+        x = ov._renderedX ?? x;
+        y = ov._renderedY ?? parseFloat(ov.y || 0);
+        w = ov._renderedW;
+        h = ov._renderedH;
     } else {
         y = parseFloat(ov.y || 0);
         h = parseFloat(ov.h || 100);
@@ -1861,6 +1870,10 @@ function _ovOnMouseDown(e) {
                     ovId: selOv.id,
                     startX: mx, startY: my,
                     origX: selOv.x, origY: selOv.y, origW: selOv.w, origH: selOv.h || selOv._renderedH || 100,
+                    origBgW: Number(selOv.bg_width) || 0,
+                    origBgH: Number(selOv.bg_height) || 0,
+                    origRenderedW: bounds.w,
+                    origRenderedH: bounds.h,
                     handle,
                 };
                 e.stopPropagation();
@@ -1873,6 +1886,8 @@ function _ovOnMouseDown(e) {
     let hit = null;
     for (let i = overlays.length - 1; i >= 0; i--) {
         const ov = overlays[i];
+        // 点缀与颗粒层(decor)固定作为中间装饰层，不拦截字幕或普通覆层的画布点击/拖拽
+        if (!ov || ov.disabled || ov.type === 'decor') continue;
         const bounds = _ovGetBounds(ov);
         if (mx >= bounds.x && mx <= bounds.x + bounds.w && my >= bounds.y && my <= bounds.y + bounds.h) {
             hit = ov;
@@ -1973,6 +1988,16 @@ function _ovApplyResize(ov, drag, dx, dy) {
     if (ov.type !== 'textcard' || !ov.auto_fit) {
         ov.h = ht;
     }
+    if (ov.type === 'scroll') {
+        if ((drag.origBgW || 0) > 0 && (h.includes('l') || h.includes('r'))) {
+            const deltaW = h.includes('l') ? -dx : dx;
+            ov.bg_width = Math.max(80, Math.round(drag.origBgW + deltaW));
+        }
+        if ((drag.origBgH || 0) > 0 && (h.includes('t') || h.includes('b'))) {
+            const deltaH = h.includes('t') ? -dy : dy;
+            ov.bg_height = Math.max(60, Math.round(drag.origBgH + deltaH));
+        }
+    }
     if (ov.auto_center_v) ov.auto_center_v = false;
 }
 
@@ -2009,7 +2034,7 @@ function _drawOverlaySelectionUI(ctx, canvasW, canvasH) {
     const proxy = _reelsState.overlayProxy;
     if (!proxy) return;
     const ov = (proxy.overlayMgr.overlays || []).find(o => o.id === _reelsState.overlaySelectedId);
-    if (!ov || ov.disabled) return;
+    if (!ov || ov.disabled || ov.type === 'decor') return;
 
     const bounds = _ovGetBounds(ov);
     const { x, y, w, h } = bounds;
@@ -2814,6 +2839,10 @@ function _readStyleFromUI() {
             ? chk('reels-highlight-scale-enabled')
             : chk('reels-anim-highlight-scale-enabled'),
         highlight_scale: num('reels-highlight-scale', 125),
+        highlight_push_apart: get('reels-highlight-push-apart')
+            ? chk('reels-highlight-push-apart')
+            : (existingStyle.highlight_push_apart !== false),
+        highlight_include_punctuation: Boolean(existingStyle.highlight_include_punctuation),
         hide_until_spoken: get('reels-hide-until-spoken')
             ? chk('reels-hide-until-spoken')
             : chk('reels-anim-hide-until-spoken'),
@@ -2912,6 +2941,15 @@ function _readStyleFromUI() {
         auto_wrap: chk('reels-auto-wrap'),
         text_align: val('reels-text-align') || val('reels-adv-textbox-align') || 'center',
         wrap_lines: 2,
+        max_words_per_segment: get('reels-max-words-per-seg')
+            ? num('reels-max-words-per-seg', 0)
+            : (Number(existingStyle.max_words_per_segment) || 0),
+        max_words_per_line: get('reels-max-words-per-line')
+            ? num('reels-max-words-per-line', 0)
+            : (Number(existingStyle.max_words_per_line) || 0),
+        balanced_two_line_wrap: get('reels-balanced-two-line')
+            ? chk('reels-balanced-two-line')
+            : Boolean(existingStyle.balanced_two_line_wrap),
         wrap_left: 0,
         wrap_right: 0,
         random_position_use_layout_range: val('reels-anim-in') === 'word_random_position',
@@ -3346,6 +3384,7 @@ function _writeStyleToUI(style) {
     const hlScaleVal = Number.isFinite(Number(style.highlight_scale)) ? Number(style.highlight_scale) : 125;
     set('reels-highlight-scale', hlScaleVal);
     set('reels-highlight-scale-range', hlScaleVal);
+    setChk('reels-highlight-push-apart', style.highlight_push_apart !== false);
     const hideUntilSpoken = Boolean(style.hide_until_spoken);
     setChk('reels-hide-until-spoken', hideUntilSpoken);
     setChk('reels-anim-hide-until-spoken', hideUntilSpoken);
@@ -3445,6 +3484,9 @@ function _writeStyleToUI(style) {
     set('reels-pos-y', Math.round((style.pos_y || 0.5) * 100));
     set('reels-wrap-width', style.wrap_width_percent || 90);
     setChk('reels-auto-wrap', style.auto_wrap !== false);
+    set('reels-max-words-per-seg', Math.max(0, parseInt(style.max_words_per_segment, 10) || 0));
+    set('reels-max-words-per-line', Math.max(0, parseInt(style.max_words_per_line, 10) || 0));
+    setChk('reels-balanced-two-line', Boolean(style.balanced_two_line_wrap));
     set('reels-text-align', style.text_align || style.advanced_textbox_align || 'center');
     set('reels-random-position-height', style.random_position_height_percent || 35);
     set('reels-random-position-height-range', style.random_position_height_percent || 35);
@@ -3625,6 +3667,194 @@ function _writeStyleToUI(style) {
     _renderSubtitleAutoColorRules();
     reelsRefreshAnimationParameterAvailability();
 }
+
+// ── 📰 12款文字底部 / 剪报底衬快速应用助手 ──
+window.reelsApplyTextBackingPreset = function(styleId) {
+    const BACKING_PROFILES = {
+        newspaper_cutout: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#3B2220', color_high: '#3B2220', highlight_enabled: false, karaoke_highlight: false,
+            use_stroke: true, color_outline: '#F4F0E8', border_width: 1.5, opacity_outline: 235,
+            color_bg: '#F3EFE6', opacity_bg: 255, box_padding_x: 24, box_padding_y: 14, box_radius: 16,
+            box_connected: true
+        },
+        newspaper_sepia: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#3E2616', color_high: '#8B2500', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#EFE4CC', border_width: 1.5, opacity_outline: 230,
+            color_bg: '#EDE2C8', opacity_bg: 255, box_padding_x: 24, box_padding_y: 14, box_radius: 16,
+            box_connected: true
+        },
+        torn_cream_paper: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#2C221E', color_high: '#7C2D12', highlight_enabled: false, karaoke_highlight: false,
+            use_stroke: false, border_width: 0,
+            color_bg: '#FAF6EE', opacity_bg: 255, box_padding_x: 24, box_padding_y: 14, box_radius: 16,
+            box_connected: true
+        },
+        kraft_sticker: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFDF9', color_high: '#FFE082', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#3B2313', border_width: 2.5, opacity_outline: 245,
+            color_bg: '#C59B6D', opacity_bg: 255, box_padding_x: 24, box_padding_y: 14, box_radius: 16,
+            box_connected: true
+        },
+        ransom_magazine: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#231F20', color_high: '#B91C1C', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#F6F3EC', border_width: 1.5, opacity_outline: 240,
+            color_bg: '#F3EFE6', opacity_bg: 255, box_padding_x: 20, box_padding_y: 11, box_radius: 6,
+            box_connected: false
+        },
+        grid_note: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#1E293B', color_high: '#B91C1C', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: false, border_width: 0,
+            color_bg: '#FBFBF7', opacity_bg: 255, box_padding_x: 22, box_padding_y: 13, box_radius: 14,
+            box_connected: true
+        },
+        gold_parchment: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#3A2010', color_high: '#8B1E0F', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: false, border_width: 0,
+            color_bg: '#F5EAD4', opacity_bg: 255, box_padding_x: 24, box_padding_y: 14, box_radius: 16,
+            box_connected: true
+        },
+        red_editorial: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFDF9', color_high: '#FFE066', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#4A0A0D', border_width: 2, opacity_outline: 220,
+            color_bg: '#9E1B20', opacity_bg: 255, box_padding_x: 24, box_padding_y: 14, box_radius: 16,
+            box_connected: true
+        },
+        dark_film_matte: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#F7EFE2', color_high: '#F5C26B', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: false, border_width: 0,
+            color_bg: '#1E1C1A', opacity_bg: 255, box_padding_x: 24, box_padding_y: 14, box_radius: 16,
+            box_connected: true
+        },
+        bottom_gold_bar: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFFFF', color_high: '#FFF3B0', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#1F1610', border_width: 3.5, opacity_outline: 255,
+            color_bg: '#D99B26', opacity_bg: 245, box_padding_x: 16, box_padding_y: 8, box_radius: 8,
+            box_connected: false
+        },
+        bottom_rose_brush: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFFFF', color_high: '#FFE4E6', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#2D1218', border_width: 3.5, opacity_outline: 255,
+            color_bg: '#C85A70', opacity_bg: 245, box_padding_x: 16, box_padding_y: 8, box_radius: 8,
+            box_connected: false
+        },
+        bottom_neon_marker: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFFFF', color_high: '#FEF08A', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#1A1A1A', border_width: 4, opacity_outline: 255,
+            color_bg: '#FACC15', opacity_bg: 245, box_padding_x: 16, box_padding_y: 8, box_radius: 8,
+            box_connected: false
+        },
+        xmas_candy_ribbon: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFDF9', color_high: '#FFE066', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#450A0A', border_width: 2.5, opacity_outline: 245,
+            color_bg: '#88131B', opacity_bg: 255, box_padding_x: 24, box_padding_y: 12, box_radius: 16,
+            box_connected: false
+        },
+        xmas_velvet_gold: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFBEB', color_high: '#FDE047', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#3F070C', border_width: 2.5, opacity_outline: 245,
+            color_bg: '#7A111A', opacity_bg: 255, box_padding_x: 26, box_padding_y: 12, box_radius: 12,
+            box_connected: false
+        },
+        xmas_pine_snow: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFFFF', color_high: '#FDE047', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#052E16', border_width: 2.5, opacity_outline: 245,
+            color_bg: '#124229', opacity_bg: 255, box_padding_x: 24, box_padding_y: 12, box_radius: 14,
+            box_connected: false
+        },
+        xmas_gingerbread_tag: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFDF9', color_high: '#FDE047', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#3E1C08', border_width: 2.5, opacity_outline: 245,
+            color_bg: '#7C3F1C', opacity_bg: 255, box_padding_x: 24, box_padding_y: 14, box_radius: 16,
+            box_connected: true
+        },
+        xmas_frost_ice: {
+            font_family: 'Playfair Display', bold: true, italic: true,
+            color_text: '#FFFFFF', color_high: '#FEF08A', highlight_enabled: true, karaoke_highlight: true,
+            use_stroke: true, color_outline: '#0C4A6E', border_width: 3.5, opacity_outline: 255,
+            color_bg: '#0EA5E9', opacity_bg: 245, box_padding_x: 18, box_padding_y: 8, box_radius: 8,
+            box_connected: false
+        }
+    };
+
+    const profile = BACKING_PROFILES[styleId] || BACKING_PROFILES.newspaper_cutout;
+    const curStyle = Object.assign({}, _readStyleFromUI(), {
+        use_box: true,
+        box_adaptive_width: true,
+        box_brush_style: styleId,
+        box_wipe_enabled: false,
+        uppercase: false,
+        text_transform: 'none'
+    }, profile);
+
+    const syncTwEl = document.getElementById('reels-backing-quick-typewriter');
+    if (syncTwEl && syncTwEl.checked) {
+        curStyle.anim_in_type = 'typewriter';
+        curStyle.typewriter_reveal_type = 'word';
+        curStyle.tw_unrevealed_opacity = 0;
+        curStyle.hide_until_spoken = true;
+        curStyle.unread_opacity = 0;
+    }
+
+    _writeStyleToUI(curStyle);
+    if (typeof _persistSubtitleStyleByScope === 'function') {
+        _persistSubtitleStyleByScope(_readStyleFromUI());
+    }
+    if (typeof window.reelsSaveHistory === 'function') {
+        window.reelsSaveHistory();
+    }
+    reelsUpdatePreview(true);
+};
+
+window.reelsApplySubtitlePresetByName = function(presetName) {
+    if (!presetName || !window.ReelsStyleEngine) return;
+    const hiddenInput = document.getElementById('reels-preset-select');
+    if (hiddenInput) {
+        hiddenInput.value = presetName;
+    }
+    const span = document.querySelector('#reels-preset-select-trigger span');
+    if (span) {
+        span.textContent = presetName;
+    }
+    const scope = typeof _getSubtitleStyleScope === 'function' ? _getSubtitleStyleScope() : 'task';
+    const targets = scope === 'all'
+        ? (_reelsState.tasks || [])
+        : (scope === 'folder' ? _getCurrentReelsGroupTasks() : [_getSelectedTask()].filter(Boolean));
+    targets.forEach(t => { if (t) t._subtitlePreset = ''; });
+
+    if (typeof reelsLoadPresetQuick === 'function') {
+        reelsLoadPresetQuick();
+    } else if (typeof reelsLoadPreset === 'function') {
+        reelsLoadPreset();
+    } else {
+        const s = window.ReelsStyleEngine.applySubtitlePreset(presetName);
+        if (s) {
+            _writeStyleToUI(s);
+            if (typeof _persistSubtitleStyleByScope === 'function') {
+                _persistSubtitleStyleByScope(_readStyleFromUI());
+            }
+            if (typeof window.reelsSaveHistory === 'function') {
+                window.reelsSaveHistory();
+            }
+            reelsUpdatePreview(true);
+        }
+    }
+};
 
 // ═══════════════════════════════════════════════════════
 // Preview rendering loop (with RAF coalescing to prevent UI freeze)
@@ -4055,14 +4285,17 @@ function _reelsUpdatePreviewInternal() {
     const subtitleToggle = document.getElementById('reels-subtitle-toggle');
     const showSubtitle = !subtitleToggle || subtitleToggle.checked;
     const showOverlay = _isReelsOverlayToggleEnabled();
+    const showDecor = _isReelsDecorToggleEnabled();
     const rangeToggle = document.getElementById('reels-show-subtitle-range');
     const showSubtitleRange = !rangeToggle || rangeToggle.checked;
 
     // 可按任务决定覆层与动态字幕的前后关系；默认保持旧项目的“覆层在上”。
+    // 点缀与颗粒层(decor)和插片轨(_insertClip)固定位于视频素材前面、T字幕与普通覆层后面（中间层，绝不遮挡字幕）。
     const overlayAboveSubtitle = taskForAudio?.overlayAboveSubtitle !== false;
-    const renderOverlays = () => {
-    // ── 渲染覆层 (文字卡片等) ──
+    const renderOverlays = (passMode = 'all') => {
+    // ── 渲染覆层 (插片/点缀中间层 vs 文字卡片等普通覆层) ──
     if (!inCoverEditMode && _inCoverPhase) {
+        if (passMode === 'middle') return;
         if (!showOverlay) return;
         // Normal mode > Cover phase -> ONLY render Cover overlays
         const coverOverlays = (_selectedTask && _selectedTask.cover && _selectedTask.cover.overlays) ? _selectedTask.cover.overlays : [];
@@ -4077,16 +4310,22 @@ function _reelsUpdatePreviewInternal() {
     } else if (window.ReelsOverlay && _selectedTask) {
         // Cover edit mode OR Normal mode > Main Phase -> Render overlayMgr or task overlays + insertClips
         const ovMgr = _reelsState.overlayProxy ? _reelsState.overlayProxy.overlayMgr : null;
-        // 使用与时间线、导出完全相同的合成栈。不能从 overlayMgr 和插入轨
-        // 临时拼接后再按陈旧 z_index 排序，否则右侧/左侧的层级调整不会反映到画面。
-        const overlays = _getTaskRenderOverlays(_selectedTask, { forExport: false, showOverlay });
+        // 使用与时间线、导出完全相同的合成栈。点缀层(decor)由 showDecor 独立控制，普通覆层由 showOverlay 控制。
+        const allEnabledOverlays = _getTaskRenderOverlays(_selectedTask, { forExport: false, showOverlay, showDecor });
+        const overlays = allEnabledOverlays.filter(ov => {
+            if (!ov) return false;
+            const isMiddle = Boolean(ov._insertClip || ov.type === 'decor');
+            if (passMode === 'middle') return isMiddle;
+            if (passMode === 'overlay') return !isMiddle;
+            return true;
+        });
         if (overlays.length > 0) {
             // 注入覆层列表引用（供跟随绑定），确保 scroll 先渲染
             const sorted = overlays.filter(o => !o.disabled).slice().sort((a, b) => {
                 return (Number(a.z_index) || 0) - (Number(b.z_index) || 0);
             });
             for (const ov of sorted) {
-                ov._allOverlays = overlays;
+                ov._allOverlays = allEnabledOverlays;
                 // "显示终点" 模式：滚动字幕用终点时间渲染
                 let ovTime = cycleTime;
                 if (_reelsState._scrollPreviewEnd && ov.type === 'scroll') {
@@ -4108,7 +4347,7 @@ function _reelsUpdatePreviewInternal() {
             }
         }
         // ── 选中框 + 拖拽手柄 ──
-        if (ovMgr && showOverlay) {
+        if (ovMgr && showOverlay && passMode !== 'middle') {
             _drawOverlaySelectionUI(ctx, w, h);
         }
     }
@@ -4117,6 +4356,9 @@ function _reelsUpdatePreviewInternal() {
     // 环境暗部与字幕光使用同一组样式，不能借用全局黑色遮罩。
     renderer.renderAmbientLightingBase?.(style, w, h);
 
+    // 1. 先画插片与独立中间装饰层【✨ 点缀与颗粒】（严格位于素材前面、T字幕与覆层后面，绝不遮挡字幕）
+    renderOverlays('middle');
+
     const hasKineticBackdrop = showSubtitle &&
         style.anim_in_type === 'kinetic_glow_stack' &&
         typeof renderer.renderKineticGlowBackdrop === 'function';
@@ -4124,8 +4366,8 @@ function _reelsUpdatePreviewInternal() {
         renderer.renderKineticGlowBackdrop(style, w, h);
     }
 
-    // “覆层在字幕下方”时先画覆层；否则等字幕完成后再画。
-    if (!overlayAboveSubtitle) renderOverlays();
+    // 2. “覆层在字幕下方”时先画普通覆层；否则等字幕完成后再画。
+    if (!overlayAboveSubtitle) renderOverlays('overlay');
 
     // ── 渲染动态字幕 ──
     if (showSubtitleRange) {
@@ -4141,7 +4383,7 @@ function _reelsUpdatePreviewInternal() {
         renderer.renderSubtitle(style, activeSegment, audioCycleTime, w, h, false, hasKineticBackdrop);
     }
 
-    if (overlayAboveSubtitle) renderOverlays();
+    if (overlayAboveSubtitle) renderOverlays('overlay');
 
     // ── AI 水印 ──
     _drawWatermarks(ctx, w, h);
@@ -4200,6 +4442,17 @@ function _isReelsOverlayToggleEnabled() {
     return true;
 }
 
+function _isReelsDecorToggleEnabled() {
+    const v1Toggle = document.getElementById('reels-decor-toggle');
+    if (v1Toggle) return v1Toggle.checked !== false;
+    const v2Toggle = document.querySelector('#reels-preview-v2-root [data-role="decor"]');
+    if (v2Toggle) return v2Toggle.checked !== false;
+    const rdpMaster = document.getElementById('rdp-master-enable');
+    if (rdpMaster) return rdpMaster.checked !== false;
+    return true;
+}
+window._isReelsDecorToggleEnabled = _isReelsDecorToggleEnabled;
+
 function reelsOnSubtitleToggleChange(checkbox) {
     const v2Toggle = document.querySelector('#reels-preview-v2-root [data-role="subs"]');
     if (v2Toggle && checkbox && v2Toggle !== checkbox) {
@@ -4227,12 +4480,38 @@ function reelsOnOverlayToggleChange(checkbox) {
     reelsUpdatePreview();
     if (typeof window.ReelsPreviewV2?.render === 'function') window.ReelsPreviewV2.render();
     if (checkbox && !checkbox.checked) {
-        const message = '已关闭覆层：预览不显示覆层，导出的视频也不会带覆层。';
+        const message = '已关闭覆层：预览不显示普通覆层，导出的视频也不会带普通覆层（不影响点缀与颗粒层）。';
         if (typeof showToast === 'function') showToast(message, 'warning');
         else alert(message);
     }
 }
 window.reelsOnOverlayToggleChange = reelsOnOverlayToggleChange;
+
+function reelsOnDecorToggleChange(checkbox) {
+    const checked = checkbox ? Boolean(checkbox.checked) : true;
+    const v1Toggle = document.getElementById('reels-decor-toggle');
+    if (v1Toggle && v1Toggle !== checkbox) {
+        v1Toggle.checked = checked;
+    }
+    const v2Toggle = document.querySelector('#reels-preview-v2-root [data-role="decor"]');
+    if (v2Toggle && v2Toggle !== checkbox) {
+        v2Toggle.checked = checked;
+    }
+    if (_reelsState.decorPanel && typeof _reelsState.decorPanel._syncMasterEnableUI === 'function') {
+        _reelsState.decorPanel._syncMasterEnableUI(checked);
+    } else {
+        const rdpMaster = document.getElementById('rdp-master-enable');
+        if (rdpMaster && rdpMaster !== checkbox) rdpMaster.checked = checked;
+    }
+    reelsUpdatePreview();
+    if (typeof window.ReelsPreviewV2?.render === 'function') window.ReelsPreviewV2.render();
+    if (checkbox && !checked) {
+        const message = '已关闭点缀与颗粒：预览不显示点缀层，导出的视频也不会带点缀层。';
+        if (typeof showToast === 'function') showToast(message, 'warning');
+        else alert(message);
+    }
+}
+window.reelsOnDecorToggleChange = reelsOnDecorToggleChange;
 
 function _drawSubtitlePreviewRange(ctx, style, canvasW, canvasH) {
     if (!ctx || !style) return;
@@ -8795,6 +9074,10 @@ function reelsSortTasks(mode = 'manual') {
 window.reelsSortTasks = reelsSortTasks;
 
 function reelsTaskDragStart(event, index) {
+    if (event.target?.closest?.('button, input, a, select, .reels-export-cb, .reels-task-delete-btn, .reels-task-duplicate-btn')) {
+        event.preventDefault();
+        return;
+    }
     event.stopPropagation();
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('application/x-videokit-reels-task-index', String(index));
@@ -9164,6 +9447,9 @@ function reelsClearTasks() {
         _reelsState.overlayPanel.deselectOverlay();
         _reelsState.overlayPanel._refreshList();
     }
+    if (_reelsState.decorPanel && typeof _reelsState.decorPanel.refresh === 'function') {
+        _reelsState.decorPanel.refresh();
+    }
 
     // Clear video/audio preview
     _reelsState._previewBgImage = null;
@@ -9477,6 +9763,11 @@ function _renderTaskList(options = {}) {
             const groupTasks = tasks.filter(item => isLegacyTask ? !item._batchTabId : item._batchTabId === batchGroupId);
             const groupSelected = groupTasks.filter(item => item._exportSelected !== false).length;
             const groupIndeterminate = groupSelected > 0 && groupSelected < groupTasks.length;
+            const incompleteInGroup = groupTasks.filter(item => {
+                const hasAudio = Boolean(item.audioPath || item.audioFile);
+                const hasSub = item.subtitleMode === 'none' || Boolean(item.srtPath || item.srtFile || (Array.isArray(item.segments) && item.segments.length > 0));
+                return !hasAudio || !hasSub;
+            }).length;
             const encodedGroupId = encodeURIComponent(batchGroupId);
             batchGroupHeader = `
                 <div class="reels-batch-group-header"
@@ -9493,6 +9784,8 @@ function _renderTaskList(options = {}) {
                         title="本组总开关：勾选则本组全部参与导出，取消则本组全部不导出">
                     <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${groupName}">${isLegacyTask ? '🕘' : '📑'} ${groupName}</span>
                     <span style="margin-left:auto;color:#94a3b8;font-weight:400;">${groupSelected}/${groupTasks.length}</span>
+                    ${incompleteInGroup > 0 ? `<button class="btn" draggable="false" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); reelsRemoveIncompleteTasksInGroup(decodeURIComponent('${encodedGroupId}'))" style="padding:1px 5px;font-size:10px;border:1px solid rgba(251,191,36,0.45);background:rgba(245,158,11,0.16);color:#fcd34d;cursor:pointer;" title="一键清理本组内缺少音频(VO)或字幕(SRT)的未完成任务 (${incompleteInGroup}条)">🧹清理空行(${incompleteInGroup})</button>` : ''}
+                    <button class="btn" draggable="false" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); reelsRemoveBatchGroup(decodeURIComponent('${encodedGroupId}'))" style="padding:1px 5px;font-size:10px;border:none;background:transparent;color:#f87171;opacity:0.8;cursor:pointer;" title="删除本组全部任务">🗑</button>
                 </div>`;
             lastFolderQueueId = null;
         }
@@ -9556,8 +9849,8 @@ function _renderTaskList(options = {}) {
                 ${ovPreview}
                 ${task.autoEditProject ? `<button class="btn" style="padding:1px 5px;font-size:10px;border:1px solid rgba(134,239,172,.35);background:rgba(74,222,128,.08);color:#86efac;" onclick="event.stopPropagation(); reelsRefreshAutoEditTask(${i})" title="手动用自动剪辑最新成片和字幕更新这条旧任务">更新旧任务</button>` : ''}
                 <span style="font-size:10px; white-space:nowrap; opacity:0.8; margin-left:auto;">${statusText}</span>
-                <button class="btn reels-task-duplicate-btn" style="padding:1px 4px; font-size:10px; opacity:0.65; border:none; background:transparent; color:#a78bfa; cursor:pointer;" onclick="event.stopPropagation(); reelsDuplicateTask(${i})" title="复制此任务为新版本副本">📋</button>
-                <button class="btn" style="padding:1px 4px; font-size:10px; opacity:0.5; border:none; background:transparent; color:var(--text-secondary);" onclick="event.stopPropagation(); reelsRemoveTask(${i})" title="删除">✕</button>
+                <button class="btn reels-task-duplicate-btn" draggable="false" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" style="padding:1px 4px; font-size:10px; opacity:0.65; border:none; background:transparent; color:#a78bfa; cursor:pointer;" onclick="event.stopPropagation(); reelsDuplicateTask(${i})" title="复制此任务为新版本副本">📋</button>
+                <button class="btn reels-task-delete-btn" draggable="false" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" style="padding:2px 6px; font-size:12px; opacity:0.75; border:none; background:transparent; color:var(--text-secondary); cursor:pointer;" onclick="event.stopPropagation(); reelsRemoveTask(${i})" title="删除此任务">✕</button>
             </div>
         `;
     }).join('');
@@ -9597,7 +9890,46 @@ function _areAllReelsTaskGroupsCollapsed() {
     return true;
 }
 
+function _isReelsTaskIncomplete(item) {
+    if (!item) return true;
+    const workMode = _reelsState?.workMode || 'srt';
+    const hasBg = Boolean(item.bgPath || item.videoPath || (Array.isArray(item.bgPaths) && item.bgPaths.length > 0));
+    const hasAudio = Boolean(item.audioPath || item.audioFile);
+    const hasSrt = Boolean(item.srtPath || item.srtFile || (Array.isArray(item.segments) && item.segments.length > 0));
+    const hasTxt = Boolean(
+        (item.txtContent && String(item.txtContent).trim()) ||
+        (item.ttsText && String(item.ttsText).trim()) ||
+        (item.aiScript && String(item.aiScript).trim())
+    );
+    if (!hasBg) return true;
+    if (workMode === 'voiced_bg') {
+        return item.subtitleMode !== 'none' && !hasSrt && !hasTxt;
+    }
+    if (workMode === 'dubbed_text') {
+        return !hasAudio || (item.subtitleMode !== 'none' && !hasSrt && !hasTxt);
+    }
+    return !hasAudio || (item.subtitleMode !== 'none' && !hasSrt);
+}
+window._isReelsTaskIncomplete = _isReelsTaskIncomplete;
+
 function _updateToggleAllGroupsBtnUI() {
+    const cleanBtn = document.getElementById('reels-clean-incomplete-btn');
+    if (cleanBtn) {
+        const incompleteCount = (_reelsState.tasks || []).filter(_isReelsTaskIncomplete).length;
+        if (incompleteCount > 0) {
+            cleanBtn.textContent = `🧹 一键清理(${incompleteCount})`;
+            cleanBtn.style.background = 'rgba(245,158,11,0.28)';
+            cleanBtn.style.borderColor = 'rgba(251,191,36,0.75)';
+            cleanBtn.style.color = '#fde68a';
+            cleanBtn.title = `检测到 ${incompleteCount} 条缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空行，点击一键清理`;
+        } else {
+            cleanBtn.textContent = '🧹 一键清理';
+            cleanBtn.style.background = 'rgba(245,158,11,0.14)';
+            cleanBtn.style.borderColor = 'rgba(251,191,36,0.35)';
+            cleanBtn.style.color = '#fcd34d';
+            cleanBtn.title = '一键清理所有缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空任务';
+        }
+    }
     const btn = document.getElementById('reels-toggle-all-groups-btn');
     if (!btn) return;
     const allCollapsed = _areAllReelsTaskGroupsCollapsed();
@@ -9632,6 +9964,11 @@ window.reelsToggleAllTaskGroups = reelsToggleAllTaskGroups;
 function reelsToggleBatchGroup(groupId) {
     if (!_reelsState.batchGroupCollapsed) _reelsState.batchGroupCollapsed = {};
     _reelsState.batchGroupCollapsed[groupId] = !_reelsState.batchGroupCollapsed[groupId];
+    if (!_reelsState.batchGroupCollapsed[groupId] && groupId && groupId !== '__reels_existing_tasks__') {
+        if (typeof window.reelsSyncActiveBatchTabFromId === 'function') {
+            window.reelsSyncActiveBatchTabFromId(groupId);
+        }
+    }
     _renderTaskList({ preserveScroll: true });
 }
 window.reelsToggleBatchGroup = reelsToggleBatchGroup;
@@ -9726,9 +10063,12 @@ function reelsSelectTask(idx, options = {}) {
     }
 
     _reelsState.selectedIdx = idx;
-    _renderTaskList();
+    _renderTaskList({ preserveScroll: options.preserveScroll === true });
     const task = _reelsState.tasks[idx];
     if (!task) return;
+    if (task._batchTabId && typeof window.reelsSyncActiveBatchTabFromId === 'function') {
+        window.reelsSyncActiveBatchTabFromId(task._batchTabId);
+    }
     _preFetchMultiBgDurations(task);
     _preFetchTaskMediaDurations(task);
     const taskStyle = _resolveSubtitleStyleForTask(task);
@@ -10074,6 +10414,33 @@ function reelsSelectTask(idx, options = {}) {
     if (options.autoplay === true && !window.ReelsPreviewV2?.isOpen?.()) reelsTogglePlay();
 }
 
+function _resetPreviewAfterTasksCleared() {
+    _reelsState.selectedIdx = -1;
+    _renderTaskList();
+
+    _reelsState._previewBgImage = null;
+    const video = document.getElementById('reels-preview-video');
+    const audio = document.getElementById('reels-preview-audio');
+    const playBtn = document.getElementById('reels-preview-play');
+    const placeholder = document.getElementById('reels-preview-placeholder');
+    if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.style.display = 'none';
+    }
+    if (audio) {
+        audio.pause();
+        audio.removeAttribute('src');
+    }
+    _resetPreviewFadeVideo();
+    if (placeholder) {
+        placeholder.style.display = 'flex';
+        placeholder.textContent = '选择任务以预览';
+    }
+    if (playBtn) playBtn.textContent = '▶️';
+    _updatePreviewTimeUI(0, 0);
+}
+
 function reelsRemoveTask(idx) {
     if (idx < 0 || idx >= _reelsState.tasks.length) return;
     const prevSelectedIdx = _reelsState.selectedIdx;
@@ -10086,45 +10453,151 @@ function reelsRemoveTask(idx) {
     }
 
     if (_reelsState.tasks.length === 0) {
-        _reelsState.selectedIdx = -1;
-        _renderTaskList();
-
-        _reelsState._previewBgImage = null;
-        const video = document.getElementById('reels-preview-video');
-        const audio = document.getElementById('reels-preview-audio');
-        const playBtn = document.getElementById('reels-preview-play');
-        const placeholder = document.getElementById('reels-preview-placeholder');
-        if (video) {
-            video.pause();
-            video.removeAttribute('src');
-            video.style.display = 'none';
-        }
-        if (audio) {
-            audio.pause();
-            audio.removeAttribute('src');
-        }
-        _resetPreviewFadeVideo();
-        if (placeholder) {
-            placeholder.style.display = 'flex';
-            placeholder.textContent = '选择任务以预览';
-        }
-        if (playBtn) playBtn.textContent = '▶️';
-        _updatePreviewTimeUI(0, 0);
+        _resetPreviewAfterTasksCleared();
+        if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
         return;
     }
 
-    // 维护删除后的选中索引
-    let nextSelectedIdx = prevSelectedIdx;
-    if (prevSelectedIdx === idx) {
-        nextSelectedIdx = Math.min(idx, _reelsState.tasks.length - 1);
-    } else if (prevSelectedIdx > idx) {
-        nextSelectedIdx = prevSelectedIdx - 1;
+    // 如果删除的不是当前正在预览的任务：只修正选中索引并保持滚动位置刷新列表，不重置播放器或跳回顶部
+    if (prevSelectedIdx !== idx) {
+        if (prevSelectedIdx > idx) {
+            _reelsState.selectedIdx = prevSelectedIdx - 1;
+        }
+        _renderTaskList({ preserveScroll: true });
+        if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
+        return;
     }
-    _reelsState.selectedIdx = Math.max(0, Math.min(nextSelectedIdx, _reelsState.tasks.length - 1));
 
-    // 统一走选择逻辑，确保预览背景/音频/时间线同步
-    reelsSelectTask(_reelsState.selectedIdx);
+    // 删除的是当前选中任务：先清空 selectedIdx，防止 reelsSelectTask 把旧任务图层写到新任务上
+    const nextSelectedIdx = Math.max(0, Math.min(idx, _reelsState.tasks.length - 1));
+    _reelsState.selectedIdx = -1;
+    reelsSelectTask(nextSelectedIdx, { preserveScroll: true });
+    if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
 }
+window.reelsRemoveTask = reelsRemoveTask;
+
+function _removeTasksByPredicate(predicate, confirmMessage) {
+    const tasks = _reelsState.tasks || [];
+    const toRemove = tasks.filter(predicate);
+    if (toRemove.length === 0) return 0;
+    if (confirmMessage && !confirm(confirmMessage)) return 0;
+
+    const prevSelectedTask = _reelsState.selectedIdx >= 0 ? tasks[_reelsState.selectedIdx] : null;
+    const removed = [];
+    for (let i = tasks.length - 1; i >= 0; i--) {
+        if (predicate(tasks[i], i)) {
+            removed.push(...tasks.splice(i, 1));
+        }
+    }
+    if (removed.length === 0) return 0;
+
+    if (typeof window.reelsSyncTaskRemovalToBatchTabs === 'function') {
+        window.reelsSyncTaskRemovalToBatchTabs(removed);
+    } else if (typeof _batchAutoSave === 'function') {
+        _batchAutoSave();
+    }
+
+    if (_reelsState.tasks.length === 0) {
+        _resetPreviewAfterTasksCleared();
+        if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
+        return removed.length;
+    }
+
+    const stillSelectedIdx = prevSelectedTask ? _reelsState.tasks.indexOf(prevSelectedTask) : -1;
+    if (stillSelectedIdx >= 0) {
+        _reelsState.selectedIdx = stillSelectedIdx;
+        _renderTaskList({ preserveScroll: true });
+    } else {
+        const nextIdx = Math.max(0, Math.min(_reelsState.selectedIdx, _reelsState.tasks.length - 1));
+        _reelsState.selectedIdx = -1;
+        reelsSelectTask(nextIdx, { preserveScroll: true });
+    }
+    if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
+    return removed.length;
+}
+
+function reelsRemoveSelectedTasks() {
+    const tasks = _reelsState.tasks || [];
+    const selectedCount = tasks.filter(t => t && t._exportSelected !== false).length;
+    if (selectedCount === 0) {
+        alert('请先在任务列表中勾选要删除的任务');
+        return 0;
+    }
+    return _removeTasksByPredicate(
+        t => t && t._exportSelected !== false,
+        `确定删除当前已勾选的 ${selectedCount} 条任务吗？`
+    );
+}
+window.reelsRemoveSelectedTasks = reelsRemoveSelectedTasks;
+
+function reelsRemoveBatchGroup(groupId) {
+    const isLegacy = groupId === '__reels_existing_tasks__';
+    const tasks = _reelsState.tasks || [];
+    const groupTasks = tasks.filter(t => isLegacy ? !t._batchTabId : t._batchTabId === groupId);
+    if (groupTasks.length === 0) return 0;
+    const groupName = isLegacy ? '已有任务（未归档）' : (groupTasks[0]?._batchTabName || groupId);
+    return _removeTasksByPredicate(
+        t => isLegacy ? !t._batchTabId : t._batchTabId === groupId,
+        `确定删除分组「${groupName}」中的全部 ${groupTasks.length} 条任务吗？`
+    );
+}
+window.reelsRemoveBatchGroup = reelsRemoveBatchGroup;
+
+function reelsRemoveIncompleteTasksInGroup(groupId) {
+    const isLegacy = groupId === '__reels_existing_tasks__';
+    const isIncomplete = (item) => {
+        if (!item) return false;
+        if (isLegacy ? Boolean(item._batchTabId) : item._batchTabId !== groupId) return false;
+        return _isReelsTaskIncomplete(item);
+    };
+    const tasks = _reelsState.tasks || [];
+    const targets = tasks.filter(isIncomplete);
+    if (targets.length === 0) return 0;
+    const groupName = isLegacy ? '已有任务（未归档）' : (targets[0]?._batchTabName || groupId);
+    return _removeTasksByPredicate(
+        isIncomplete,
+        `确定清理分组「${groupName}」中缺少音频(VO)或字幕(SRT)的 ${targets.length} 条空任务吗？`
+    );
+}
+window.reelsRemoveIncompleteTasksInGroup = reelsRemoveIncompleteTasksInGroup;
+
+function reelsOneClickCleanupTasks() {
+    const tasks = _reelsState.tasks || [];
+    const incompleteTasks = tasks.filter(_isReelsTaskIncomplete);
+    if (incompleteTasks.length > 0) {
+        const groupNames = [...new Set(incompleteTasks.map(t => t?._batchTabName || (t?._batchTabId ? t._batchTabId : '当前列表')))];
+        const groupDesc = groupNames.slice(0, 5).join('、') + (groupNames.length > 5 ? ` 等 ${groupNames.length} 个分组` : '');
+        const removedCount = _removeTasksByPredicate(
+            _isReelsTaskIncomplete,
+            `检测到 ${incompleteTasks.length} 条残缺/空任务（缺少配音 VO、字幕 SRT 或背景 BG，分布在：${groupDesc}）。\n\n确定一键清理这 ${incompleteTasks.length} 条残缺任务吗？`
+        );
+        if (removedCount > 0 && typeof showToast === 'function') {
+            showToast(`🧹 已一键清理 ${removedCount} 条残缺空任务`, 'success');
+        }
+        return removedCount;
+    }
+
+    if (typeof window.reelsCleanAllTabsIncompleteTasks === 'function') {
+        const cleanedFromTabs = window.reelsCleanAllTabsIncompleteTasks({ silentWhenZero: true });
+        if (cleanedFromTabs > 0) return cleanedFromTabs;
+    }
+
+    const uncheckedTasks = tasks.filter(t => t && t._exportSelected === false);
+    if (uncheckedTasks.length > 0 && uncheckedTasks.length < tasks.length) {
+        const removedUnchecked = _removeTasksByPredicate(
+            t => t && t._exportSelected === false,
+            `当前没有发现缺少素材（BG/VO/SRT）的残缺空任务。\n\n检测到有 ${uncheckedTasks.length} 条【未勾选导出】的任务，是否一键清理这些未勾选的任务？`
+        );
+        if (removedUnchecked > 0 && typeof showToast === 'function') {
+            showToast(`🧹 已一键清理 ${removedUnchecked} 条未勾选任务`, 'success');
+        }
+        return removedUnchecked;
+    }
+
+    alert('✨ 当前所有任务素材完整（BG / VO / SRT 齐全），没有需要清理的残缺空行！');
+    return 0;
+}
+window.reelsOneClickCleanupTasks = reelsOneClickCleanupTasks;
 
 async function reelsDuplicateTask(idx, versionTagInput) {
     if (idx < 0 || idx >= (_reelsState?.tasks || []).length) return null;
@@ -13869,8 +14342,14 @@ async function reelsStartExport(options = {}) {
                         if (!_reelsState.isExporting || !/后台渲染进程异常退出/.test(String(error?.message || error))) throw error;
                         console.warn(`[Reels] 后台渲染器异常退出，自动重试一次: ${task.fileName}`);
                         if (statusEl) statusEl.textContent = `后台渲染器已恢复，正在重试 ${i + 1}/${totalJobs}: ${task.fileName}${presetLabel}`;
-                        await new Promise(resolve => setTimeout(resolve, 800));
-                        wysiwygResult = await runIsolatedOnce(2);
+                        await new Promise(resolve => setTimeout(resolve, 600));
+                        try {
+                            wysiwygResult = await runIsolatedOnce(2);
+                        } catch (retryError) {
+                            if (!_reelsState.isExporting || !/后台渲染进程异常退出/.test(String(retryError?.message || retryError))) throw retryError;
+                            console.warn(`[Reels] 独立渲染窗口不可用，自动回退当前窗口直接渲染: ${task.fileName}`);
+                            wysiwygResult = await window.reelsWysiwygExport(wysiwygParams);
+                        }
                     }
                 } else {
                     wysiwygResult = await window.reelsWysiwygExport(wysiwygParams);
@@ -14351,6 +14830,9 @@ function applyRestoredProject(result) {
         _reelsState.overlayPanel.deselectOverlay();
         _reelsState.overlayPanel._refreshList();
     }
+    if (_reelsState.decorPanel && typeof _reelsState.decorPanel.refresh === 'function') {
+        _reelsState.decorPanel.refresh();
+    }
     _reelsState._coverEditMode = false;
     _reelsState.selectedIdx = -1; // 标记为无选中，防止 reelsSelectTask 回写
 
@@ -14821,7 +15303,9 @@ function _flushReelsHistory(){if(_reelsHistoryPending!==null){clearTimeout(_reel
 for(const name of ['pointerdown','beforeinput'])document.addEventListener(name,event=>{
     if(!_reelsHistoryEventInEditor(event)||_isRestoringHistory)return;
     if(name==='pointerdown'&&!event.target?.closest?.('input,textarea,select,button,canvas,[onclick],[contenteditable]'))return;
-    if(_reelsHistoryPending===null)window.reelsSaveHistory();
+    const isHeavyTaskList = (_reelsState?.tasks?.length || 0) > 60;
+    const needsImmediatePreSnapshot = name !== 'pointerdown' || !isHeavyTaskList || Boolean(event.target?.closest?.('canvas,input[type="range"]'));
+    if(_reelsHistoryPending===null && needsImmediatePreSnapshot)window.reelsSaveHistory();
     if(name==='pointerdown'&&event.target?.type==='range')_reelsHistoryRangeGesture=true;
 },true);
 for(const name of ['input','change','click','pointerup'])document.addEventListener(name,event=>{
@@ -14934,7 +15418,7 @@ function reelsMarkStyleDirty(e) {
     // Ignore non-style inputs
     if (el.id === 'reels-style-scope' || el.id === 'reels-preset-select' ||
         el.id === 'reels-subtitle-toggle' || el.id === 'reels-overlay-toggle' ||
-        el.id === 'reels-show-subtitle-range') return;
+        el.id === 'reels-decor-toggle' || el.id === 'reels-show-subtitle-range') return;
 
     // User actively modified a style parameter, breaking the preset link
     const applyAll = typeof _isStyleApplyAllEnabled === 'function' ? _isStyleApplyAllEnabled() : true;
@@ -15116,17 +15600,26 @@ function _getTaskRenderOverlays(task, customOptions = {}) {
     const showOverlay = customOptions.showOverlay !== undefined
         ? customOptions.showOverlay
         : _isReelsOverlayToggleEnabled();
+    const showDecor = customOptions.showDecor !== undefined
+        ? customOptions.showDecor
+        : _isReelsDecorToggleEnabled();
     const options = {
         width: _reelsState?.targetWidth || 1080,
         height: _reelsState?.targetHeight || 1920,
         forExport: true,
         ...customOptions,
     };
+    const filterByToggle = (ov) => {
+        if (!ov) return false;
+        if (ov._insertClip) return true;
+        if (ov.type === 'decor') return Boolean(showDecor);
+        return Boolean(showOverlay);
+    };
     if (typeof window.ReelsRenderPlan?.getCompositedOverlays === 'function') {
         const composited = window.ReelsRenderPlan.getCompositedOverlays(task, options);
-        return showOverlay ? composited : composited.filter(ov => ov && ov._insertClip);
+        return composited.filter(filterByToggle);
     }
-    const base = showOverlay && Array.isArray(task?.overlays) ? task.overlays : [];
+    const base = Array.isArray(task?.overlays) ? task.overlays.filter(filterByToggle) : [];
     const inserts = window.ReelsRenderPlan?.getInsertOverlays?.(task, options) || [];
     return [...inserts, ...base];
 }

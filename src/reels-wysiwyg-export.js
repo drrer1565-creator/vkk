@@ -63,22 +63,50 @@ function _loadImage(src) {
 
 async function _refreshExportOverlayFrame(ov, src) {
     if (ov._currentFramePath === src && ov._currentFrameImage) return;
+    const canCacheCycle = ov._frameCycleDuration > 0 && (ov._frameCount || 0) > 0 && (ov._frameCount || 0) <= 120;
+    if (canCacheCycle) {
+        if (!ov._frameImageCache) ov._frameImageCache = new Map();
+        const cachedImg = ov._frameImageCache.get(src);
+        if (cachedImg) {
+            ov._currentFrameImage = cachedImg;
+            ov._currentFramePath = src;
+            return;
+        }
+    }
     const previous = ov._currentFrameImage;
+    const previousWasCached = canCacheCycle && ov._frameImageCache && ov._currentFramePath && ov._frameImageCache.has(ov._currentFramePath);
     try {
-        ov._currentFrameImage = await _loadImage(src);
+        const img = await _loadImage(src);
+        ov._currentFrameImage = img;
         ov._currentFramePath = src;
+        if (canCacheCycle && ov._frameImageCache) {
+            ov._frameImageCache.set(src, img);
+        }
     } catch (_) {
         ov._currentFrameImage = null;
         delete ov._currentFramePath;
     } finally {
-        if (previous && previous !== ov._currentFrameImage) previous.src = '';
+        if (!previousWasCached && previous && previous !== ov._currentFrameImage) previous.src = '';
     }
 }
 
-function _releaseExportOverlayFrame(ov) {
-    if (ov._currentFrameImage) ov._currentFrameImage.src = '';
+function _releaseExportOverlayFrame(ov, clearCycleCache = false) {
+    const isCached = ov._frameImageCache && ov._currentFramePath && ov._frameImageCache.has(ov._currentFramePath);
+    if (ov._currentFrameImage && (!isCached || clearCycleCache)) ov._currentFrameImage.src = '';
     delete ov._currentFrameImage;
     delete ov._currentFramePath;
+    if (clearCycleCache && ov._frameImageCache) {
+        for (const img of ov._frameImageCache.values()) {
+            if (img) img.src = '';
+        }
+        ov._frameImageCache.clear();
+        delete ov._frameImageCache;
+    }
+    if (clearCycleCache && ov._featherCanvas) {
+        ov._featherCanvas.width = 1;
+        ov._featherCanvas.height = 1;
+        delete ov._featherCanvas;
+    }
 }
 
 function _normalizeOverlayLocalPath(filePath) {
@@ -933,10 +961,10 @@ async function reelsWysiwygExport(params) {
     });
     if (!sessionId) throw new Error('FFmpeg 启动失败');
 
-    // 极速流水线与极速硬件模式都使用无拷贝帧通道；硬件编码器由主进程探测并自动回退。
+    // 所有模式都启用三帧批量通道以消除逐帧同步 IPC 往返开销；硬件编码器由主进程探测并自动回退。
     let framePipeline = null;
     const normalizedEngine = exportEngine === 'experimental' ? 'hardware' : exportEngine;
-    const wantsPipeline = normalizedEngine === 'pipeline' || normalizedEngine === 'hardware';
+    const wantsPipeline = normalizedEngine === 'canvas' || normalizedEngine === 'pipeline' || normalizedEngine === 'hardware';
     if (normalizedEngine === 'hardware') log('极速硬件模式：正在自动探测系统 H.264 硬件编码器，不可用时回退 CPU。');
     if (wantsPipeline) {
         framePipeline = _createFramePipeline(sessionId, Math.max(1, Math.min(3, Math.floor(24 * 1024 * 1024 / (targetWidth * targetHeight * 4)))));
@@ -1204,16 +1232,9 @@ async function reelsWysiwygExport(params) {
                 }
             };
 
-            // 默认沿用旧项目：覆层在动态字幕上方。
-            if (overlayAboveSubtitle) renderSubtitle();
-
-            // ── 覆盖层（文字卡片等）──
-            if (taskOverlays && taskOverlays.length > 0 && window.ReelsOverlay) {
-                // 与主预览/分层导出一致：滚动覆层先绘制，其余按时间线层级顺序。
-                const sortedOvs = taskOverlays.filter(ov => !ov.disabled).slice().sort((a, b) => {
-                    return (Number(a.z_index) || 0) - (Number(b.z_index) || 0);
-                });
-                for (const ov of sortedOvs) {
+            const drawOverlayGroup = (ovGroup) => {
+                if (!ovGroup || !ovGroup.length || !window.ReelsOverlay) return;
+                for (const ov of ovGroup) {
                     ov._allOverlays = taskOverlays;
                     const ovStart = parseFloat(ov.start || 0);
                     const ovEnd = parseFloat(ov.end || 9999);
@@ -1234,8 +1255,20 @@ async function reelsWysiwygExport(params) {
                         }
                     }
                 }
-            }
+            };
 
+            const sortedOvs = (taskOverlays && taskOverlays.length > 0)
+                ? taskOverlays.filter(ov => ov && !ov.disabled).slice().sort((a, b) => (Number(a.z_index) || 0) - (Number(b.z_index) || 0))
+                : [];
+            const middleOvs = sortedOvs.filter(ov => Boolean(ov._insertClip || ov.type === 'decor'));
+            const regularOvs = sortedOvs.filter(ov => !ov._insertClip && ov.type !== 'decor');
+
+            // 1. 先绘制插片轨与独立中间装饰层【✨ 点缀与颗粒】（严格位于素材前面、T字幕与普通覆层后面，绝不遮挡字幕）
+            drawOverlayGroup(middleOvs);
+
+            // 2. 再按覆层与动态字幕的前后关系绘制 T 字幕与普通覆层
+            if (overlayAboveSubtitle) renderSubtitle();
+            drawOverlayGroup(regularOvs);
             if (!overlayAboveSubtitle) renderSubtitle();
 
             // ── AI 水印 ──
@@ -1285,7 +1318,7 @@ async function reelsWysiwygExport(params) {
         for (const ov of taskOverlays || []) {
             if (ov._exportImage) ov._exportImage.src = '';
             delete ov._exportImage;
-            _releaseExportOverlayFrame(ov);
+            _releaseExportOverlayFrame(ov, true);
             delete ov._allOverlays;
         }
         if (canvas) { canvas.width = 1; canvas.height = 1; }
@@ -1318,7 +1351,7 @@ async function reelsWysiwygExport(params) {
         for (const ov of taskOverlays || []) {
             if (ov._exportImage) ov._exportImage.src = '';
             delete ov._exportImage;
-            _releaseExportOverlayFrame(ov);
+            _releaseExportOverlayFrame(ov, true);
             delete ov._allOverlays;
         }
         if (canvas) { canvas.width = 1; canvas.height = 1; }

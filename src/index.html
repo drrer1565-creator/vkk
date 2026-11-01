@@ -4965,13 +4965,14 @@
                 <div
                   style="flex-shrink:0; padding:8px 10px; border-bottom:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; gap:6px;">
                   <h3 class="section-title" style="margin:0; font-size:13px; white-space:nowrap;">📋 任务列表</h3>
-                  <div style="display:flex; align-items:center; gap:6px; margin-left:auto;">
+                  <div style="display:flex; align-items:center; gap:5px; margin-left:auto; flex-wrap:wrap;">
+                    <button id="reels-clean-incomplete-btn" class="btn" style="font-size:10px;padding:2px 7px;background:rgba(245,158,11,0.16);color:#fcd34d;border:1px solid rgba(251,191,36,0.4);border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;" onclick="reelsOneClickCleanupTasks()" title="一键清理所有缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空任务">🧹 一键清理</button>
                     <button id="reels-toggle-all-groups-btn" class="btn" style="font-size:10px;padding:2px 7px;background:rgba(59,130,246,0.14);color:#93c5fd;border:1px solid rgba(59,130,246,0.32);border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;" onclick="reelsToggleAllTaskGroups()" title="一键全部展开或全部合拢任务分组">▼ 全部展开</button>
                     <span id="reels-task-count-panel" style="font-size:11px; color:var(--text-secondary);">0</span>
                   </div>
                 </div>
                 <!-- 导出选择控制栏 -->
-                <div id="reels-export-select-bar" style="flex-shrink:0; display:flex; align-items:center; gap:6px; padding:4px 10px; border-bottom:1px solid var(--border-color); font-size:11px; background:rgba(0,0,0,0.15);">
+                <div id="reels-export-select-bar" style="flex-shrink:0; display:flex; align-items:center; flex-wrap:wrap; gap:5px; padding:4px 10px; border-bottom:1px solid var(--border-color); font-size:11px; background:rgba(0,0,0,0.15);">
                   <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;color:var(--text-secondary);" title="全选/取消全选导出任务">
                     <input type="checkbox" id="reels-export-select-all" checked
                       style="accent-color:var(--accent-color);transform:scale(1.2);margin:0 4px 0 2px;cursor:pointer;"
@@ -4979,7 +4980,8 @@
                     <span style="font-size:10px;">全选导出</span>
                   </label>
                   <span style="flex:1;"></span>
-                  <button id="reels-batch-duplicate-btn" class="btn" style="font-size:10px;padding:2px 7px;background:rgba(124,92,255,0.15);color:#c4b5fd;border:1px solid rgba(124,92,255,0.35);border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="reelsDuplicateSelectedTasks()" title="将当前勾选的所有任务批量复制为副本新版本">📋 复制副本</button>
+                  <button id="reels-batch-duplicate-btn" class="btn" style="font-size:10px;padding:2px 6px;background:rgba(124,92,255,0.15);color:#c4b5fd;border:1px solid rgba(124,92,255,0.35);border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:2px;white-space:nowrap;" onclick="reelsDuplicateSelectedTasks()" title="将当前勾选的所有任务批量复制为副本新版本">📋 复制</button>
+                  <button id="reels-batch-delete-btn" class="btn" style="font-size:10px;padding:2px 6px;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.35);border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:2px;white-space:nowrap;" onclick="reelsRemoveSelectedTasks()" title="批量删除当前勾选的所有任务">🗑 删除已选</button>
                   <span id="reels-export-selected-count" style="font-size:10px;color:var(--accent,#7b8bef);font-weight:600;" title="已选中导出的任务数"></span>
                 </div>
                 <div style="flex-shrink:0;display:flex;align-items:center;gap:5px;padding:4px 10px;border-bottom:1px solid var(--border-color);font-size:10px;background:rgba(0,0,0,.08);">
@@ -5017,6 +5019,7 @@
                 <div class="inspector-tabs" style="display:flex; gap:0; flex-shrink:0; background:var(--bg-titlebar); border-bottom:1px solid var(--border-color);">
                   <button class="inspector-tab active" data-tab="subtitle" onclick="reelsInspectorSwitch('subtitle',this)" style="flex:1; padding:8px 0; border:none; background:transparent; color:var(--text-secondary); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid var(--accent);">T 字幕</button>
                   <button class="inspector-tab" data-tab="overlay" onclick="reelsInspectorSwitch('overlay',this)" style="flex:1; padding:8px 0; border:none; background:transparent; color:var(--text-secondary); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent;">🖼️ 覆层</button>
+                  <button class="inspector-tab" data-tab="decor" onclick="reelsInspectorSwitch('decor',this)" style="flex:1; padding:8px 0; border:none; background:transparent; color:#fde68a; font-size:11px; font-weight:700; cursor:pointer; border-bottom:2px solid transparent;" title="独立调节 30 款点缀、黑色氛围模板、飘浮粒子、电影颗粒与圣诞装饰">✨ 点缀与颗粒</button>
                   <button class="inspector-tab" data-tab="watermark" onclick="reelsInspectorSwitch('watermark',this)" style="flex:1; padding:8px 0; border:none; background:transparent; color:var(--text-secondary); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent;">🔒 水印</button>
                   <button class="inspector-tab" data-tab="background" onclick="reelsInspectorSwitch('background',this)" style="flex:1; padding:8px 0; border:none; background:transparent; color:var(--text-secondary); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent;">🌫️ 背景与内容视频</button>
                 </div>
@@ -5160,6 +5163,9 @@
                         <input type="number" id="reels-highlight-scale" class="input input-small" min="100" max="220" step="5" value="125" style="width: 48px;"
                           oninput="document.getElementById('reels-highlight-scale-range').value=this.value; reelsUpdatePreview()" title="当前朗读词放大比例 (%)">
                         <span style="font-size: 11px; color: var(--text-secondary);">%</span>
+                        <label class="checkbox-label" style="margin:0;" title="开启后当前朗读词放大时会自动向左右推开同行相邻词，绝不互相压字重叠（成品04同款）"><input type="checkbox" id="reels-highlight-push-apart" checked
+                            onchange="reelsUpdatePreview()"><span>放大推开邻词</span></label>
+                        <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:2px 8px; height:26px; background:#0b2e13; color:#08FF08; border:1px solid #08FF08; font-weight:700;" onclick="window.reelsApplySubtitlePresetByName && window.reelsApplySubtitlePresetByName('🟢 绿字放大推开_双行爆款 (成品04同款)')" title="一键套用成品04同款：白字厚黑描边 + 荧光绿当前词放大推开 + 每屏最多5词双行均衡排版">🟢 绿字放大推开(成品04同款)</button>
                         <label class="checkbox-label" style="margin:0;" title="开启后未读到的文字透明/半透明，读到时才显现（出字效果）"><input type="checkbox" id="reels-hide-until-spoken"
                             onchange="var h=document.getElementById('reels-anim-hide-until-spoken'); if(h)h.checked=this.checked; reelsUpdatePreview()"><span>未读字透明:</span></label>
                         <input type="range" id="reels-unread-opacity-range" min="0" max="100" step="5" value="0" style="width: 58px;"
@@ -5330,6 +5336,42 @@
                           <div class="param-row" style="flex-wrap: wrap; gap: 10px; margin-bottom: 6px;">
                     <label class="checkbox-label"><input type="checkbox" id="reels-use-box"
                         onchange="reelsUpdatePreview()"><span>启用字幕底框</span></label>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="white-space: nowrap;">底衬/底条样式:</label>
+                      <select id="reels-box-brush-style" class="input input-small" style="min-width: 195px;" onchange="reelsUpdatePreview()">
+                        <option value="rect">⬛ 标准纯色/渐变底框</option>
+                        <optgroup label="📰 贴字剪报 / 手撕纸轮廓系列">
+                          <option value="newspaper_cutout">📰 复古旧报纸剪报 (爆款同款贴字)</option>
+                          <option value="newspaper_sepia">🗞️ 怀旧泛黄古董报刊 (暖黄剪报)</option>
+                          <option value="torn_cream_paper">📜 奶油手撕宣纸贴 (纯净纸张轮廓)</option>
+                          <option value="kraft_sticker">🏷️ 手撕牛皮纸贴纸 (复古白边牛皮纸)</option>
+                          <option value="ransom_magazine">✂️ 杂志拼贴剪报块 (斜切报刊条)</option>
+                        </optgroup>
+                        <optgroup label="✨ 质感纹理底衬系列">
+                          <option value="grid_note">📓 手账方格便签纸 (清新方格底衬)</option>
+                          <option value="gold_parchment">✨ 圣经烫金羊皮书页 (古典羊皮卷)</option>
+                          <option value="red_editorial">🔖 报刊红底白边剪报 (高冲击红底贴)</option>
+                          <option value="dark_film_matte">🎬 暗夜胶片磨砂贴纸 (黑金胶片底)</option>
+                        </optgroup>
+                        <optgroup label="🌟 文字底部半高托底条系列">
+                          <option value="bottom_gold_bar">🌟 鎏金半高文字底条 (文字下半部金底)</option>
+                          <option value="bottom_rose_brush">🌸 莫兰迪玫瑰手绘底条 (文字底部温柔笔触)</option>
+                          <option value="bottom_neon_marker">🖍️ 荧光马克笔手绘底条 (重点荧光半高托底)</option>
+                          <option value="xmas_frost_ice">❄️ 圣诞冰雪极光半高底条 (冰晶蓝底+六角雪花)</option>
+                        </optgroup>
+                        <optgroup label="🎄 圣诞节限定字幕带 / 装饰系列">
+                          <option value="xmas_candy_ribbon">🍬 圣诞红白拐杖糖字幕带 (斜纹糖果框+冬青红果)</option>
+                          <option value="xmas_velvet_gold">🎅 圣诞红丝绒烫金挂旗带 (金线缝边+伯利恒金星)</option>
+                          <option value="xmas_pine_snow">🎄 圣诞松林绿覆雪字幕带 (积雪顶边+冬青彩球)</option>
+                          <option value="xmas_gingerbread_tag">🍪 圣诞姜饼屋糖霜礼物签 (白糖霜花边+冬青果)</option>
+                        </optgroup>
+                        <optgroup label="🖌️ 经典笔刷底框">
+                          <option value="brush1">🖌️ 泼墨毛笔笔触</option>
+                          <option value="brush2">🖍️ 马克笔粗涂</option>
+                          <option value="tape">🩹 撕边胶带条</option>
+                        </optgroup>
+                      </select>
+                    </div>
                     <label class="checkbox-label" title="开启后，多行字幕将根据单行宽度绘制贴合背景"><input type="checkbox" id="reels-box-adaptive-width"
                         onchange="reelsUpdatePreview()"><span>贴合行宽</span></label>
                     <label class="checkbox-label" title="开启后，多行贴合背景自动连接为平滑连体轮廓，并消除相邻行微小台阶"><input type="checkbox" id="reels-box-connected" checked
@@ -5371,17 +5413,42 @@
                       <input type="number" id="reels-box-blur" class="input input-small" value="0" min="0" max="40"
                         style="width: 45px;" oninput="document.getElementById('reels-box-blur-range').value=this.value; reelsUpdatePreview()">
                     </div>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                      <label>内距X:</label>
-                      <input type="range" id="reels-box-pad-x-range" min="0" max="60" value="12" style="width: 50px;" oninput="document.getElementById('reels-box-pad-x').value=this.value; reelsUpdatePreview()">
-                      <input type="number" id="reels-box-pad-x" class="input input-small" value="12" min="0" max="60"
-                        style="width: 45px;" oninput="document.getElementById('reels-box-pad-x-range').value=this.value; reelsUpdatePreview()">
+                    <div style="display: flex; align-items: center; gap: 4px;" title="调节底衬/报纸剪报条左右两端的伸出长度（支持负数收窄）">
+                      <label style="color:#fde68a;font-weight:600;">左右长度(内距X):</label>
+                      <input type="range" id="reels-box-pad-x-range" min="-20" max="120" value="12" style="width: 65px;" oninput="document.getElementById('reels-box-pad-x').value=this.value; reelsUpdatePreview()">
+                      <input type="number" id="reels-box-pad-x" class="input input-small" value="12" min="-20" max="200"
+                        style="width: 48px;" oninput="document.getElementById('reels-box-pad-x-range').value=this.value; reelsUpdatePreview()">
                     </div>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                      <label>内距Y:</label>
-                      <input type="range" id="reels-box-pad-y-range" min="0" max="60" value="8" style="width: 50px;" oninput="document.getElementById('reels-box-pad-y').value=this.value; reelsUpdatePreview()">
-                      <input type="number" id="reels-box-pad-y" class="input input-small" value="8" min="0" max="60"
-                        style="width: 45px;" oninput="document.getElementById('reels-box-pad-y-range').value=this.value; reelsUpdatePreview()">
+                    <div style="display: flex; align-items: center; gap: 4px;" title="调节底衬/报纸剪报条上下的包裹宽度（支持负数变窄）">
+                      <label style="color:#fde68a;font-weight:600;">上下宽度(内距Y):</label>
+                      <input type="range" id="reels-box-pad-y-range" min="-15" max="80" value="8" style="width: 65px;" oninput="document.getElementById('reels-box-pad-y').value=this.value; reelsUpdatePreview()">
+                      <input type="number" id="reels-box-pad-y" class="input input-small" value="8" min="-20" max="200"
+                        style="width: 48px;" oninput="document.getElementById('reels-box-pad-y-range').value=this.value; reelsUpdatePreview()">
+                    </div>
+                  </div>
+                  <div style="margin: 6px 0 10px 0; padding: 8px 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+                      <span>📰 <b>文字底部 / 报纸剪报底衬快速选择</b>（点击即切换底衬样式并匹配配色；可通过上方 <b>左右长度(内距X) / 上下宽度(内距Y)</b> 自由调节长宽）：</span>
+                      <label class="checkbox-label" style="font-size: 11px;" title="勾选后，点击下方样式将同时开启逐词出字效果"><input type="checkbox" id="reels-backing-quick-typewriter" checked><span>同步开启逐词出字</span></label>
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#F3EFE6; color:#3B2220; border:1px solid #C8BFA8; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('newspaper_cutout')">📰 复古旧报纸剪报 (同款)</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#EDE2C8; color:#3E2616; border:1px solid #C2AE85; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('newspaper_sepia')">🗞️ 泛黄古董报刊</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#FAF6EE; color:#2C221E; border:1px solid #DCD4C4; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('torn_cream_paper')">📜 奶油手撕宣纸</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#C59B6D; color:#FFFDF9; border:1px solid #FFFDF9; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('kraft_sticker')">🏷️ 牛皮纸白边贴</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#F1ECE1; color:#231F20; border:1px solid #999; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('ransom_magazine')">✂️ 杂志拼贴剪报</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#FBFBF7; color:#1E293B; border:1px solid #94A3B8; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('grid_note')">📓 手账方格便签</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#F5EAD4; color:#3A2010; border:1px solid #C89D54; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('gold_parchment')">✨ 圣经烫金羊皮</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#9E1B20; color:#FFFDF9; border:1px solid #F6F1E7; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('red_editorial')">🔖 报刊红底白边</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#1E1C1A; color:#F7EFE2; border:1px solid #C8A25A; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('dark_film_matte')">🎬 暗夜胶片磨砂</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:linear-gradient(180deg, #2A241E 45%, #D99B26 45%); color:#FFFFFF; border:1px solid #F3C65F; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('bottom_gold_bar')">🌟 鎏金半高底条</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:linear-gradient(180deg, #2A1E22 45%, #C85A70 45%); color:#FFFFFF; border:1px solid #E58FA0; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('bottom_rose_brush')">🌸 玫瑰手绘底条</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:linear-gradient(180deg, #222 45%, #FACC15 45%); color:#FFFFFF; border:1px solid #FDE047; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('bottom_neon_marker')">🖍️ 荧光马克笔底条</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#88131B; color:#FFFDF9; border:2px dashed #FCA5A5; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('xmas_candy_ribbon')">🍬 圣诞拐杖糖带</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#7A111A; color:#FDE047; border:1px solid #FACC15; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('xmas_velvet_gold')">🎅 圣诞红丝绒烫金带</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#124229; color:#FFFFFF; border:1px solid #F8FAFC; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('xmas_pine_snow')">🎄 圣诞松林覆雪带</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:#7C3F1C; color:#FFFDF9; border:1px solid #FFFDF9; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('xmas_gingerbread_tag')">🍪 圣诞姜饼糖霜签</button>
+                      <button type="button" class="btn btn-secondary btn-small" style="font-size:11px; padding:3px 8px; background:linear-gradient(180deg, #0F172A 45%, #0EA5E9 45%); color:#FFFFFF; border:1px solid #BAE6FD; font-weight:700;" onclick="window.reelsApplyTextBackingPreset && window.reelsApplyTextBackingPreset('xmas_frost_ice')">❄️ 圣诞冰雪底条</button>
                     </div>
                   </div>
 
@@ -5712,6 +5779,12 @@
                               <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;" onclick="reelsSetSpeechWritingTip('music_note')">🎵 金音符</button>
                               <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;" onclick="reelsSetSpeechWritingTip('cross_light')">✝️ 十字光</button>
                               <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;" onclick="reelsSetSpeechWritingTip('feather_gold')">🪽 圣金羽</button>
+                              <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;border-color:#dc2626;" onclick="reelsSetSpeechWritingTip('candy_cane')">🍬 拐杖糖笔</button>
+                              <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;border-color:#16a34a;" onclick="reelsSetSpeechWritingTip('christmas_tree')">🎄 圣诞树</button>
+                              <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;border-color:#15803d;" onclick="reelsSetSpeechWritingTip('holly_berry')">🍒 冬青红果</button>
+                              <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;border-color:#0284c7;" onclick="reelsSetSpeechWritingTip('snowflake_wand')">❄️ 冰雪魔杖</button>
+                              <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;border-color:#b91c1c;" onclick="reelsSetSpeechWritingTip('santa_feather')">🎅 圣诞绒笔</button>
+                              <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;border-color:#eab308;" onclick="reelsSetSpeechWritingTip('jingle_bell')">🔔 圣诞铃铛</button>
                               <button type="button" class="btn btn-secondary" style="padding:3px 7px;font-size:11px;" onclick="reelsUploadSpeechWritingImage()">🖼 上传图片</button>
                             </div>
                             <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
@@ -5738,6 +5811,12 @@
                                 <option value="music_note">🎵 律动金色音符</option>
                                 <option value="cross_light">✝️ 光芒十字架</option>
                                 <option value="feather_gold">🪽 鎏金神圣金羽</option>
+                                <option value="candy_cane">🍬 圣诞红白拐杖糖笔</option>
+                                <option value="christmas_tree">🎄 璀璨金星圣诞树</option>
+                                <option value="holly_berry">🍒 圣诞冬青红果叶</option>
+                                <option value="snowflake_wand">❄️ 晶莹冰雪魔杖</option>
+                                <option value="santa_feather">🎅 圣诞红金绒毛笔</option>
+                                <option value="jingle_bell">🔔 圣诞金铃铛</option>
                                 <option value="image">🖼 上传的图片</option>
                               </select>
                             </div>
@@ -5861,6 +5940,20 @@
                     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-secondary);" title="文字超过上方宽度时自动分成多行，不改变字号">
                       <input type="checkbox" id="reels-auto-wrap" checked onchange="reelsUpdatePreview()">
                       超长字幕自动断行
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 4px;" title="每屏最多显示多少个单词 (0=不限，设为5则自动按每屏最多5词+句尾标点自然切分短句，无需手动重分段)">
+                      <label>每屏词数:</label>
+                      <input type="number" id="reels-max-words-per-seg" class="input input-small" value="0" min="0" max="30" style="width: 48px;"
+                        oninput="reelsUpdatePreview()" onchange="reelsUpdatePreview()">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 4px;" title="单行最多显示多少个单词 (0=不限，设为4则单行最多4个词)">
+                      <label>每行词数:</label>
+                      <input type="number" id="reels-max-words-per-line" class="input input-small" value="0" min="0" max="15" style="width: 48px;"
+                        oninput="reelsUpdatePreview()" onchange="reelsUpdatePreview()">
+                    </div>
+                    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-secondary);" title="开启后2~5词短句自动排成视觉均衡的上下两行（上宽下窄金字塔/均衡双行，成品04同款）">
+                      <input type="checkbox" id="reels-balanced-two-line" onchange="reelsUpdatePreview()">
+                      双行均衡分词
                     </label>
                     <div style="display: flex; align-items: center; gap: 4px;">
                       <label>对齐:</label>
@@ -6360,6 +6453,11 @@
                 <div id="inspector-tab-overlay" style="display:none; flex:1; overflow-y:scroll; scrollbar-gutter: stable; padding:10px;">
                   <h3 class="section-title">📐 覆层编辑</h3>
                   <div id="reels-overlay-panel-root"></div>
+                </div>
+
+                <!-- Tab: 点缀与颗粒 (独立专属大面板: 30款黑色模板/粒子/电影颗粒/圣诞装饰) -->
+                <div id="inspector-tab-decor" style="display:none; flex:1; overflow-y:scroll; scrollbar-gutter: stable; padding:10px;">
+                  <div id="reels-decor-panel-root"></div>
                 </div>
 
                 <!-- Tab: 水印 -->
@@ -7025,9 +7123,15 @@
                       </label>
                       <label
                         style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;margin-left:2px;"
-                        title="预览与导出覆层总开关：关闭后，导出的视频也不会带覆层">
+                        title="预览与导出覆层总开关：关闭后，导出的视频也不会带普通覆层（不影响点缀与颗粒层）">
                         <input type="checkbox" id="reels-overlay-toggle" checked onchange="reelsOnOverlayToggleChange(this)"
                           style="accent-color:var(--accent-color);"> 覆层（关闭=导出不带）
+                      </label>
+                      <label
+                        style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;margin-left:2px;"
+                        title="预览与导出点缀/颗粒总开关：勾选时预览并导出点缀层；关闭后不预览且导出的视频也不带点缀层">
+                        <input type="checkbox" id="reels-decor-toggle" checked onchange="reelsOnDecorToggleChange(this)"
+                          style="accent-color:var(--accent-color);"> 点缀（关闭=导出不带）
                       </label>
                       <label
                         style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;margin-left:2px;"
@@ -7092,16 +7196,21 @@
           <script>
           function reelsInspectorSwitch(tab, btn) {
             // 切换 Tab 内容可见性
-            var tabs = ['subtitle', 'overlay', 'watermark', 'background'];
+            var tabs = ['subtitle', 'overlay', 'decor', 'watermark', 'background'];
             for (var i = 0; i < tabs.length; i++) {
               var el = document.getElementById('inspector-tab-' + tabs[i]);
               if (el) el.style.display = tabs[i] === tab ? '' : 'none';
             }
             // 更新 Tab 按钮样式
-            var buttons = btn.parentElement.querySelectorAll('.inspector-tab');
-            for (var j = 0; j < buttons.length; j++) {
-              buttons[j].style.borderBottomColor = buttons[j] === btn ? 'var(--accent)' : 'transparent';
-              buttons[j].classList.toggle('active', buttons[j] === btn);
+            if (btn && btn.parentElement) {
+              var buttons = btn.parentElement.querySelectorAll('.inspector-tab');
+              for (var j = 0; j < buttons.length; j++) {
+                buttons[j].style.borderBottomColor = buttons[j] === btn ? 'var(--accent)' : 'transparent';
+                buttons[j].classList.toggle('active', buttons[j] === btn);
+              }
+            }
+            if (tab === 'decor' && window._reelsState && window._reelsState.decorPanel && typeof window._reelsState.decorPanel.refresh === 'function') {
+              window._reelsState.decorPanel.refresh();
             }
           }
           </script>
@@ -7918,7 +8027,7 @@
           <div class="form-section">
             <h3 class="section-title">关于</h3>
             <div class="about-info">
-              <p><strong>VideoKit</strong> <span id="app-version-display">v4.4.39</span></p>
+              <p><strong>VideoKit</strong> <span id="app-version-display">v4.5.0</span></p>
               <p>视频工具包-批量：音频生成-reels视频制作-多媒体转换</p>
               <div style="margin-top: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <button id="check-update-btn" class="btn btn-secondary" onclick="checkAppUpdate()"

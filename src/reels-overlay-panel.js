@@ -138,6 +138,7 @@ class ReelsOverlayPanel {
                         <button class="btn btn-secondary rop-btn" id="rop-add-image" title="添加图片/视频/动图覆层">+ 媒体</button>
                         <button class="btn btn-secondary rop-btn" id="rop-media-library" title="打开固定覆层素材库" style="padding:2px 6px;">📂 素材</button>
                         <button class="btn btn-secondary rop-btn" id="rop-add-scroll" title="添加滚动字幕" style="background:#FF6B35;color:#fff;">+ 滚动字幕</button>
+                        <button class="btn btn-secondary rop-btn" id="rop-add-decor" title="添加边缘点缀 / 圣诞装饰 / 发光星星 / 复古画框图层" style="background:linear-gradient(135deg,#dc2626,#d97706);color:#fff;font-weight:700;border:1px solid #fde68a;">+ ✨ 点缀图层</button>
                     </div>
                 </div>
                 <label style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:11px;cursor:pointer;color:var(--text-secondary);flex-wrap:wrap;" title="关闭后，动态字幕会显示在所有覆层上方">
@@ -520,6 +521,136 @@ class ReelsOverlayPanel {
                     </div>
                 </div>
 
+                <!-- ✨ 点缀装饰图层属性 (decor覆层独有) -->
+                <div id="rop-decor-props" class="rop-group" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap;">
+                        <div class="rop-group-title" style="margin:0;color:#fde68a;">✨ 点缀与颗粒图层 (30款黑色模板/粒子/电影颗粒/圣诞)</div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <button type="button" class="btn btn-secondary rop-btn" id="rop-open-dedicated-decor-tab" style="padding:2px 8px;font-size:11px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:1px solid #a78bfa;border-radius:5px;cursor:pointer;">✨ 切换到【点缀与颗粒】独立大面板</button>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;color:var(--text-primary);margin:0;">
+                                <input type="checkbox" id="rop-decor-apply-all" checked>
+                                <span title="按顶部【样式作用】范围同步样式">同步到作用范围</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:6px;margin-bottom:8px;">
+                        <button type="button" class="btn btn-secondary rop-btn" id="rop-decor-fit-fullscreen" style="flex:1;padding:4px 6px;font-size:11px;" title="让点缀铺满整个视频画面边缘 (1080×1920)">📐 铺满全屏边缘 (1080×1920)</button>
+                        <button type="button" class="btn btn-secondary rop-btn" id="rop-decor-fit-card" style="flex:1;padding:4px 6px;font-size:11px;" title="让点缀框缩小贴合在中间字幕/卡片四周 (940×1260)">🎯 贴合中间字幕框 (940×1260)</button>
+                    </div>
+
+                    <div class="rop-grid">
+                        <label>30款主题</label>
+                        <select id="rop-decor-style" class="rop-select">
+                            <optgroup label="🖤 黑色氛围模板 & 飘浮粒子 (7款)">
+                                <option value="dark_floating_dust">🖤 暗黑深邃模板 + 悬浮微尘</option>
+                                <option value="dark_gold_embers">🔥 黑金暗夜模板 + 升腾火星余烬</option>
+                                <option value="dark_starlight_mist">🌌 暗夜星空黑底 + 呼吸星芒微粒</option>
+                                <option value="dark_firefly_woods">✨ 暗调森林黑底 + 萤火虫漂浮</option>
+                                <option value="dark_silver_snow_ash">🌨️ 暗黑冰原模板 + 银白灰烬细雪</option>
+                                <option value="dark_holy_halo_dust">🕯️ 暗夜烛光圣殿 + 鎏金圣尘</option>
+                                <option value="dark_cyber_neon_sparks">⚡ 暗黑赛博黑底 + 霓虹微光粒子</option>
+                            </optgroup>
+                            <optgroup label="🎞️ 电影颗粒 & 回忆质感 (7款)">
+                                <option value="cinema_35mm_grain">🎞️ 35mm 经典电影颗粒 + 宽银幕暗角</option>
+                                <option value="memory_sepia_grain">🕰️ 怀旧泛黄回忆颗粒 + 老照片柔光</option>
+                                <option value="vintage_8mm_scratches">📽️ 8mm 老电影划痕 + 闪烁噪点颗粒</option>
+                                <option value="noir_bw_high_grain">🎬 黑白胶片高反差粗颗粒</option>
+                                <option value="dreamy_light_leak_grain">🌅 复古胶片漏光 + 柔焦回忆颗粒</option>
+                                <option value="vhs_retro_scanlines">📼 90年代 VHS 扫描线 + 磁带噪点</option>
+                                <option value="cinema_vignette_grain">🎥 电影取景框暗角 + 胶片星尘</option>
+                            </optgroup>
+                            <optgroup label="🌟 发光星芒 & 梦幻光斑 (6款)">
+                                <option value="glowing_starfield">🌟 璀璨发光星芒点缀</option>
+                                <option value="fairy_bokeh_lights">💡 梦幻暖金串灯与光斑</option>
+                                <option value="golden_meteor_dust">✨ 圣光鎏金星尘飘落</option>
+                                <option value="angelic_rays_stars">🕊️ 圣洁光芒与四角星辉</option>
+                                <option value="diamond_prism_sparkles">💎 钻石棱镜十字星芒闪烁</option>
+                                <option value="warm_sunset_bokeh">🌇 落日暖阳大光斑漂浮</option>
+                            </optgroup>
+                            <optgroup label="🎄 圣诞节限定点缀 (5款)">
+                                <option value="xmas_holly_pine_garland">🎄 圣诞松枝冬青花环框</option>
+                                <option value="xmas_snowfall_frost">❄️ 圣诞漫天飘雪与冰晶边</option>
+                                <option value="xmas_hanging_baubles">🎅 圣诞顶部挂球与金星吊坠</option>
+                                <option value="xmas_candy_corner_ribbons">🍬 圣诞拐杖糖与蝴蝶结角花</option>
+                                <option value="xmas_golden_bells_reindeer">🔔 圣诞金铃铛与雪花金框</option>
+                            </optgroup>
+                            <optgroup label="⚜️ 复古画框 & 边缘雕花 (5款)">
+                                <option value="vintage_gold_filigree">⚜️ 古典烫金巴洛克雕花角框</option>
+                                <option value="newspaper_torn_tape_frame">📰 复古报刊手撕边与胶带点缀</option>
+                                <option value="rose_botanical_vine">🌹 复古玫瑰藤蔓边缘点缀</option>
+                                <option value="sacred_cathedral_arch">⛪ 圣经哥特拱窗烫金边框</option>
+                                <option value="polaroid_memory_border">🖼️ 拍立得回忆相纸框 + 胶片颗粒</option>
+                            </optgroup>
+                        </select>
+
+                        <label>分布位置</label>
+                        <select id="rop-decor-layout" class="rop-select">
+                            <option value="edges_and_float">四周边缘环绕 + 少量轻柔漂浮 (推荐)</option>
+                            <option value="edges_only">仅四周边缘环绕 (中心完全留空)</option>
+                            <option value="corners_only">仅四角精致点缀</option>
+                            <option value="top_bottom">仅上下边缘点缀 (顶部+底部)</option>
+                            <option value="full_scatter">全画面均匀漫天分布 (适合颗粒/微尘)</option>
+                        </select>
+
+                        <div style="grid-column: span 2; font-size:11px; color:#f87171; margin-top:4px; margin-bottom:2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">🖤 黑色氛围模板 & 电影暗角</div>
+                        <label title="四周暗黑遮罩与上下宽银幕暗角浓度">黑色模板浓度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-dark-vignette" class="rop-range" min="0" max="100" step="2" value="0"><input type="number" class="rop-num-readout" data-link="rop-decor-dark-vignette" min="0" max="100" step="2" value="0"></div>
+                        <label title="暗角向画面中心聚拢扩散的范围">暗角扩散范围%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-vignette-spread" class="rop-range" min="10" max="95" step="5" value="55"><input type="number" class="rop-num-readout" data-link="rop-decor-vignette-spread" min="10" max="95" step="5" value="55"></div>
+                        <label title="黑色模板底色或怀旧暗褐色">暗底色调</label><input type="color" id="rop-decor-dark-tint" class="rop-color" value="#05070B">
+
+                        <div style="grid-column: span 2; font-size:11px; color:#fbbf24; margin-top:4px; margin-bottom:2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">🎞️ 电影颗粒 & 回忆颗粒感</div>
+                        <label title="35mm/8mm胶片噪点与回忆颗粒感强度">电影颗粒强度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-grain-intensity" class="rop-range" min="0" max="100" step="2" value="0"><input type="number" class="rop-num-readout" data-link="rop-decor-grain-intensity" min="0" max="100" step="2" value="0"></div>
+                        <label title="胶片颗粒的粗细大小">颗粒粗细%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-grain-size" class="rop-range" min="50" max="250" step="5" value="100"><input type="number" class="rop-num-readout" data-link="rop-decor-grain-size" min="50" max="250" step="5" value="100"></div>
+                        <label title="老照片泛黄暖调回忆感">怀旧泛黄暖调%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-grain-warmth" class="rop-range" min="0" max="100" step="5" value="0"><input type="number" class="rop-num-readout" data-link="rop-decor-grain-warmth" min="0" max="100" step="5" value="0"></div>
+                        <label>老电影划痕/扫描线</label><input type="checkbox" id="rop-decor-film-scratches">
+                        <label>胶片边缘漏光</label><input type="checkbox" id="rop-decor-light-leak">
+
+                        <div style="grid-column: span 2; font-size:11px; color:var(--accent); margin-top:4px; margin-bottom:2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">✨ 飘浮粒子 & 组合装饰开关</div>
+                        <label>开启飘浮粒子</label><input type="checkbox" id="rop-decor-floating-particles">
+                        <label>粒子形态模式</label>
+                        <select id="rop-decor-particle-mode" class="rop-select">
+                            <option value="dust">🖤 悬浮微尘粒子 (Dust)</option>
+                            <option value="embers">🔥 升腾火星余烬 (Embers)</option>
+                            <option value="fireflies">✨ 森林萤火虫 (Fireflies)</option>
+                            <option value="ash">🌨️ 银白灰烬细雪 (Ash)</option>
+                            <option value="neon">⚡ 赛博霓虹微粒 (Neon)</option>
+                            <option value="sunset_bokeh">🌇 落日暖阳大光斑 (Bokeh)</option>
+                            <option value="prism">💎 钻石棱镜星芒 (Prism)</option>
+                        </select>
+                        <label>发光闪烁星芒</label><input type="checkbox" id="rop-decor-glow-stars" checked>
+                        <label>飘落雪花/冰晶</label><input type="checkbox" id="rop-decor-snowflakes">
+                        <label>四角主题挂饰</label><input type="checkbox" id="rop-decor-corner-ornaments" checked>
+                        <label>边缘花环/串灯/框</label><input type="checkbox" id="rop-decor-edge-garland" checked>
+
+                        <div style="grid-column: span 2; font-size:11px; color:var(--accent); margin-top:4px; margin-bottom:2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">📐 大小 / 密度 / 发光 / 边距调节</div>
+                        <label title="粒子、星星、光斑或雪花的数量密度">数量密度</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-density" class="rop-range" min="5" max="180" step="5" value="55"><input type="number" class="rop-num-readout" data-link="rop-decor-density" min="5" max="200" step="5" value="55"></div>
+
+                        <label title="点缀元素、粒子、角花、挂球与星星的整体尺寸缩放">点缀大小%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-size" class="rop-range" min="30" max="250" step="5" value="100"><input type="number" class="rop-num-readout" data-link="rop-decor-size" min="20" max="300" step="5" value="100"></div>
+
+                        <label title="粒子、星星与串灯周围放射光晕的强弱">发光强度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-glow" class="rop-range" min="0" max="200" step="5" value="100"><input type="number" class="rop-num-readout" data-link="rop-decor-glow" min="0" max="200" step="5" value="100"></div>
+
+                        <label title="0% = 完全静止；大于0% = 粒子飘动、星星呼吸、雪花飘落">动态速度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-speed" class="rop-range" min="0" max="250" step="10" value="100"><input type="number" class="rop-num-readout" data-link="rop-decor-speed" min="0" max="300" step="10" value="100"></div>
+
+                        <label title="边缘画框与角花距离图层四边的内缩距离">边缘内缩px</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-margin" class="rop-range" min="0" max="220" step="4" value="36"><input type="number" class="rop-num-readout" data-link="rop-decor-margin" min="0" max="300" step="4" value="36"></div>
+
+                        <label title="中心区域留空比例，越大则点缀越集中在四周边缘">中心留空%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-decor-center-clear" class="rop-range" min="0" max="90" step="5" value="65"><input type="number" class="rop-num-readout" data-link="rop-decor-center-clear" min="0" max="95" step="5" value="65"></div>
+
+                        <label>主色调</label><input type="color" id="rop-decor-color1" class="rop-color" value="#FFD700">
+                        <label>副色/星核色</label><input type="color" id="rop-decor-color2" class="rop-color" value="#FFFDF5">
+                    </div>
+                </div>
+
                 <!-- 滚动字幕属性 (scroll覆层独合) -->
                 <div id="rop-scroll-props" class="rop-group" style="display:none;">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -528,6 +659,73 @@ class ReelsOverlayPanel {
                             <input type="checkbox" id="rop-scroll-apply-all" checked>
                             <span title="按顶部【样式作用】范围同步样式">同步到作用范围</span>
                         </label>
+                    </div>
+
+                    <!-- 🎨 滚动字幕背景主题快速选择（始终置顶可见：支持整块大背景画板 & 逐行底衬 & 直接调节长宽与滚动循环） -->
+                    <div style="margin:6px 0 8px 0;padding:8px;border-radius:8px;background:linear-gradient(135deg, rgba(220,38,38,0.10), rgba(21,128,61,0.10), rgba(245,158,11,0.10));border:1px solid rgba(251,191,36,0.28);">
+                        <div style="font-size:11px;font-weight:700;color:#fde68a;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;">
+                            <span>🖼️ 整块大背景画板 / 边框 (报纸 / 圣诞贺卡)</span>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="off" style="padding:1px 6px;font-size:10px;background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);border-radius:4px;cursor:pointer;">关闭大背景</button>
+                        </div>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="newspaper_page" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#f3efe6,#dfd7c6);color:#2b1b18;font-weight:700;border:1px solid #cbbba0;border-radius:5px;cursor:pointer;">📰 旧报纸整版</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="newspaper_sepia_page" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#eadbc2,#d4be98);color:#3b2313;font-weight:700;border:1px solid #bfa376;border-radius:5px;cursor:pointer;">🗞️ 泛黄报刊板</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="torn_parchment_board" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#f7f1e3,#e6d4a7);color:#422810;font-weight:700;border:1px solid #c59b27;border-radius:5px;cursor:pointer;">📜 烫金羊皮卷</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="kraft_clipboard" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#c8a276,#a67c52);color:#fffdf9;font-weight:700;border:1px solid #e6dec8;border-radius:5px;cursor:pointer;">🏷️ 牛皮纸画板</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="grid_notebook_page" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#faf8f2,#e2e8f0);color:#1e293b;font-weight:700;border:1px solid #94a3b8;border-radius:5px;cursor:pointer;">📓 方格手账页</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="xmas_candy_frame" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#b91c1c,#7f1d1d);color:#fffdf5;font-weight:700;border:1px solid #fca5a5;border-radius:5px;cursor:pointer;">🍬 圣诞拐杖糖框</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="xmas_velvet_gold_board" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#88131b,#4c0519);color:#fde68a;font-weight:700;border:1px solid #f5d061;border-radius:5px;cursor:pointer;">🎅 圣诞红丝绒卡</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="xmas_pine_snow_board" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#15803d,#14532d);color:#f0fdf4;font-weight:700;border:1px solid #86efac;border-radius:5px;cursor:pointer;">🎄 圣诞松林覆雪板</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="xmas_gingerbread_card" style="flex:1 1 30%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#8d4e25,#5c2d10);color:#fffdf9;font-weight:700;border:1px solid #fde68a;border-radius:5px;cursor:pointer;">🍪 圣诞姜饼糖霜卡</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="xmas_starry_snow_night" style="flex:1 1 45%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#bae6fd;font-weight:700;border:1px solid #38bdf8;border-radius:5px;cursor:pointer;">❄️ 圣诞飘雪夜空板</button>
+                            <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="xmas_cream_holly_letter" style="flex:1 1 45%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#fcf8ee,#efe6d5);color:#991b1b;font-weight:700;border:1px solid #15803d;border-radius:5px;cursor:pointer;">🦌 圣诞冬青信纸卡</button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px 6px;align-items:center;font-size:11px;margin-bottom:5px;padding:4px 6px;border-radius:5px;background:rgba(0,0,0,0.22);">
+                            <span style="color:#fde68a;white-space:nowrap;" title="0=自动跟随覆层宽度；调小可露出左右视频边缘与手撕边/边框">画板宽度</span>
+                            <div style="display:flex;align-items:center;gap:3px;">
+                                <input type="range" id="rop-scroll-bg-width-quick" class="rop-range" min="0" max="1080" step="10" value="0" style="flex:1;min-width:45px;">
+                                <input type="number" id="rop-scroll-bg-width-quick-num" class="rop-input" min="0" max="1920" step="10" value="0" style="width:52px;padding:1px 3px;font-size:11px;" title="0=自动">
+                            </div>
+                            <span style="color:#fde68a;white-space:nowrap;" title="0=自动跟随覆层高度；可直接调节背景画板与边框的上下长度">画板长度</span>
+                            <div style="display:flex;align-items:center;gap:3px;">
+                                <input type="range" id="rop-scroll-bg-height-quick" class="rop-range" min="0" max="1920" step="10" value="0" style="flex:1;min-width:45px;">
+                                <input type="number" id="rop-scroll-bg-height-quick-num" class="rop-input" min="0" max="1920" step="10" value="0" style="width:52px;padding:1px 3px;font-size:11px;" title="0=自动">
+                            </div>
+                            <label style="grid-column:span 2;display:flex;align-items:center;gap:4px;cursor:pointer;color:#fef08a;margin:0;" title="开启后，报纸版面、报头线、撕边纹理与圣诞装饰会跟着字幕一起往上循环移动">
+                                <input type="checkbox" id="rop-scroll-bg-scroll-follow-quick" checked>
+                                <span>🔄 背景随字幕向上循环滚动</span>
+                            </label>
+                            <label style="grid-column:span 2;display:flex;align-items:center;gap:4px;cursor:pointer;color:#cbd5e1;margin:0;" title="开启后，大背景/边框只包裹下方滚动正文区，不包裹顶部标题">
+                                <input type="checkbox" id="rop-scroll-bg-body-only-quick">
+                                <span>📐 仅包裹正文区(不含标题)</span>
+                            </label>
+                        </div>
+                        <div style="font-size:11px;font-weight:700;color:#93c5fd;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;border-top:1px dashed rgba(255,255,255,0.14);padding-top:5px;">
+                            <span>✂️ 逐行贴字底衬 (随每行文字向上滚动：剪报条 / 圣诞带)</span>
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="off" style="padding:1px 6px;font-size:10px;background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);border-radius:4px;cursor:pointer;">关闭行底衬</button>
+                        </div>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px;">
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="newspaper_cutout" style="flex:1 1 22%;padding:3px 5px;font-size:10px;background:#f3efe6;color:#2b1b18;font-weight:700;border:1px solid #cbbba0;border-radius:4px;cursor:pointer;">📰 旧报纸条</button>
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="newspaper_sepia" style="flex:1 1 22%;padding:3px 5px;font-size:10px;background:#eadbc2;color:#3b2313;font-weight:700;border:1px solid #bfa376;border-radius:4px;cursor:pointer;">🗞️ 泛黄报刊条</button>
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="torn_cream_paper" style="flex:1 1 22%;padding:3px 5px;font-size:10px;background:#faf6ee;color:#2c221e;font-weight:700;border:1px solid #d6cfc2;border-radius:4px;cursor:pointer;">📜 宣纸贴条</button>
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="xmas_candy_ribbon" style="flex:1 1 22%;padding:3px 5px;font-size:10px;background:#991b1b;color:#fff;font-weight:700;border:1px solid #fca5a5;border-radius:4px;cursor:pointer;">🍬 拐杖糖带</button>
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="xmas_velvet_gold" style="flex:1 1 22%;padding:3px 5px;font-size:10px;background:#6e0b16;color:#fde68a;font-weight:700;border:1px solid #f5d061;border-radius:4px;cursor:pointer;">🎅 红丝绒带</button>
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="xmas_pine_snow" style="flex:1 1 22%;padding:3px 5px;font-size:10px;background:#14532d;color:#f0fdf4;font-weight:700;border:1px solid #86efac;border-radius:4px;cursor:pointer;">🎄 松林覆雪带</button>
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="xmas_gingerbread_tag" style="flex:1 1 22%;padding:3px 5px;font-size:10px;background:#7c3f1c;color:#fffdf9;font-weight:700;border:1px solid #fde68a;border-radius:4px;cursor:pointer;">🍪 姜饼糖霜签</button>
+                            <button type="button" class="rop-btn rop-scroll-body-bg-preset" data-body-bg-preset="xmas_frost_ice" style="flex:1 1 22%;padding:3px 5px;font-size:10px;background:#0369a1;color:#e0f2fe;font-weight:700;border:1px solid #7dd3fc;border-radius:4px;cursor:pointer;">❄️ 冰雪半高条</button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px 6px;align-items:center;font-size:11px;padding:4px 6px;border-radius:5px;background:rgba(0,0,0,0.22);">
+                            <span style="color:#93c5fd;white-space:nowrap;" title="调节每行剪报条/圣诞带左右两端的伸出长度（支持负数收窄）">左右长度</span>
+                            <div style="display:flex;align-items:center;gap:3px;">
+                                <input type="range" id="rop-scroll-body-bg-pad-h-quick" class="rop-range" min="-20" max="120" step="1" value="24" style="flex:1;min-width:45px;">
+                                <input type="number" id="rop-scroll-body-bg-pad-h-quick-num" class="rop-input" min="-20" max="200" step="1" value="24" style="width:46px;padding:1px 3px;font-size:11px;">
+                            </div>
+                            <span style="color:#93c5fd;white-space:nowrap;" title="调节每行剪报条/圣诞带上下包裹的厚薄宽度（支持负数变窄）">上下宽度</span>
+                            <div style="display:flex;align-items:center;gap:3px;">
+                                <input type="range" id="rop-scroll-body-bg-pad-v-quick" class="rop-range" min="-15" max="80" step="1" value="11" style="flex:1;min-width:45px;">
+                                <input type="number" id="rop-scroll-body-bg-pad-v-quick-num" class="rop-input" min="-20" max="200" step="1" value="11" style="width:46px;padding:1px 3px;font-size:11px;">
+                            </div>
+                        </div>
                     </div>
 
                     <!-- ① 内容：标题在前，正文在后 -->
@@ -591,6 +789,25 @@ class ReelsOverlayPanel {
                         <label>阴影偏移Y</label><input type="number" id="rop-scroll-title-shadow-y" class="rop-input" min="-20" max="20" value="2">
                         <div style="grid-column: span 2; font-size:11px; color:var(--accent); margin-top:6px; margin-bottom:2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">标题独立背景</div>
                         <label>开启背景</label><input type="checkbox" id="rop-scroll-title-bg-enabled">
+                        <label>底衬样式</label>
+                        <select id="rop-scroll-title-bg-style" class="rop-select">
+                            <option value="solid">⬛ 纯色底框 (默认)</option>
+                            <optgroup label="📰 报纸剪报 / 纸张贴条系列">
+                                <option value="newspaper_cutout">📰 复古旧报纸剪报</option>
+                                <option value="newspaper_sepia">🗞️ 怀旧泛黄古董报刊</option>
+                                <option value="torn_cream_paper">📜 奶油手撕宣纸贴</option>
+                                <option value="kraft_sticker">🏷️ 手撕牛皮纸贴纸</option>
+                                <option value="gold_parchment">✨ 圣经烫金羊皮书页</option>
+                                <option value="red_editorial">🔖 报刊红底白边剪报</option>
+                            </optgroup>
+                            <optgroup label="🎄 圣诞节限定字幕带 / 礼物签">
+                                <option value="xmas_candy_ribbon">🍬 圣诞红白拐杖糖字幕带</option>
+                                <option value="xmas_velvet_gold">🎅 圣诞红丝绒烫金挂旗带</option>
+                                <option value="xmas_pine_snow">🎄 圣诞松林绿覆雪字幕带</option>
+                                <option value="xmas_gingerbread_tag">🍪 圣诞姜饼屋糖霜礼物签</option>
+                                <option value="xmas_frost_ice">❄️ 圣诞冰雪极光半高底条</option>
+                            </optgroup>
+                        </select>
                         <label>背景模式</label>
                         <select id="rop-scroll-title-bg-mode" class="rop-select">
                             <option value="block">整块</option><option value="inline">每行独立包裹</option><option value="inline-joined">连体包裹</option>
@@ -598,9 +815,9 @@ class ReelsOverlayPanel {
                         <label>背景颜色</label><input type="color" id="rop-scroll-title-bg-color" class="rop-color" value="#000000">
                         <label>背景透明%</label><input type="number" id="rop-scroll-title-bg-opacity" class="rop-input" min="0" max="100" value="60">
                         <label>背景圆角</label><input type="number" id="rop-scroll-title-bg-radius" class="rop-input" min="0" max="100" value="12">
-                        <label>背景水平内边距</label><input type="number" id="rop-scroll-title-bg-pad-h" class="rop-input" min="0" max="200" value="0">
-                        <label>背景上边距</label><input type="number" id="rop-scroll-title-bg-pad-top" class="rop-input" min="0" max="200" value="0">
-                        <label>背景下边距</label><input type="number" id="rop-scroll-title-bg-pad-bottom" class="rop-input" min="0" max="200" value="0">
+                        <label title="调节标题底衬左右两端的伸出长度（支持负数收窄）">左右长度(内距X)</label><input type="number" id="rop-scroll-title-bg-pad-h" class="rop-input" min="-20" max="200" value="0">
+                        <label title="调节标题底衬上方的包裹宽度（支持负数变窄）">上侧宽度(内距上)</label><input type="number" id="rop-scroll-title-bg-pad-top" class="rop-input" min="-20" max="200" value="0">
+                        <label title="调节标题底衬下方的包裹宽度（支持负数变窄）">下侧宽度(内距下)</label><input type="number" id="rop-scroll-title-bg-pad-bottom" class="rop-input" min="-20" max="200" value="0">
                     </div>
 
                     <div style="font-size:11px; color:var(--accent); margin-top:8px; margin-bottom:2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">标题装饰线</div>
@@ -660,8 +877,50 @@ class ReelsOverlayPanel {
                         <label>阴影模糊</label><input type="number" id="rop-scroll-shadow-blur" class="rop-input" min="0" max="50" value="4">
                         <label>阴影偏移X</label><input type="number" id="rop-scroll-shadow-x" class="rop-input" min="-20" max="20" value="2">
                         <label>阴影偏移Y</label><input type="number" id="rop-scroll-shadow-y" class="rop-input" min="-20" max="20" value="2">
-                        <div style="grid-column: span 2; font-size:11px; color:var(--accent); margin-top:6px; margin-bottom:2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">正文独立背景</div>
+                        <div style="grid-column: span 2; font-size:11px; color:var(--accent); margin-top:6px; margin-bottom:2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">正文独立背景 / 报纸剪报底衬</div>
                         <label>开启背景</label><input type="checkbox" id="rop-scroll-body-bg-enabled">
+                        <label>底衬样式</label>
+                        <select id="rop-scroll-body-bg-style" class="rop-select">
+                            <option value="solid">⬛ 纯色底框 (默认)</option>
+                            <optgroup label="📰 贴字剪报 / 手撕纸轮廓系列">
+                                <option value="newspaper_cutout">📰 复古旧报纸剪报 (爆款同款贴字)</option>
+                                <option value="newspaper_sepia">🗞️ 怀旧泛黄古董报刊 (暖黄剪报)</option>
+                                <option value="torn_cream_paper">📜 奶油手撕宣纸贴 (纯净纸张轮廓)</option>
+                                <option value="kraft_sticker">🏷️ 手撕牛皮纸贴纸 (复古白边牛皮纸)</option>
+                                <option value="ransom_magazine">✂️ 杂志拼贴剪报块 (斜切报刊条)</option>
+                            </optgroup>
+                            <optgroup label="✨ 质感纹理底衬系列">
+                                <option value="grid_note">📓 手账方格便签纸 (清新方格底衬)</option>
+                                <option value="gold_parchment">✨ 圣经烫金羊皮书页 (古典羊皮卷)</option>
+                                <option value="red_editorial">🔖 报刊红底白边剪报 (高冲击红底贴)</option>
+                                <option value="dark_film_matte">🎬 暗夜胶片磨砂贴纸 (黑金胶片底)</option>
+                            </optgroup>
+                            <optgroup label="🌟 文字底部半高托底条系列">
+                                <option value="bottom_gold_bar">🌟 鎏金半高文字底条 (文字下半部金底)</option>
+                                <option value="bottom_rose_brush">🌸 莫兰迪玫瑰手绘底条 (文字底部温柔笔触)</option>
+                                <option value="bottom_neon_marker">🖍️ 荧光马克笔手绘底条 (重点荧光半高托底)</option>
+                                <option value="xmas_frost_ice">❄️ 圣诞冰雪极光半高底条 (冰晶蓝底+六角雪花)</option>
+                            </optgroup>
+                            <optgroup label="🎄 圣诞节限定字幕带 / 装饰系列">
+                                <option value="xmas_candy_ribbon">🍬 圣诞红白拐杖糖字幕带 (斜纹糖果框+冬青红果)</option>
+                                <option value="xmas_velvet_gold">🎅 圣诞红丝绒烫金挂旗带 (金线缝边+伯利恒金星)</option>
+                                <option value="xmas_pine_snow">🎄 圣诞松林绿覆雪字幕带 (积雪顶边+冬青彩球)</option>
+                                <option value="xmas_gingerbread_tag">🍪 圣诞姜饼屋糖霜礼物签 (白糖霜花边+冬青果)</option>
+                            </optgroup>
+                            <optgroup label="🖼️ 整块主题画板系列 (配合【整块】背景模式)">
+                                <option value="newspaper_page">📰 复古旧报纸整版画板 (报刊分栏+报头线)</option>
+                                <option value="newspaper_sepia_page">🗞️ 怀旧泛黄古董报刊板 (暖黄旧报+双线内框)</option>
+                                <option value="torn_parchment_board">📜 圣经烫金羊皮书卷板 (四角烫金星芒框)</option>
+                                <option value="kraft_clipboard">🏷️ 手撕牛皮纸剪贴画板 (白边牛皮纸+胶带)</option>
+                                <option value="grid_notebook_page">📓 手账方格笔记本页 (清新方格信纸)</option>
+                                <option value="xmas_candy_frame">🍬 圣诞红白拐杖糖画框板 (糖果外框+冬青果)</option>
+                                <option value="xmas_velvet_gold_board">🎅 圣诞红丝绒烫金贺卡板 (皇家红丝绒+八角金星)</option>
+                                <option value="xmas_pine_snow_board">🎄 圣诞松林覆雪木牌板 (森林松绿+顶部厚积雪)</option>
+                                <option value="xmas_gingerbread_card">🍪 圣诞姜饼屋糖霜贺卡 (白糖霜裱花框+冬青果)</option>
+                                <option value="xmas_starry_snow_night">❄️ 圣诞极光飘雪夜空板 (冰晶深蓝+漫天雪花星芒)</option>
+                                <option value="xmas_cream_holly_letter">🦌 圣诞暖白信纸冬青贺卡 (奶油信纸+红绿金线框)</option>
+                            </optgroup>
+                        </select>
                         <label>背景模式</label>
                         <select id="rop-scroll-body-bg-mode" class="rop-select">
                             <option value="block">整块</option><option value="inline">每行独立包裹</option><option value="inline-joined">连体包裹</option>
@@ -669,9 +928,9 @@ class ReelsOverlayPanel {
                         <label>背景颜色</label><input type="color" id="rop-scroll-body-bg-color" class="rop-color" value="#000000">
                         <label>背景透明%</label><input type="number" id="rop-scroll-body-bg-opacity" class="rop-input" min="0" max="100" value="60">
                         <label>背景圆角</label><input type="number" id="rop-scroll-body-bg-radius" class="rop-input" min="0" max="100" value="12">
-                        <label>背景水平内边距</label><input type="number" id="rop-scroll-body-bg-pad-h" class="rop-input" min="0" max="200" value="0">
-                        <label>背景上边距</label><input type="number" id="rop-scroll-body-bg-pad-top" class="rop-input" min="0" max="200" value="0">
-                        <label>背景下边距</label><input type="number" id="rop-scroll-body-bg-pad-bottom" class="rop-input" min="0" max="200" value="0">
+                        <label title="调节正文底衬左右两端的伸出长度（支持负数收窄）">左右长度(内距X)</label><input type="number" id="rop-scroll-body-bg-pad-h" class="rop-input" min="-20" max="200" value="0">
+                        <label title="调节正文底衬上方的包裹宽度（支持负数变窄）">上侧宽度(内距上)</label><input type="number" id="rop-scroll-body-bg-pad-top" class="rop-input" min="-20" max="200" value="0">
+                        <label title="调节正文底衬下方的包裹宽度（支持负数变窄）">下侧宽度(内距下)</label><input type="number" id="rop-scroll-body-bg-pad-bottom" class="rop-input" min="-20" max="200" value="0">
                     </div>
 
                     <!-- ②-b 出字效果（朗诵打字机 / 手写跟读） -->
@@ -688,6 +947,11 @@ class ReelsOverlayPanel {
                         <label>结束(S)</label><input type="number" id="rop-scroll-tw-end" class="rop-input" min="0" step="0.1" placeholder="跟随滚动结束">
                         <div style="grid-column:span 2;font-size:11px;color:var(--text-muted);">留空沿用原来的语音时间；填写后仅调整出字时间，不改变滚动运动。</div>
                         <div style="grid-column: span 2; display:grid; grid-template-columns:1fr 1fr; gap:5px; margin:2px 0 4px 0;">
+                            <button type="button" class="btn btn-secondary rop-scroll-tw-style-preset" data-preset="newspaper" style="grid-column:span 2;padding:5px 8px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid #C8BFA8;background:#F3EFE6;color:#3B2220;cursor:pointer;">📰 复古旧报纸剪报贴字出字 (爆款同款)</button>
+                            <button type="button" class="btn btn-secondary rop-scroll-tw-style-preset" data-preset="xmas_candy" style="padding:4px 6px;font-size:11px;font-weight:700;border-radius:5px;border:1px dashed #FCA5A5;background:#88131B;color:#FFFDF9;cursor:pointer;">🍬 圣诞拐杖糖带+糖笔出字</button>
+                            <button type="button" class="btn btn-secondary rop-scroll-tw-style-preset" data-preset="xmas_pine" style="padding:4px 6px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid #86EFAC;background:#124229;color:#FFFFFF;cursor:pointer;">🎄 圣诞松林覆雪+圣诞树出字</button>
+                            <button type="button" class="btn btn-secondary rop-scroll-tw-style-preset" data-preset="newspaper_sepia" style="padding:4px 6px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #C2AE85;background:#EDE2C8;color:#3E2616;cursor:pointer;">🗞️ 泛黄古董报刊出字</button>
+                            <button type="button" class="btn btn-secondary rop-scroll-tw-style-preset" data-preset="torn_paper" style="padding:4px 6px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #DCD4C4;background:#FAF6EE;color:#2C221E;cursor:pointer;">📜 奶油手撕宣纸出字</button>
                             <button type="button" class="btn btn-secondary rop-scroll-tw-style-preset" data-preset="quill" style="padding:4px 6px;font-size:11px;border-radius:5px;border:1px solid rgba(251,191,36,0.4);background:rgba(251,191,36,0.12);color:#fde68a;cursor:pointer;">🪶 羽毛笔朗诵写出</button>
                             <button type="button" class="btn btn-secondary rop-scroll-tw-style-preset" data-preset="rose" style="padding:4px 6px;font-size:11px;border-radius:5px;border:1px solid rgba(244,114,182,0.4);background:rgba(244,114,182,0.12);color:#fbcfe8;cursor:pointer;">🌹 玫瑰花朗诵写出</button>
                             <button type="button" class="btn btn-secondary rop-scroll-tw-style-preset" data-preset="image" style="padding:4px 6px;font-size:11px;border-radius:5px;border:1px solid rgba(56,189,248,0.4);background:rgba(56,189,248,0.12);color:#bae6fd;cursor:pointer;">🖼 上传图片朗诵写出</button>
@@ -765,12 +1029,18 @@ class ReelsOverlayPanel {
                             <option value="music_note">🎵 律动金色音符</option>
                             <option value="cross_light">✝️ 光芒十字架</option>
                             <option value="feather_gold">🪽 鎏金神圣金羽</option>
+                            <option value="candy_cane">🍬 圣诞红白拐杖糖笔</option>
+                            <option value="christmas_tree">🎄 璀璨金星圣诞树</option>
+                            <option value="holly_berry">🍒 圣诞冬青红果叶</option>
+                            <option value="snowflake_wand">❄️ 晶莹冰雪魔杖</option>
+                            <option value="santa_feather">🎅 圣诞红金绒毛笔</option>
+                            <option value="jingle_bell">🔔 圣诞金铃铛</option>
                             <option value="image">🖼 自定义图片 (PNG/WebP/GIF)</option>
                             <option value="char">| 文本光标</option>
                         </select>
 
                         <div style="grid-column: span 2; margin: 2px 0 4px 0;">
-                            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">点选内置笔尖小图标（共16款矢量图标 + 自定义传图）：</div>
+                            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">点选内置笔尖小图标（共22款含🎄圣诞限定矢量图标 + 自定义传图）：</div>
                             <div id="rop-scroll-tw-icon-grid" style="display:grid;grid-template-columns:repeat(4, 1fr);gap:4px;">
                                 <button type="button" class="rop-scroll-tw-icon-chip" data-kind="quill" data-angle="-8" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:#eee;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="quill" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>羽毛笔</span></button>
                                 <button type="button" class="rop-scroll-tw-icon-chip" data-kind="rose" data-angle="-12" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:#eee;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="rose" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>玫瑰花</span></button>
@@ -788,6 +1058,12 @@ class ReelsOverlayPanel {
                                 <button type="button" class="rop-scroll-tw-icon-chip" data-kind="music_note" data-angle="0" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:#eee;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="music_note" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>金音符</span></button>
                                 <button type="button" class="rop-scroll-tw-icon-chip" data-kind="cross_light" data-angle="0" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:#eee;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="cross_light" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>十字光</span></button>
                                 <button type="button" class="rop-scroll-tw-icon-chip" data-kind="feather_gold" data-angle="-8" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:#eee;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="feather_gold" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>圣金羽</span></button>
+                                <button type="button" class="rop-scroll-tw-icon-chip" data-kind="candy_cane" data-angle="-6" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(248,113,113,0.35);background:rgba(153,27,27,0.18);color:#fecaca;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="candy_cane" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>拐杖糖</span></button>
+                                <button type="button" class="rop-scroll-tw-icon-chip" data-kind="christmas_tree" data-angle="0" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(74,222,128,0.35);background:rgba(20,83,45,0.22);color:#bbf7d0;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="christmas_tree" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>圣诞树</span></button>
+                                <button type="button" class="rop-scroll-tw-icon-chip" data-kind="holly_berry" data-angle="-6" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(74,222,128,0.35);background:rgba(20,83,45,0.22);color:#bbf7d0;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="holly_berry" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>冬青果</span></button>
+                                <button type="button" class="rop-scroll-tw-icon-chip" data-kind="snowflake_wand" data-angle="-6" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(56,189,248,0.35);background:rgba(12,74,110,0.22);color:#bae6fd;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="snowflake_wand" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>冰雪杖</span></button>
+                                <button type="button" class="rop-scroll-tw-icon-chip" data-kind="santa_feather" data-angle="-8" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(248,113,113,0.35);background:rgba(153,27,27,0.18);color:#fecaca;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="santa_feather" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>圣诞羽</span></button>
+                                <button type="button" class="rop-scroll-tw-icon-chip" data-kind="jingle_bell" data-angle="0" style="display:flex;align-items:center;gap:4px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid rgba(250,204,21,0.35);background:rgba(133,77,14,0.22);color:#fef08a;cursor:pointer;"><canvas class="rop-tw-icon-canvas" data-kind="jingle_bell" width="20" height="20" style="width:18px;height:18px;flex-shrink:0;"></canvas><span>金铃铛</span></button>
                             </div>
                         </div>
 
@@ -879,16 +1155,52 @@ class ReelsOverlayPanel {
                     </div>
 
                     <!-- ⑥ 卡片背景 -->
-                    <div class="rop-group-title" style="margin-top:8px;">卡片背景</div>
+                    <div class="rop-group-title" style="margin-top:8px;">🖼️ 卡片背景 (整块大背景画板)</div>
                     <div class="rop-grid">
                         <label>启用</label><input type="checkbox" id="rop-scroll-bg-enabled">
+                        <label>背景画板</label>
+                        <select id="rop-scroll-bg-style" class="rop-select">
+                            <option value="solid">⬛ 纯色圆角底板 (默认)</option>
+                            <optgroup label="📰 报纸 / 复古纸张整版背景板">
+                                <option value="newspaper_page">📰 复古旧报纸整版画板 (报刊分栏纹+报头双线+手撕边)</option>
+                                <option value="newspaper_sepia_page">🗞️ 怀旧泛黄古董报刊板 (暖黄旧报+古典双线内框)</option>
+                                <option value="torn_parchment_board">📜 圣经烫金羊皮书卷板 (古典羊皮纸+四角烫金星芒框)</option>
+                                <option value="kraft_clipboard">🏷️ 手撕牛皮纸剪贴画板 (白边牛皮纸卡+半透明胶带贴)</option>
+                                <option value="grid_notebook_page">📓 手账方格笔记本页 (清新方格信纸+红蓝手账线)</option>
+                                <option value="dark_film_board">🎬 暗夜黑金胶片画板 (深邃磨砂底+复古暗金双线框)</option>
+                            </optgroup>
+                            <optgroup label="🎄 圣诞节限定大背景画板 / 贺卡框">
+                                <option value="xmas_candy_frame">🍬 圣诞红白拐杖糖画框板 (红白斜纹糖果外框+深红丝绒底)</option>
+                                <option value="xmas_velvet_gold_board">🎅 圣诞红丝绒烫金贺卡板 (皇家红丝绒+双层金线+八角金星)</option>
+                                <option value="xmas_pine_snow_board">🎄 圣诞松林覆雪木牌板 (森林松绿+顶部厚积雪层+雪花冬青)</option>
+                                <option value="xmas_gingerbread_card">🍪 圣诞姜饼屋糖霜贺卡 (暖棕姜饼+白糖霜裱花框+冬青果)</option>
+                                <option value="xmas_starry_snow_night">❄️ 圣诞极光飘雪夜空板 (冰晶深蓝渐变+漫天雪花星芒)</option>
+                                <option value="xmas_cream_holly_letter">🦌 圣诞暖白信纸冬青贺卡 (奶油羊皮信纸+红绿金线框+冬青)</option>
+                            </optgroup>
+                        </select>
                         <label>颜色</label><input type="color" id="rop-scroll-bg-color" class="rop-color" value="#000000">
                         <label>透明度%</label><input type="number" id="rop-scroll-bg-opacity" class="rop-input" min="0" max="100" value="75">
+                        <label title="开启后，报纸版面、报头线、撕边纹理与圣诞装饰会跟着字幕一起往上循环移动">随字幕循环滚动</label>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input type="checkbox" id="rop-scroll-bg-scroll-follow" checked>
+                            <span style="font-size:11px;color:#fde68a;">背景随字幕向上循环移动</span>
+                        </div>
+                        <label title="开启后，背景画板和边框只包裹下方滚动正文区，不含顶部固定标题">仅包裹正文区</label>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <input type="checkbox" id="rop-scroll-bg-body-only">
+                            <span style="font-size:11px;color:var(--text-muted);">背景/边框不含顶部标题</span>
+                        </div>
+                        <label title="0=自动跟随覆层宽度；设置具体像素可直接控制背景画板与边框的宽度">画板/边框宽(0=自动)</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-scroll-bg-width" class="rop-range" min="0" max="1080" step="10" value="0"><input type="number" class="rop-num-readout" data-link="rop-scroll-bg-width" min="0" max="1920" step="10" value="0"></div>
+                        <label title="0=自动跟随覆层高度；设置具体像素可直接控制背景画板与边框的上下长度">画板/边框长(0=自动)</label>
+                        <div class="rop-slider-combo"><input type="range" id="rop-scroll-bg-height" class="rop-range" min="0" max="1920" step="10" value="0"><input type="number" class="rop-num-readout" data-link="rop-scroll-bg-height" min="0" max="1920" step="10" value="0"></div>
+                        <label title="微调背景画板与边框的左右位置">水平偏移X</label><input type="number" id="rop-scroll-bg-offset-x" class="rop-input" min="-1000" max="1000" step="5" value="0">
+                        <label title="微调背景画板与边框的上下位置">垂直偏移Y</label><input type="number" id="rop-scroll-bg-offset-y" class="rop-input" min="-1000" max="1000" step="5" value="0">
                         <label>圆角</label><input type="number" id="rop-scroll-bg-radius" class="rop-input" min="0" max="200" value="12">
-                        <label>上边距</label><input type="number" id="rop-scroll-bg-pad-top" class="rop-input" min="0" max="500" value="55">
-                        <label>下边距</label><input type="number" id="rop-scroll-bg-pad-bottom" class="rop-input" min="0" max="500" value="55">
-                        <label>左边距</label><input type="number" id="rop-scroll-bg-pad-left" class="rop-input" min="0" max="500" value="16">
-                        <label>右边距</label><input type="number" id="rop-scroll-bg-pad-right" class="rop-input" min="0" max="500" value="16">
+                        <label title="支持正数外扩或负数内缩">上边距</label><input type="number" id="rop-scroll-bg-pad-top" class="rop-input" min="-400" max="500" value="55">
+                        <label title="支持正数外扩或负数内缩">下边距</label><input type="number" id="rop-scroll-bg-pad-bottom" class="rop-input" min="-400" max="500" value="55">
+                        <label title="支持正数外扩或负数内缩">左边距</label><input type="number" id="rop-scroll-bg-pad-left" class="rop-input" min="-400" max="500" value="16">
+                        <label title="支持正数外扩或负数内缩">右边距</label><input type="number" id="rop-scroll-bg-pad-right" class="rop-input" min="-400" max="500" value="16">
                         <label>全屏蒙版</label>
                         <div style="display:flex;align-items:center;gap:6px;">
                             <input type="checkbox" id="rop-scroll-bg-fullscreen">
@@ -987,6 +1299,29 @@ class ReelsOverlayPanel {
                                 <option value="watercolor">水彩通透水痕</option>
                                 <option value="drybrush">粗砺宣纸飞白</option>
                                 <option value="tornpaper">复古手撕纸边</option>
+                                <optgroup label="📰 贴字剪报 / 纸张底衬">
+                                    <option value="newspaper_cutout">📰 复古旧报纸剪报</option>
+                                    <option value="newspaper_sepia">🗞️ 怀旧泛黄古董报刊</option>
+                                    <option value="torn_cream_paper">📜 奶油手撕宣纸贴</option>
+                                    <option value="kraft_sticker">🏷️ 手撕牛皮纸白边贴</option>
+                                    <option value="ransom_magazine">✂️ 杂志拼贴剪报块</option>
+                                    <option value="grid_note">📓 手账方格便签纸</option>
+                                    <option value="gold_parchment">✨ 圣经烫金羊皮书页</option>
+                                    <option value="red_editorial">🔖 报刊红底白边剪报</option>
+                                    <option value="dark_film_matte">🎬 暗夜胶片磨砂贴纸</option>
+                                </optgroup>
+                                <optgroup label="🌟 文字底部半高底条">
+                                    <option value="bottom_gold_bar">🌟 鎏金半高文字底条</option>
+                                    <option value="bottom_rose_brush">🌸 莫兰迪玫瑰手绘底条</option>
+                                    <option value="bottom_neon_marker">🖍️ 荧光马克笔手绘底条</option>
+                                    <option value="xmas_frost_ice">❄️ 圣诞冰雪极光半高底条</option>
+                                </optgroup>
+                                <optgroup label="🎄 圣诞节限定字幕带 / 装饰">
+                                    <option value="xmas_candy_ribbon">🍬 圣诞红白拐杖糖字幕带</option>
+                                    <option value="xmas_velvet_gold">🎅 圣诞红丝绒烫金挂旗带</option>
+                                    <option value="xmas_pine_snow">🎄 圣诞松林绿覆雪字幕带</option>
+                                    <option value="xmas_gingerbread_tag">🍪 圣诞姜饼屋糖霜礼物签</option>
+                                </optgroup>
                                 <option value="custom">➕ 导入单张笔刷图...</option>
                             </select>
                             <button id="rop-title-brush-upload-btn" class="rop-btn" type="button" title="选取单张笔刷图片导入 (PNG/JPG/WEBP)" style="padding:4px 7px; font-size:11px; white-space:nowrap; cursor:pointer; background:var(--bg-secondary, #333); border:1px solid var(--border-color, #555); border-radius:4px; color:var(--text-color, #fff);">📁 导入单图</button>
@@ -1113,6 +1448,29 @@ class ReelsOverlayPanel {
                                 <option value="watercolor">水彩通透水痕</option>
                                 <option value="drybrush">粗砺宣纸飞白</option>
                                 <option value="tornpaper">复古手撕纸边</option>
+                                <optgroup label="📰 贴字剪报 / 纸张底衬">
+                                    <option value="newspaper_cutout">📰 复古旧报纸剪报</option>
+                                    <option value="newspaper_sepia">🗞️ 怀旧泛黄古董报刊</option>
+                                    <option value="torn_cream_paper">📜 奶油手撕宣纸贴</option>
+                                    <option value="kraft_sticker">🏷️ 手撕牛皮纸白边贴</option>
+                                    <option value="ransom_magazine">✂️ 杂志拼贴剪报块</option>
+                                    <option value="grid_note">📓 手账方格便签纸</option>
+                                    <option value="gold_parchment">✨ 圣经烫金羊皮书页</option>
+                                    <option value="red_editorial">🔖 报刊红底白边剪报</option>
+                                    <option value="dark_film_matte">🎬 暗夜胶片磨砂贴纸</option>
+                                </optgroup>
+                                <optgroup label="🌟 文字底部半高底条">
+                                    <option value="bottom_gold_bar">🌟 鎏金半高文字底条</option>
+                                    <option value="bottom_rose_brush">🌸 莫兰迪玫瑰手绘底条</option>
+                                    <option value="bottom_neon_marker">🖍️ 荧光马克笔手绘底条</option>
+                                    <option value="xmas_frost_ice">❄️ 圣诞冰雪极光半高底条</option>
+                                </optgroup>
+                                <optgroup label="🎄 圣诞节限定字幕带 / 装饰">
+                                    <option value="xmas_candy_ribbon">🍬 圣诞红白拐杖糖字幕带</option>
+                                    <option value="xmas_velvet_gold">🎅 圣诞红丝绒烫金挂旗带</option>
+                                    <option value="xmas_pine_snow">🎄 圣诞松林绿覆雪字幕带</option>
+                                    <option value="xmas_gingerbread_tag">🍪 圣诞姜饼屋糖霜礼物签</option>
+                                </optgroup>
                                 <option value="custom">➕ 导入单张笔刷图...</option>
                             </select>
                             <button id="rop-body-brush-upload-btn" class="rop-btn" type="button" title="选取单张笔刷图片导入 (PNG/JPG/WEBP)" style="padding:4px 7px; font-size:11px; white-space:nowrap; cursor:pointer; background:var(--bg-secondary, #333); border:1px solid var(--border-color, #555); border-radius:4px; color:var(--text-color, #fff);">📁 导入单图</button>
@@ -1328,6 +1686,10 @@ class ReelsOverlayPanel {
                 }
             }
             if (typeof onChange === 'function') onChange(normalized || colorEl.value);
+            this._syncToOverlay();
+            if (typeof this.videoCanvas?.onOverlayChange === 'function') {
+                this.videoCanvas.onOverlayChange(this._selectedOv);
+            }
         };
         const syncFromHex = () => {
             if (isInternalSync) return;
@@ -1653,6 +2015,7 @@ class ReelsOverlayPanel {
         this.container.querySelector('#rop-add-image').addEventListener('click', () => this._addImageOverlay());
         this.container.querySelector('#rop-media-library').addEventListener('click', () => this._openMediaLibrary());
         this.container.querySelector('#rop-add-scroll').addEventListener('click', () => this._addScrollOverlay());
+        this.container.querySelector('#rop-add-decor')?.addEventListener('click', () => this._addDecorOverlay());
         this.container.querySelector('#rop-duplicate').addEventListener('click', () => this._duplicateOverlay());
         this.container.querySelector('#rop-delete').addEventListener('click', () => this._deleteOverlay());
 
@@ -1902,7 +2265,7 @@ class ReelsOverlayPanel {
             'rop-scroll-title-stroke-color', 'rop-scroll-title-stroke-width',
             'rop-scroll-title-shadow', 'rop-scroll-title-shadow-color',
             'rop-scroll-title-shadow-blur', 'rop-scroll-title-shadow-x', 'rop-scroll-title-shadow-y',
-            'rop-scroll-title-bg-enabled', 'rop-scroll-title-bg-mode', 'rop-scroll-title-bg-color',
+            'rop-scroll-title-bg-enabled', 'rop-scroll-title-bg-style', 'rop-scroll-title-bg-mode', 'rop-scroll-title-bg-color',
             'rop-scroll-title-bg-opacity', 'rop-scroll-title-bg-radius',
             'rop-scroll-title-bg-pad-h', 'rop-scroll-title-bg-pad-top', 'rop-scroll-title-bg-pad-bottom',
             'rop-scroll-title-deco-enabled', 'rop-scroll-title-deco-position', 'rop-scroll-title-deco-style',
@@ -1917,7 +2280,7 @@ class ReelsOverlayPanel {
             'rop-scroll-stroke-color', 'rop-scroll-stroke-width',
             'rop-scroll-shadow', 'rop-scroll-shadow-color', 'rop-scroll-shadow-blur',
             'rop-scroll-shadow-x', 'rop-scroll-shadow-y',
-            'rop-scroll-body-bg-enabled', 'rop-scroll-body-bg-mode', 'rop-scroll-body-bg-color',
+            'rop-scroll-body-bg-enabled', 'rop-scroll-body-bg-style', 'rop-scroll-body-bg-mode', 'rop-scroll-body-bg-color',
             'rop-scroll-body-bg-opacity', 'rop-scroll-body-bg-radius',
             'rop-scroll-body-bg-pad-h', 'rop-scroll-body-bg-pad-top', 'rop-scroll-body-bg-pad-bottom',
             'rop-scroll-from-y', 'rop-scroll-to-y', 'rop-scroll-end-y-auto', 'rop-scroll-from-x', 'rop-scroll-to-x',
@@ -1931,7 +2294,9 @@ class ReelsOverlayPanel {
             'rop-scroll-auto-fit', 'rop-scroll-min-fontsize',
             'rop-scroll-feather-top', 'rop-scroll-feather-bottom', 'rop-scroll-feather-top-offset', 'rop-scroll-feather-bottom-offset',
             'rop-scroll-feather-left', 'rop-scroll-feather-right', 'rop-scroll-feather-left-offset', 'rop-scroll-feather-right-offset',
-            'rop-scroll-bg-enabled', 'rop-scroll-bg-color', 'rop-scroll-bg-opacity',
+            'rop-scroll-bg-enabled', 'rop-scroll-bg-style', 'rop-scroll-bg-color', 'rop-scroll-bg-opacity',
+            'rop-scroll-bg-scroll-follow', 'rop-scroll-bg-body-only',
+            'rop-scroll-bg-width', 'rop-scroll-bg-height', 'rop-scroll-bg-offset-x', 'rop-scroll-bg-offset-y',
             'rop-scroll-bg-radius', 'rop-scroll-bg-pad-top', 'rop-scroll-bg-pad-bottom',
             'rop-scroll-bg-pad-left', 'rop-scroll-bg-pad-right', 'rop-scroll-bg-fullscreen',
             'rop-scroll-bg-border-enabled', 'rop-scroll-bg-border-sides', 'rop-scroll-bg-border-color', 'rop-scroll-bg-border-width',
@@ -1947,7 +2312,16 @@ class ReelsOverlayPanel {
             'rop-scroll-tw-cursor-scale', 'rop-scroll-tw-cursor-offset-x', 'rop-scroll-tw-cursor-offset-y',
             'rop-scroll-tw-cursor-angle', 'rop-scroll-tw-cursor-char', 'rop-scroll-tw-cursor-color',
             // 文字翻转器
-            'rop-flipper-enabled', 'rop-flipper-duration', 'rop-flipper-lines', 'rop-flipper-loop', 'rop-flipper-effect', 'rop-flipper-transition-duration'
+            'rop-flipper-enabled', 'rop-flipper-duration', 'rop-flipper-lines', 'rop-flipper-loop', 'rop-flipper-effect', 'rop-flipper-transition-duration',
+            // 点缀装饰覆层
+            'rop-decor-style', 'rop-decor-layout',
+            'rop-decor-dark-vignette', 'rop-decor-vignette-spread', 'rop-decor-dark-tint',
+            'rop-decor-grain-intensity', 'rop-decor-grain-size', 'rop-decor-grain-warmth',
+            'rop-decor-film-scratches', 'rop-decor-light-leak',
+            'rop-decor-floating-particles', 'rop-decor-particle-mode',
+            'rop-decor-glow-stars', 'rop-decor-snowflakes', 'rop-decor-corner-ornaments', 'rop-decor-edge-garland',
+            'rop-decor-density', 'rop-decor-size', 'rop-decor-glow', 'rop-decor-speed',
+            'rop-decor-margin', 'rop-decor-center-clear', 'rop-decor-color1', 'rop-decor-color2'
         ];
         for (const fid of fields) {
             const el = this.container.querySelector('#' + fid);
@@ -2015,6 +2389,31 @@ class ReelsOverlayPanel {
             scrollTwUnreadOpEl.addEventListener('input', syncHideChk);
             scrollTwUnreadOpEl.addEventListener('change', syncHideChk);
         }
+        const scrollTwActiveHlChkEl = this.container.querySelector('#rop-scroll-tw-active-highlight');
+        if (scrollTwActiveHlChkEl) {
+            scrollTwActiveHlChkEl.addEventListener('change', () => {
+                if (scrollTwActiveHlChkEl.checked) {
+                    this._val('rop-scroll-tw-enabled', true);
+                }
+                this._syncScrollTypewriterCursorImageUI();
+                this._syncToOverlay();
+            });
+        }
+        const scrollTwActiveColorEl = this.container.querySelector('#rop-scroll-tw-active-color');
+        if (scrollTwActiveColorEl) {
+            const onActiveColorEdit = () => {
+                this._val('rop-scroll-tw-enabled', true);
+                this._val('rop-scroll-tw-active-highlight', true);
+                this._syncScrollTypewriterCursorImageUI();
+                this._syncToOverlay();
+            };
+            scrollTwActiveColorEl.addEventListener('input', onActiveColorEdit);
+            scrollTwActiveColorEl.addEventListener('change', onActiveColorEdit);
+            if (scrollTwActiveColorEl._ropHexInput) {
+                scrollTwActiveColorEl._ropHexInput.addEventListener('input', onActiveColorEdit);
+                scrollTwActiveColorEl._ropHexInput.addEventListener('change', onActiveColorEdit);
+            }
+        }
         const scrollTwActiveScaleChkEl = this.container.querySelector('#rop-scroll-tw-active-scale-enabled');
         if (scrollTwActiveScaleChkEl) {
             scrollTwActiveScaleChkEl.addEventListener('change', () => {
@@ -2040,13 +2439,339 @@ class ReelsOverlayPanel {
                 this._syncToOverlay();
             });
         });
+        const scrollBodyBgStyleEl = this.container.querySelector('#rop-scroll-body-bg-style');
+        if (scrollBodyBgStyleEl) {
+            scrollBodyBgStyleEl.addEventListener('change', () => {
+                const st = scrollBodyBgStyleEl.value || 'solid';
+                if (st !== 'solid') {
+                    this._val('rop-scroll-body-bg-enabled', true);
+                    const isBoard = Boolean(window.ReelsBrushEngine?.CARD_BACKGROUND_STYLES?.[st]);
+                    this._val('rop-scroll-body-bg-mode', isBoard ? 'block' : 'inline-joined');
+                    this._val('rop-scroll-body-bg-opacity', 100);
+                    if (Number(this._get('rop-scroll-body-bg-pad-h') || 0) < 16) this._val('rop-scroll-body-bg-pad-h', 24);
+                    if (Number(this._get('rop-scroll-body-bg-pad-top') || 0) < 6) this._val('rop-scroll-body-bg-pad-top', isBoard ? 24 : 10);
+                    if (Number(this._get('rop-scroll-body-bg-pad-bottom') || 0) < 6) this._val('rop-scroll-body-bg-pad-bottom', isBoard ? 24 : 10);
+                }
+                this._syncToOverlay();
+            });
+        }
+        const scrollTitleBgStyleEl = this.container.querySelector('#rop-scroll-title-bg-style');
+        if (scrollTitleBgStyleEl) {
+            scrollTitleBgStyleEl.addEventListener('change', () => {
+                const st = scrollTitleBgStyleEl.value || 'solid';
+                if (st !== 'solid') {
+                    this._val('rop-scroll-title-bg-enabled', true);
+                    this._val('rop-scroll-title-bg-mode', 'inline-joined');
+                    this._val('rop-scroll-title-bg-opacity', 100);
+                    if (Number(this._get('rop-scroll-title-bg-pad-h') || 0) < 16) this._val('rop-scroll-title-bg-pad-h', 22);
+                    if (Number(this._get('rop-scroll-title-bg-pad-top') || 0) < 6) this._val('rop-scroll-title-bg-pad-top', 10);
+                    if (Number(this._get('rop-scroll-title-bg-pad-bottom') || 0) < 6) this._val('rop-scroll-title-bg-pad-bottom', 10);
+                }
+                this._syncToOverlay();
+            });
+        }
+        const scrollCardBgStyleEl = this.container.querySelector('#rop-scroll-bg-style');
+        if (scrollCardBgStyleEl) {
+            scrollCardBgStyleEl.addEventListener('change', () => {
+                const st = scrollCardBgStyleEl.value || 'solid';
+                if (st !== 'solid') {
+                    this._val('rop-scroll-bg-enabled', true);
+                    if (Number(this._get('rop-scroll-bg-opacity') || 0) < 85) {
+                        this._val('rop-scroll-bg-opacity', 96);
+                    }
+                    if (Number(this._get('rop-scroll-bg-pad-left') || 0) < 20) this._val('rop-scroll-bg-pad-left', 28);
+                    if (Number(this._get('rop-scroll-bg-pad-right') || 0) < 20) this._val('rop-scroll-bg-pad-right', 28);
+                }
+                this._syncToOverlay();
+            });
+        }
+        // 一键切换滚动字幕整块大背景画板（旧报纸整版 / 羊皮卷 / 圣诞贺卡画板）
+        this.container.querySelectorAll('.rop-scroll-card-bg-preset').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const preset = btn.dataset.bgPreset || 'off';
+                if (preset === 'off') {
+                    this._val('rop-scroll-bg-enabled', false);
+                    this._syncToOverlay();
+                    return;
+                }
+                this._val('rop-scroll-bg-enabled', true);
+                this._val('rop-scroll-bg-style', preset);
+                this._val('rop-scroll-bg-scroll-follow', true);
+                this._val('rop-scroll-bg-opacity', 96);
+                this._val('rop-scroll-bg-radius', 20);
+                if (Number(this._get('rop-scroll-bg-width') || 0) <= 0 && (this._selectedOv?.w ?? 1080) >= 1020) {
+                    this._val('rop-scroll-bg-width', 940);
+                }
+                if (Number(this._get('rop-scroll-bg-pad-top') || 0) < 36) this._val('rop-scroll-bg-pad-top', 48);
+                if (Number(this._get('rop-scroll-bg-pad-bottom') || 0) < 36) this._val('rop-scroll-bg-pad-bottom', 48);
+                if (Number(this._get('rop-scroll-bg-pad-left') || 0) < 24) this._val('rop-scroll-bg-pad-left', 30);
+                if (Number(this._get('rop-scroll-bg-pad-right') || 0) < 24) this._val('rop-scroll-bg-pad-right', 30);
+                // 关闭单行剪报底衬，避免浅色报纸大背景与浅色单行剪报叠重（用户可随时再点下面一排开启）
+                this._val('rop-scroll-body-bg-enabled', false);
+
+                // 智能联动标题与正文配色，确保在浅色报刊或深色圣诞贺卡上都清晰好看
+                const lightBoards = {
+                    newspaper_page: { body: '#2B1B18', stroke: '#F4F0E8', sw: 1.5, title: '#8B1E1E', ts: '#F4F0E8' },
+                    newspaper_sepia_page: { body: '#362012', stroke: '#EFE4CC', sw: 1.5, title: '#6E2614', ts: '#EFE4CC' },
+                    torn_parchment_board: { body: '#2C1D14', stroke: '#F7F1E3', sw: 1.2, title: '#8C5A08', ts: '#F7F1E3' },
+                    grid_notebook_page: { body: '#1E293B', stroke: '#FAF8F2', sw: 1.2, title: '#B91C1C', ts: '#FAF8F2' },
+                    xmas_cream_holly_letter: { body: '#2B1B17', stroke: '#FCF8EE', sw: 1.5, title: '#B91C1C', ts: '#FCF8EE' },
+                };
+                const darkBoards = {
+                    kraft_clipboard: { body: '#FFFDF9', stroke: '#3E2723', sw: 2.5, title: '#FFE082', ts: '#3E2723' },
+                    dark_film_board: { body: '#F8FAFC', stroke: '#0F172A', sw: 2.0, title: '#FFD700', ts: '#0F172A' },
+                    xmas_candy_frame: { body: '#FFFDF9', stroke: '#4A0404', sw: 2.0, title: '#FFD700', ts: '#4A0404' },
+                    xmas_velvet_gold_board: { body: '#FFF8E7', stroke: '#3D050B', sw: 2.0, title: '#FFD700', ts: '#3D050B' },
+                    xmas_pine_snow_board: { body: '#FFFFFF', stroke: '#0A2618', sw: 2.0, title: '#FFE066', ts: '#0A2618' },
+                    xmas_gingerbread_card: { body: '#FFFDF9', stroke: '#4E260E', sw: 2.2, title: '#FFE57F', ts: '#4E260E' },
+                    xmas_starry_snow_night: { body: '#F0F9FF', stroke: '#081426', sw: 2.0, title: '#7DD3FC', ts: '#081426' },
+                };
+                const palette = lightBoards[preset] || darkBoards[preset];
+                if (palette) {
+                    this._val('rop-scroll-color', palette.body);
+                    this._val('rop-scroll-stroke-color', palette.stroke);
+                    this._val('rop-scroll-stroke-width', palette.sw);
+                    this._val('rop-scroll-title-color', palette.title);
+                    this._val('rop-scroll-title-stroke-color', palette.ts);
+                    this._val('rop-scroll-title-stroke-width', palette.sw);
+                }
+                this._syncToOverlay();
+            });
+        });
+        // 一键切换滚动字幕逐行贴字底衬（旧报纸剪报条 / 圣诞拐杖糖带 / 红丝绒带 / 松林覆雪带 / 姜饼签）
+        this.container.querySelectorAll('.rop-scroll-body-bg-preset').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const style = btn.dataset.bodyBgPreset || 'off';
+                if (style === 'off') {
+                    this._val('rop-scroll-body-bg-enabled', false);
+                    this._syncToOverlay();
+                    return;
+                }
+                this._val('rop-scroll-body-bg-enabled', true);
+                this._val('rop-scroll-body-bg-style', style);
+                this._val('rop-scroll-body-bg-mode', 'inline-joined');
+                this._val('rop-scroll-body-bg-opacity', 100);
+                this._val('rop-scroll-body-bg-radius', 16);
+                this._val('rop-scroll-body-bg-pad-h', 24);
+                this._val('rop-scroll-body-bg-pad-top', 11);
+                this._val('rop-scroll-body-bg-pad-bottom', 11);
+                const isLightCutout = style === 'newspaper_cutout' || style === 'newspaper_sepia' || style === 'torn_cream_paper';
+                if (isLightCutout) {
+                    this._val('rop-scroll-color', style === 'newspaper_sepia' ? '#3E2616' : '#3B2220');
+                    this._val('rop-scroll-stroke-color', '#F4F0E8');
+                    this._val('rop-scroll-stroke-width', style === 'torn_cream_paper' ? 0 : 1.5);
+                } else {
+                    this._val('rop-scroll-color', '#FFFDF9');
+                    this._val('rop-scroll-stroke-color', style === 'xmas_pine_snow' ? '#0D2E1B' : (style === 'xmas_gingerbread_tag' ? '#4E260E' : '#4A0404'));
+                    this._val('rop-scroll-stroke-width', 1.8);
+                }
+                this._syncToOverlay();
+            });
+        });
+        // 顶部快捷调节栏 ↔ 卡片背景/正文底衬参数双向联动
+        const bindQuickPair = (quickRangeId, quickNumId, targetIds, onQuickInput) => {
+            const qRange = this.container.querySelector('#' + quickRangeId);
+            const qNum = this.container.querySelector('#' + quickNumId);
+            const applyQuickVal = (rawVal) => {
+                const v = Number(rawVal);
+                if (!Number.isFinite(v)) return;
+                if (qRange) qRange.value = String(v);
+                if (qNum) qNum.value = String(v);
+                for (const tid of targetIds) {
+                    this._val(tid, v);
+                }
+                if (typeof onQuickInput === 'function') onQuickInput(v);
+                this._syncToOverlay();
+            };
+            if (qRange) {
+                qRange.addEventListener('input', () => applyQuickVal(qRange.value));
+                qRange.addEventListener('change', () => applyQuickVal(qRange.value));
+            }
+            if (qNum) {
+                qNum.addEventListener('input', () => applyQuickVal(qNum.value));
+                qNum.addEventListener('change', () => applyQuickVal(qNum.value));
+            }
+        };
+        bindQuickPair('rop-scroll-bg-width-quick', 'rop-scroll-bg-width-quick-num', ['rop-scroll-bg-width']);
+        bindQuickPair('rop-scroll-bg-height-quick', 'rop-scroll-bg-height-quick-num', ['rop-scroll-bg-height']);
+        bindQuickPair('rop-scroll-body-bg-pad-h-quick', 'rop-scroll-body-bg-pad-h-quick-num', ['rop-scroll-body-bg-pad-h']);
+        bindQuickPair('rop-scroll-body-bg-pad-v-quick', 'rop-scroll-body-bg-pad-v-quick-num', ['rop-scroll-body-bg-pad-top', 'rop-scroll-body-bg-pad-bottom']);
+        const bindQuickCheckbox = (quickChkId, targetChkId) => {
+            const qChk = this.container.querySelector('#' + quickChkId);
+            if (!qChk) return;
+            qChk.addEventListener('change', () => {
+                this._val(targetChkId, qChk.checked);
+                this._syncToOverlay();
+            });
+        };
+        bindQuickCheckbox('rop-scroll-bg-scroll-follow-quick', 'rop-scroll-bg-scroll-follow');
+        bindQuickCheckbox('rop-scroll-bg-body-only-quick', 'rop-scroll-bg-body-only');
+
+        // ✨ 点缀装饰图层快捷预设按钮与尺寸按钮
+        const applyDecorStylePreset = (styleId) => {
+            const styles = window.ReelsOverlay?.DECOR_OVERLAY_STYLES || window.ReelsBrushEngine?.DECOR_OVERLAY_STYLES || {};
+            const cfg = styles[styleId];
+            this._val('rop-decor-style', styleId);
+            if (cfg) {
+                this._val('rop-decor-color1', cfg.color1 || '#FFD700');
+                this._val('rop-decor-color2', cfg.color2 || '#FFFDF5');
+                this._val('rop-decor-glow-stars', Boolean(cfg.glow_stars));
+                this._val('rop-decor-snowflakes', Boolean(cfg.snowflakes));
+                this._val('rop-decor-corner-ornaments', Boolean(cfg.corner_ornaments));
+                this._val('rop-decor-edge-garland', Boolean(cfg.edge_garland));
+                this._val('rop-decor-dark-vignette', cfg.dark_vignette ?? 0);
+                this._val('rop-decor-vignette-spread', cfg.vignette_spread ?? 55);
+                this._val('rop-decor-dark-tint', cfg.dark_tint || '#05070B');
+                this._val('rop-decor-grain-intensity', cfg.grain_intensity ?? 0);
+                this._val('rop-decor-grain-size', cfg.grain_size ?? 100);
+                this._val('rop-decor-grain-warmth', cfg.grain_warmth ?? 0);
+                this._val('rop-decor-film-scratches', Boolean(cfg.film_scratches));
+                this._val('rop-decor-light-leak', Boolean(cfg.light_leak));
+                this._val('rop-decor-floating-particles', Boolean(cfg.floating_particles));
+                this._val('rop-decor-particle-mode', cfg.particle_mode || 'dust');
+                if (cfg.layout) this._val('rop-decor-layout', cfg.layout);
+                if (cfg.density !== undefined) this._val('rop-decor-density', cfg.density);
+                if (cfg.center_clear !== undefined) this._val('rop-decor-center-clear', cfg.center_clear);
+            }
+            this._syncToOverlay();
+            if (window._reelsState?.decorPanel) window._reelsState.decorPanel.refresh();
+        };
+        const openDedicatedDecorBtn = this.container.querySelector('#rop-open-dedicated-decor-tab');
+        if (openDedicatedDecorBtn) {
+            openDedicatedDecorBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabBtn = document.querySelector('.inspector-tab[data-tab="decor"]');
+                if (tabBtn && typeof window.reelsInspectorSwitch === 'function') {
+                    window.reelsInspectorSwitch('decor', tabBtn);
+                } else if (tabBtn) {
+                    tabBtn.click();
+                }
+            });
+        }
+        this.container.querySelectorAll('.rop-decor-preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const styleId = btn.dataset.decorPreset || 'glowing_starfield';
+                applyDecorStylePreset(styleId);
+            });
+        });
+        const decorStyleEl = this.container.querySelector('#rop-decor-style');
+        if (decorStyleEl) {
+            decorStyleEl.addEventListener('change', () => {
+                applyDecorStylePreset(decorStyleEl.value || 'glowing_starfield');
+            });
+        }
+        const decorFitFullBtn = this.container.querySelector('#rop-decor-fit-fullscreen');
+        if (decorFitFullBtn) {
+            decorFitFullBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!this._selectedOv || this._selectedOv.type !== 'decor') return;
+                this._selectedOv.x = 0;
+                this._selectedOv.y = 0;
+                this._selectedOv.w = 1080;
+                this._selectedOv.h = 1920;
+                this._val('rop-x', 0);
+                this._val('rop-y', 0);
+                this._val('rop-w', 1080);
+                this._val('rop-h', 1920);
+                this._val('rop-decor-margin', 36);
+                this._syncToOverlay();
+            });
+        }
+        const decorFitCardBtn = this.container.querySelector('#rop-decor-fit-card');
+        if (decorFitCardBtn) {
+            decorFitCardBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!this._selectedOv || this._selectedOv.type !== 'decor') return;
+                this._selectedOv.x = 70;
+                this._selectedOv.y = 330;
+                this._selectedOv.w = 940;
+                this._selectedOv.h = 1260;
+                this._val('rop-x', 70);
+                this._val('rop-y', 330);
+                this._val('rop-w', 940);
+                this._val('rop-h', 1260);
+                this._val('rop-decor-margin', 16);
+                this._syncToOverlay();
+            });
+        }
+        const decorApplyAllEl = this.container.querySelector('#rop-decor-apply-all');
+        if (decorApplyAllEl) {
+            decorApplyAllEl.addEventListener('change', () => {
+                if (decorApplyAllEl.checked && this._selectedOv && this._selectedOv.type === 'decor') {
+                    this._syncToOverlay();
+                }
+            });
+        }
         this.container.querySelectorAll('.rop-scroll-tw-style-preset').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const preset = btn.dataset.preset;
                 this._val('rop-scroll-tw-enabled', true);
                 this._val('rop-scroll-tw-speech-sync', true);
-                if (preset === 'quill') {
+                if (preset === 'newspaper' || preset === 'newspaper_sepia' || preset === 'torn_paper') {
+                    const bgStyle = preset === 'newspaper' ? 'newspaper_cutout' : (preset === 'newspaper_sepia' ? 'newspaper_sepia' : 'torn_cream_paper');
+                    const inkColor = preset === 'newspaper' ? '#3B2220' : (preset === 'newspaper_sepia' ? '#3E2616' : '#2C221E');
+                    const haloColor = preset === 'newspaper' ? '#F4F0E8' : (preset === 'newspaper_sepia' ? '#EFE4CC' : '#FAF6EE');
+                    this._val('rop-scroll-font', 'Playfair Display');
+                    this._val('rop-scroll-bold', true);
+                    this._val('rop-scroll-weight', '700');
+                    this._val('rop-scroll-uppercase', false);
+                    this._val('rop-scroll-color', inkColor);
+                    this._val('rop-scroll-stroke-color', haloColor);
+                    this._val('rop-scroll-stroke-width', preset === 'torn_paper' ? 0 : 1.5);
+                    this._val('rop-scroll-shadow', false);
+                    this._val('rop-scroll-body-bg-enabled', true);
+                    this._val('rop-scroll-body-bg-style', bgStyle);
+                    this._val('rop-scroll-body-bg-mode', 'inline-joined');
+                    this._val('rop-scroll-body-bg-color', haloColor);
+                    this._val('rop-scroll-body-bg-opacity', 100);
+                    this._val('rop-scroll-body-bg-radius', 16);
+                    this._val('rop-scroll-body-bg-pad-h', 24);
+                    this._val('rop-scroll-body-bg-pad-top', 12);
+                    this._val('rop-scroll-body-bg-pad-bottom', 12);
+                    this._val('rop-scroll-tw-reveal-type', 'word');
+                    this._val('rop-scroll-tw-unrevealed-opacity', 0);
+                    this._val('rop-scroll-tw-hide-unread', true);
+                    this._val('rop-scroll-tw-active-highlight', false);
+                    this._val('rop-scroll-tw-cursor-enabled', false);
+                    if (this._selectedOv) {
+                        this._selectedOv.italic = true;
+                    }
+                } else if (preset === 'xmas_candy' || preset === 'xmas_pine') {
+                    const isCandy = preset === 'xmas_candy';
+                    this._val('rop-scroll-font', 'Playfair Display');
+                    this._val('rop-scroll-bold', true);
+                    this._val('rop-scroll-weight', '700');
+                    this._val('rop-scroll-uppercase', false);
+                    this._val('rop-scroll-color', '#FFFDF9');
+                    this._val('rop-scroll-stroke-color', isCandy ? '#450A0A' : '#052E16');
+                    this._val('rop-scroll-stroke-width', 2.0);
+                    this._val('rop-scroll-shadow', false);
+                    this._val('rop-scroll-body-bg-enabled', true);
+                    this._val('rop-scroll-body-bg-style', isCandy ? 'xmas_candy_ribbon' : 'xmas_pine_snow');
+                    this._val('rop-scroll-body-bg-mode', 'inline-joined');
+                    this._val('rop-scroll-body-bg-color', isCandy ? '#88131B' : '#124229');
+                    this._val('rop-scroll-body-bg-opacity', 100);
+                    this._val('rop-scroll-body-bg-radius', 16);
+                    this._val('rop-scroll-body-bg-pad-h', 24);
+                    this._val('rop-scroll-body-bg-pad-top', 12);
+                    this._val('rop-scroll-body-bg-pad-bottom', 12);
+                    this._val('rop-scroll-tw-reveal-type', 'char');
+                    this._val('rop-scroll-tw-unrevealed-opacity', 0);
+                    this._val('rop-scroll-tw-hide-unread', true);
+                    this._val('rop-scroll-tw-active-highlight', true);
+                    this._val('rop-scroll-tw-active-color', '#FDE047');
+                    this._val('rop-scroll-tw-cursor-enabled', true);
+                    this._val('rop-scroll-tw-cursor-kind', isCandy ? 'candy_cane' : 'christmas_tree');
+                    this._val('rop-scroll-tw-cursor-scale', 1.25);
+                    this._val('rop-scroll-tw-cursor-angle', isCandy ? -6 : 0);
+                    if (this._selectedOv) {
+                        this._selectedOv.italic = true;
+                    }
+                } else if (preset === 'quill') {
                     this._val('rop-scroll-tw-reveal-type', 'char');
                     this._val('rop-scroll-tw-unrevealed-opacity', 0);
                     this._val('rop-scroll-tw-hide-unread', true);
@@ -2707,6 +3432,36 @@ class ReelsOverlayPanel {
         this.selectOverlay(ov);
     }
 
+    _addDecorOverlay() {
+        const ReelsOverlay = window.ReelsOverlay;
+        if (!ReelsOverlay || typeof ReelsOverlay.createDecorOverlay !== 'function') return;
+        let decors = (this.videoCanvas?.overlayMgr?.overlays || []).filter(o => o && o.type === 'decor');
+        let ov = decors[decors.length - 1] || null;
+        if (!ov) {
+            ov = ReelsOverlay.createDecorOverlay({
+                x: 0,
+                y: 0,
+                w: 1080,
+                h: 1920,
+                start: 0,
+                end: 9999,
+                decor_style: 'dark_floating_dust',
+                decor_layout: 'edges_and_float',
+            });
+            if (this.videoCanvas) this.videoCanvas.addOverlay(ov);
+        }
+        if (window._reelsState?.decorPanel) {
+            window._reelsState.decorPanel._selectedDecorId = ov.id;
+            window._reelsState.decorPanel.refresh();
+        }
+        if (typeof window.reelsSwitchInspectorTab === 'function') {
+            window.reelsSwitchInspectorTab('decor');
+        } else {
+            this._refreshList();
+            this.selectOverlay(ov);
+        }
+    }
+
     /**
      * 批量导入文字卡片 — 从 Google Sheets 粘贴 TSV
      * 格式: 第一列=标题, 第二列=内容 (支持单元格内换行)
@@ -2942,8 +3697,22 @@ class ReelsOverlayPanel {
                 'scroll_title_independent', 'scroll_title_x', 'scroll_title_y',
                 'scroll_title_auto_fit', 'scroll_title_max_height',
                 'feather_top', 'feather_bottom', 'feather_top_offset', 'feather_bottom_offset',
-                'bg_enabled', 'bg_color', 'bg_opacity', 'bg_radius',
+                'feather_left', 'feather_right', 'feather_left_offset', 'feather_right_offset',
+                'bg_enabled', 'bg_style', 'bg_color', 'bg_opacity', 'bg_radius',
+                'bg_scroll_follow', 'bg_body_only', 'bg_width', 'bg_height', 'bg_offset_x', 'bg_offset_y',
                 'bg_padding_top', 'bg_padding_bottom', 'bg_padding_left', 'bg_padding_right', 'bg_fullscreen',
+                'bg_border_enabled', 'bg_border_sides', 'bg_border_color', 'bg_border_width', 'bg_border_style', 'bg_border_opacity',
+                'scroll_body_bg_enabled', 'scroll_body_bg_style', 'scroll_body_bg_mode', 'scroll_body_bg_color',
+                'scroll_body_bg_opacity', 'scroll_body_bg_radius', 'scroll_body_bg_pad_h', 'scroll_body_bg_pad_top', 'scroll_body_bg_pad_bottom',
+                'scroll_title_bg_enabled', 'scroll_title_bg_style', 'scroll_title_bg_mode', 'scroll_title_bg_color',
+                'scroll_title_bg_opacity', 'scroll_title_bg_radius', 'scroll_title_bg_pad_h', 'scroll_title_bg_pad_top', 'scroll_title_bg_pad_bottom',
+                'scroll_uppercase', 'scroll_letter_spacing', 'scroll_title_uppercase', 'scroll_title_letter_spacing',
+                'scroll_typewriter_enabled', 'scroll_tw_start', 'scroll_tw_end', 'scroll_tw_hide_unread', 'scroll_tw_active_scale_enabled', 'scroll_tw_unrevealed_opacity', 'scroll_tw_speech_sync', 'scroll_tw_reveal_type',
+                'scroll_tw_active_highlight', 'scroll_tw_active_color', 'scroll_tw_active_scale',
+                'scroll_tw_cursor_enabled', 'scroll_tw_cursor_kind', 'scroll_tw_cursor_image',
+                'scroll_tw_cursor_anchor_x', 'scroll_tw_cursor_anchor_y',
+                'scroll_tw_cursor_scale', 'scroll_tw_cursor_offset_x', 'scroll_tw_cursor_offset_y',
+                'scroll_tw_cursor_angle', 'scroll_tw_cursor_char', 'scroll_tw_cursor_color',
                 'x', 'y', 'w', 'h',
             ];
             for (const k of keys) {
@@ -3347,7 +4116,9 @@ class ReelsOverlayPanel {
 
         // 面板显示顺序必须与时间线/预览/导出使用的合成栈一致。
         // getOrderedOverlays 会返回底到顶的普通覆层；列表反转后仍保持“顶层在最上”。
-        const overlays = this.videoCanvas.getOrderedOverlays?.() || this.videoCanvas.overlayMgr.overlays || [];
+        // 点缀与颗粒层(decor)已在顶部独立【✨ 点缀与颗粒】标签页中单独管理，此处不再混入覆层列表。
+        const rawOverlays = this.videoCanvas.getOrderedOverlays?.() || this.videoCanvas.overlayMgr.overlays || [];
+        const overlays = rawOverlays.filter(ov => ov && ov.type !== 'decor');
         if (overlays.length === 0) {
             list.innerHTML = '<div class="rop-empty">暂无覆层，点击上方按钮添加</div>';
             return;
@@ -3355,13 +4126,17 @@ class ReelsOverlayPanel {
 
         list.innerHTML = overlays.slice().reverse().map(ov => {
             const isSelected = this._selectedOv?.id === ov.id;
-            const icon = ov.type === 'text' ? '📝' : (ov.type === 'textcard' ? '📋' : (ov.type === 'scroll' ? '🔄' : (ov.type === 'solid_mask' ? '🔳' : '🖼️')));
+            const icon = ov.type === 'text' ? '📝' : (ov.type === 'textcard' ? '📋' : (ov.type === 'scroll' ? '🔄' : (ov.type === 'solid_mask' ? '🔳' : (ov.type === 'decor' ? '✨' : '🖼️'))));
             const lockIcon = ov.fixed_text ? '🔒' : '';
             let label = ov.name;
             if (!label) {
                 if (ov.type === 'textcard') label = (ov.title_text || '').slice(0, 15) || '文字卡片';
                 else if (ov.type === 'solid_mask') label = '纯色蒙版';
                 else if (ov.type === 'scroll') label = '滚动: ' + (ov.content || '').split('\n')[0].slice(0, 12);
+                else if (ov.type === 'decor') {
+                    const stName = window.ReelsOverlay?.DECOR_OVERLAY_STYLES?.[ov.decor_style]?.name || '点缀图层';
+                    label = stName.replace(/^[^\s]+\s*/, '');
+                }
                 else if (ov.type === 'text') label = (ov.content || '').slice(0, 15) || '文本';
                 else label = (ov.type==='video' ? '视频/动图' : '图片');
             }
@@ -3521,6 +4296,8 @@ class ReelsOverlayPanel {
         const isCard = ov.type === 'textcard' || ov.type === 'solid_mask';
         this.container.querySelector('#rop-textcard-layout-props').style.display = isCard ? 'block' : 'none';
         this.container.querySelector('#rop-scroll-props').style.display = ov.type === 'scroll' ? 'block' : 'none';
+        const decorPropsEl = this.container.querySelector('#rop-decor-props');
+        if (decorPropsEl) decorPropsEl.style.display = ov.type === 'decor' ? 'block' : 'none';
         this.container.querySelector('#rop-textcard-debug-props').style.display = ov.type === 'textcard' ? 'block' : 'none';
         
         const innerTextLayout = this.container.querySelector('#rop-textcard-only-text-layout-inner');
@@ -3580,10 +4357,11 @@ class ReelsOverlayPanel {
         this.container.querySelector('#rop-scale-label').style.display = (ov.type === 'image' || ov.type === 'video') ? '' : 'none';
         this.container.querySelector('#rop-scale-wrap').style.display = (ov.type === 'image' || ov.type === 'video') ? '' : 'none';
 
-        // Dynamic labels for scroll overlay (x/y/w/h = clip region)
+        // Dynamic labels for scroll / decor overlay (x/y/w/h = top-left region)
         const isScroll = ov.type === 'scroll';
-        this.container.querySelector('#rop-xy-label-x').textContent = isScroll ? '裁切X' : '位置X(中心)';
-        this.container.querySelector('#rop-xy-label-y').textContent = isScroll ? '裁切Y' : '位置Y(中心)';
+        const isTopLeftBox = ov.type === 'scroll' || ov.type === 'decor';
+        this.container.querySelector('#rop-xy-label-x').textContent = isScroll ? '裁切X' : (ov.type === 'decor' ? '区域X' : '位置X(中心)');
+        this.container.querySelector('#rop-xy-label-y').textContent = isScroll ? '裁切Y' : (ov.type === 'decor' ? '区域Y' : '位置Y(中心)');
         this.container.querySelector('#rop-wh-label-w').textContent = isScroll ? '裁切宽' : '宽度';
         this.container.querySelector('#rop-wh-label-h').textContent = isScroll ? '裁切高' : '高度';
 
@@ -3820,7 +4598,7 @@ class ReelsOverlayPanel {
 
     _syncFromOverlay(ov) {
         if (!ov) return;
-        if (ov.type === 'scroll') {
+        if (ov.type === 'scroll' || ov.type === 'decor') {
             this._val('rop-x', Math.round(ov.x));
             this._val('rop-y', Math.round(ov.y));
         } else if (ov.type === 'textcard' || ov.type === 'solid_mask') {
@@ -3938,6 +4716,35 @@ class ReelsOverlayPanel {
             this._val('rop-shadow-offset-x', ov.shadow_offset_x ?? 4);
             this._val('rop-shadow-offset-y', ov.shadow_offset_y ?? 4);
             this._val('rop-shadow-opacity', Math.round((ov.shadow_opacity ?? 120) / 255 * 100));
+        }
+
+        if (ov.type === 'decor') {
+            const st = ov.decor_style || 'glowing_starfield';
+            const preset = window.ReelsOverlay?.DECOR_OVERLAY_STYLES?.[st] || {};
+            this._val('rop-decor-style', st);
+            this._val('rop-decor-layout', ov.decor_layout || preset.layout || 'edges_and_float');
+            this._val('rop-decor-dark-vignette', ov.decor_dark_vignette ?? preset.dark_vignette ?? 0);
+            this._val('rop-decor-vignette-spread', ov.decor_vignette_spread ?? preset.vignette_spread ?? 55);
+            this._val('rop-decor-dark-tint', ov.decor_dark_tint || preset.dark_tint || '#05070B');
+            this._val('rop-decor-grain-intensity', ov.decor_grain_intensity ?? preset.grain_intensity ?? 0);
+            this._val('rop-decor-grain-size', ov.decor_grain_size ?? preset.grain_size ?? 100);
+            this._val('rop-decor-grain-warmth', ov.decor_grain_warmth ?? preset.grain_warmth ?? 0);
+            this._val('rop-decor-film-scratches', ov.decor_film_scratches !== undefined ? Boolean(ov.decor_film_scratches) : Boolean(preset.film_scratches));
+            this._val('rop-decor-light-leak', ov.decor_light_leak !== undefined ? Boolean(ov.decor_light_leak) : Boolean(preset.light_leak));
+            this._val('rop-decor-floating-particles', ov.decor_floating_particles !== undefined ? Boolean(ov.decor_floating_particles) : Boolean(preset.floating_particles));
+            this._val('rop-decor-particle-mode', ov.decor_particle_mode || preset.particle_mode || 'dust');
+            this._val('rop-decor-glow-stars', ov.decor_glow_stars !== undefined ? Boolean(ov.decor_glow_stars) : Boolean(preset.glow_stars));
+            this._val('rop-decor-snowflakes', ov.decor_snowflakes !== undefined ? Boolean(ov.decor_snowflakes) : Boolean(preset.snowflakes));
+            this._val('rop-decor-corner-ornaments', ov.decor_corner_ornaments !== undefined ? Boolean(ov.decor_corner_ornaments) : Boolean(preset.corner_ornaments));
+            this._val('rop-decor-edge-garland', ov.decor_edge_garland !== undefined ? Boolean(ov.decor_edge_garland) : Boolean(preset.edge_garland));
+            this._val('rop-decor-density', ov.decor_density ?? preset.density ?? 55);
+            this._val('rop-decor-size', ov.decor_size ?? 100);
+            this._val('rop-decor-glow', ov.decor_glow ?? 100);
+            this._val('rop-decor-speed', ov.decor_speed ?? 100);
+            this._val('rop-decor-margin', ov.decor_margin ?? 36);
+            this._val('rop-decor-center-clear', ov.decor_center_clear ?? preset.center_clear ?? 65);
+            this._val('rop-decor-color1', ov.decor_color1 || preset.color1 || '#FFD700');
+            this._val('rop-decor-color2', ov.decor_color2 || preset.color2 || '#FFFDF5');
         }
 
         if (ov.type === 'image' || ov.type === 'video') {
@@ -4237,6 +5044,7 @@ class ReelsOverlayPanel {
             this._val('rop-scroll-title-shadow-y', ov.scroll_title_shadow_y || 2);
             // 标题独立背景
             this._val('rop-scroll-title-bg-enabled', ov.scroll_title_bg_enabled || false);
+            this._val('rop-scroll-title-bg-style', ov.scroll_title_bg_style || 'solid');
             this._val('rop-scroll-title-bg-mode', ov.scroll_title_bg_mode || 'block');
             this._val('rop-scroll-title-bg-color', ov.scroll_title_bg_color || '#000000');
             this._val('rop-scroll-title-bg-opacity', ov.scroll_title_bg_opacity ?? 60);
@@ -4280,6 +5088,7 @@ class ReelsOverlayPanel {
             this._val('rop-scroll-shadow-y', ov.scroll_shadow_y || 2);
             // 正文独立背景
             this._val('rop-scroll-body-bg-enabled', ov.scroll_body_bg_enabled || false);
+            this._val('rop-scroll-body-bg-style', ov.scroll_body_bg_style || 'solid');
             this._val('rop-scroll-body-bg-mode', ov.scroll_body_bg_mode || 'block');
             this._val('rop-scroll-body-bg-color', ov.scroll_body_bg_color || '#000000');
             this._val('rop-scroll-body-bg-opacity', ov.scroll_body_bg_opacity ?? 60);
@@ -4287,6 +5096,11 @@ class ReelsOverlayPanel {
             this._val('rop-scroll-body-bg-pad-h', ov.scroll_body_bg_pad_h ?? 0);
             this._val('rop-scroll-body-bg-pad-top', ov.scroll_body_bg_pad_top ?? 0);
             this._val('rop-scroll-body-bg-pad-bottom', ov.scroll_body_bg_pad_bottom ?? 0);
+            this._val('rop-scroll-body-bg-pad-h-quick', ov.scroll_body_bg_pad_h ?? 24);
+            this._val('rop-scroll-body-bg-pad-h-quick-num', ov.scroll_body_bg_pad_h ?? 24);
+            const _quickPadV = ov.scroll_body_bg_pad_top ?? ov.scroll_body_bg_pad_bottom ?? 11;
+            this._val('rop-scroll-body-bg-pad-v-quick', _quickPadV);
+            this._val('rop-scroll-body-bg-pad-v-quick-num', _quickPadV);
             // 独立同步 起始Y 和 结束Y
             this._val('rop-scroll-from-y', ov.scroll_from_y ?? 960);
             this._val('rop-scroll-end-y-auto', ov.scroll_end_y_auto !== false);
@@ -4318,8 +5132,21 @@ class ReelsOverlayPanel {
             this._val('rop-scroll-min-fontsize', ov.scroll_min_fontsize ?? 16);
             // 卡片背景
             this._val('rop-scroll-bg-enabled', ov.bg_enabled || false);
+            this._val('rop-scroll-bg-style', ov.bg_style || 'solid');
             this._val('rop-scroll-bg-color', ov.bg_color || '#000000');
             this._val('rop-scroll-bg-opacity', Math.round((ov.bg_opacity ?? 191) / 255 * 100));
+            this._val('rop-scroll-bg-scroll-follow', ov.bg_scroll_follow !== false);
+            this._val('rop-scroll-bg-scroll-follow-quick', ov.bg_scroll_follow !== false);
+            this._val('rop-scroll-bg-body-only', ov.bg_body_only === true);
+            this._val('rop-scroll-bg-body-only-quick', ov.bg_body_only === true);
+            this._val('rop-scroll-bg-width', ov.bg_width ?? 0);
+            this._val('rop-scroll-bg-width-quick', ov.bg_width ?? 0);
+            this._val('rop-scroll-bg-width-quick-num', ov.bg_width ?? 0);
+            this._val('rop-scroll-bg-height', ov.bg_height ?? 0);
+            this._val('rop-scroll-bg-height-quick', ov.bg_height ?? 0);
+            this._val('rop-scroll-bg-height-quick-num', ov.bg_height ?? 0);
+            this._val('rop-scroll-bg-offset-x', ov.bg_offset_x ?? 0);
+            this._val('rop-scroll-bg-offset-y', ov.bg_offset_y ?? 0);
             this._val('rop-scroll-bg-radius', ov.bg_radius ?? 12);
             this._val('rop-scroll-bg-pad-top', ov.bg_padding_top ?? 55);
             this._val('rop-scroll-bg-pad-bottom', ov.bg_padding_bottom ?? 55);
@@ -4475,7 +5302,7 @@ class ReelsOverlayPanel {
             ov.w = this._get('rop-w');
             ov.h = this._get('rop-h');
         }
-        if (ov.type === 'scroll') {
+        if (ov.type === 'scroll' || ov.type === 'decor') {
             ov.x = this._get('rop-x');
             ov.y = this._get('rop-y');
         } else {
@@ -4833,6 +5660,7 @@ class ReelsOverlayPanel {
             ov.scroll_title_shadow_y = this._get('rop-scroll-title-shadow-y');
             // 标题独立背景
             ov.scroll_title_bg_enabled = this._get('rop-scroll-title-bg-enabled');
+            ov.scroll_title_bg_style = this._get('rop-scroll-title-bg-style') || 'solid';
             ov.scroll_title_bg_mode = this._get('rop-scroll-title-bg-mode') || 'block';
             ov.scroll_title_bg_color = this._get('rop-scroll-title-bg-color');
             ov.scroll_title_bg_opacity = this._get('rop-scroll-title-bg-opacity') ?? 60;
@@ -4875,6 +5703,7 @@ class ReelsOverlayPanel {
             ov.scroll_shadow_y = this._get('rop-scroll-shadow-y');
             // 正文独立背景
             ov.scroll_body_bg_enabled = this._get('rop-scroll-body-bg-enabled');
+            ov.scroll_body_bg_style = this._get('rop-scroll-body-bg-style') || 'solid';
             ov.scroll_body_bg_mode = this._get('rop-scroll-body-bg-mode') || 'block';
             ov.scroll_body_bg_color = this._get('rop-scroll-body-bg-color');
             ov.scroll_body_bg_opacity = this._get('rop-scroll-body-bg-opacity') ?? 60;
@@ -4908,14 +5737,33 @@ class ReelsOverlayPanel {
             ov.scroll_min_fontsize = this._get('rop-scroll-min-fontsize');
             // 卡片背景
             ov.bg_enabled = this._get('rop-scroll-bg-enabled');
+            ov.bg_style = this._get('rop-scroll-bg-style') || 'solid';
             ov.bg_color = this._get('rop-scroll-bg-color');
             ov.bg_opacity = Math.round(this._get('rop-scroll-bg-opacity') / 100 * 255);
+            ov.bg_scroll_follow = this._get('rop-scroll-bg-scroll-follow') !== false;
+            ov.bg_body_only = !!this._get('rop-scroll-bg-body-only');
+            ov.bg_width = Number(this._get('rop-scroll-bg-width')) || 0;
+            ov.bg_height = Number(this._get('rop-scroll-bg-height')) || 0;
+            ov.bg_offset_x = Number(this._get('rop-scroll-bg-offset-x')) || 0;
+            ov.bg_offset_y = Number(this._get('rop-scroll-bg-offset-y')) || 0;
             ov.bg_radius = this._get('rop-scroll-bg-radius');
             ov.bg_padding_top = this._get('rop-scroll-bg-pad-top');
             ov.bg_padding_bottom = this._get('rop-scroll-bg-pad-bottom');
             ov.bg_padding_left = this._get('rop-scroll-bg-pad-left');
             ov.bg_padding_right = this._get('rop-scroll-bg-pad-right');
             ov.bg_fullscreen = this._get('rop-scroll-bg-fullscreen');
+            // 同步顶部快捷栏显示
+            this._val('rop-scroll-bg-scroll-follow-quick', ov.bg_scroll_follow);
+            this._val('rop-scroll-bg-body-only-quick', ov.bg_body_only);
+            this._val('rop-scroll-bg-width-quick', ov.bg_width);
+            this._val('rop-scroll-bg-width-quick-num', ov.bg_width);
+            this._val('rop-scroll-bg-height-quick', ov.bg_height);
+            this._val('rop-scroll-bg-height-quick-num', ov.bg_height);
+            this._val('rop-scroll-body-bg-pad-h-quick', ov.scroll_body_bg_pad_h ?? 24);
+            this._val('rop-scroll-body-bg-pad-h-quick-num', ov.scroll_body_bg_pad_h ?? 24);
+            const _syncQuickPadV = ov.scroll_body_bg_pad_top ?? ov.scroll_body_bg_pad_bottom ?? 11;
+            this._val('rop-scroll-body-bg-pad-v-quick', _syncQuickPadV);
+            this._val('rop-scroll-body-bg-pad-v-quick-num', _syncQuickPadV);
             // 卡片边框
             ov.bg_border_enabled = this._get('rop-scroll-bg-border-enabled');
             ov.bg_border_sides = this._get('rop-scroll-bg-border-sides') || 'all';
@@ -4956,6 +5804,35 @@ class ReelsOverlayPanel {
             ov.scroll_tw_cursor_anchor_x = Number(this._get('rop-scroll-tw-cursor-anchor-x') ?? 15);
             ov.scroll_tw_cursor_anchor_y = Number(this._get('rop-scroll-tw-cursor-anchor-y') ?? 85);
             this._syncScrollTypewriterCursorImageUI();
+        }
+
+        if (ov.type === 'decor') {
+            ov.decor_style = this._get('rop-decor-style') || 'glowing_starfield';
+            ov.decor_layout = this._get('rop-decor-layout') || 'edges_and_float';
+            ov.decor_dark_vignette = Number(this._get('rop-decor-dark-vignette') ?? 0);
+            ov.decor_vignette_spread = Number(this._get('rop-decor-vignette-spread') ?? 55);
+            ov.decor_dark_tint = this._get('rop-decor-dark-tint') || '#05070B';
+            ov.decor_grain_intensity = Number(this._get('rop-decor-grain-intensity') ?? 0);
+            ov.decor_grain_size = Number(this._get('rop-decor-grain-size') ?? 100);
+            ov.decor_grain_warmth = Number(this._get('rop-decor-grain-warmth') ?? 0);
+            ov.decor_film_scratches = Boolean(this._get('rop-decor-film-scratches'));
+            ov.decor_light_leak = Boolean(this._get('rop-decor-light-leak'));
+            ov.decor_floating_particles = Boolean(this._get('rop-decor-floating-particles'));
+            ov.decor_particle_mode = this._get('rop-decor-particle-mode') || 'dust';
+            ov.decor_glow_stars = Boolean(this._get('rop-decor-glow-stars'));
+            ov.decor_snowflakes = Boolean(this._get('rop-decor-snowflakes'));
+            ov.decor_corner_ornaments = Boolean(this._get('rop-decor-corner-ornaments'));
+            ov.decor_edge_garland = Boolean(this._get('rop-decor-edge-garland'));
+            ov.decor_density = Number(this._get('rop-decor-density') ?? 55);
+            ov.decor_size = Number(this._get('rop-decor-size') ?? 100);
+            ov.decor_glow = Number(this._get('rop-decor-glow') ?? 100);
+            ov.decor_speed = Number(this._get('rop-decor-speed') ?? 100);
+            ov.decor_margin = Number(this._get('rop-decor-margin') ?? 36);
+            ov.decor_center_clear = Number(this._get('rop-decor-center-clear') ?? 65);
+            ov.decor_color1 = this._get('rop-decor-color1') || '#FFD700';
+            ov.decor_color2 = this._get('rop-decor-color2') || '#FFFDF5';
+            this._refreshList();
+            if (window._reelsState?.decorPanel) window._reelsState.decorPanel.refresh();
         }
 
         ov.anim_in_type = this._get('rop-anim-in');
@@ -5111,6 +5988,10 @@ class ReelsOverlayPanel {
             const cb = this.container?.querySelector('#rop-scroll-apply-all');
             if (cb && !cb.checked) return false;
         }
+        if (ov?.type === 'decor') {
+            const cb = this.container?.querySelector('#rop-decor-apply-all');
+            if (cb && !cb.checked) return false;
+        }
         return true;
     }
 
@@ -5158,10 +6039,16 @@ class ReelsOverlayPanel {
                 delete cloneBase.styled_ranges;
             }
             scopedTasks.forEach(task => {
+                if (!task) return;
+                if (!Array.isArray(task.overlays)) task.overlays = [];
                 const targetOv = this._findMatchingOverlayInTask(task, ov);
                 if (targetOv) {
                     const styleCopy = JSON.parse(JSON.stringify(cloneBase));
                     Object.assign(targetOv, styleCopy);
+                } else if (ov.type === 'decor' && !task.overlays.includes(ov)) {
+                    const styleCopy = JSON.parse(JSON.stringify(cloneBase));
+                    styleCopy.id = 'ov_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+                    task.overlays.push(styleCopy);
                 }
             });
         } finally {
@@ -5224,7 +6111,7 @@ class ReelsOverlayPanel {
             'scroll_title_stroke_color', 'scroll_title_stroke_width',
             'scroll_title_shadow_enabled', 'scroll_title_shadow_color', 'scroll_title_shadow_blur',
             'scroll_title_shadow_x', 'scroll_title_shadow_y',
-            'scroll_title_bg_enabled', 'scroll_title_bg_mode', 'scroll_title_bg_color',
+            'scroll_title_bg_enabled', 'scroll_title_bg_style', 'scroll_title_bg_mode', 'scroll_title_bg_color',
             'scroll_title_bg_opacity', 'scroll_title_bg_radius',
             'scroll_title_bg_pad_h', 'scroll_title_bg_pad_top', 'scroll_title_bg_pad_bottom',
             'scroll_title_deco_enabled', 'scroll_title_deco_position', 'scroll_title_deco_style',
@@ -5238,7 +6125,7 @@ class ReelsOverlayPanel {
             'shadow_enabled', 'shadow_color', 'shadow_blur',
             'scroll_shadow_x', 'scroll_shadow_y',
             // 正文独立背景
-            'scroll_body_bg_enabled', 'scroll_body_bg_mode', 'scroll_body_bg_color',
+            'scroll_body_bg_enabled', 'scroll_body_bg_style', 'scroll_body_bg_mode', 'scroll_body_bg_color',
             'scroll_body_bg_opacity', 'scroll_body_bg_radius',
             'scroll_body_bg_pad_h', 'scroll_body_bg_pad_top', 'scroll_body_bg_pad_bottom',
             // 滚动参数
@@ -5255,7 +6142,8 @@ class ReelsOverlayPanel {
             'feather_top', 'feather_bottom', 'feather_top_offset', 'feather_bottom_offset',
             'feather_left', 'feather_right', 'feather_left_offset', 'feather_right_offset',
             // 卡片背景
-            'bg_enabled', 'bg_color', 'bg_opacity', 'bg_radius',
+            'bg_enabled', 'bg_style', 'bg_color', 'bg_opacity', 'bg_radius',
+            'bg_scroll_follow', 'bg_body_only', 'bg_width', 'bg_height', 'bg_offset_x', 'bg_offset_y',
             'bg_padding_top', 'bg_padding_bottom', 'bg_padding_left', 'bg_padding_right', 'bg_fullscreen',
             // 卡片边框
             'bg_border_enabled', 'bg_border_sides', 'bg_border_color', 'bg_border_width', 'bg_border_style', 'bg_border_opacity',
@@ -8858,5 +9746,766 @@ class ReelsOverlayPanel {
     document.head.appendChild(s);
 })();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ✨ 独立专属大面板：点缀、黑色氛围模板、飘浮粒子与电影颗粒工作台 (ReelsDecorPanel)
+// ═══════════════════════════════════════════════════════════════════════════
+class ReelsDecorPanel {
+    constructor(container, videoCanvasProxy, linkedOverlayPanel = null) {
+        this.container = container;
+        this.videoCanvas = videoCanvasProxy;
+        this.linkedOverlayPanel = linkedOverlayPanel;
+        this._selectedDecorId = null;
+        this._activeCategory = 'all';
+        this._syncing = false;
+        this._renderUI();
+        this._bindEvents();
+        this.refresh();
+    }
+
+    _getDecorOverlays() {
+        const list = this.videoCanvas?.overlayMgr?.overlays || [];
+        return list.filter(o => o && o.type === 'decor');
+    }
+
+    _getSelectedDecor() {
+        const list = this._getDecorOverlays();
+        if (!list.length) return null;
+        if (this._selectedDecorId) {
+            const found = list.find(o => o.id === this._selectedDecorId);
+            if (found) return found;
+        }
+        this._selectedDecorId = list[list.length - 1].id;
+        return list[list.length - 1];
+    }
+
+    _ensureDecorOverlay(defaultStyleId = 'dark_floating_dust') {
+        let ov = this._getSelectedDecor();
+        if (ov) return ov;
+        const ReelsOverlayMod = window.ReelsOverlay;
+        if (!ReelsOverlayMod || typeof ReelsOverlayMod.createDecorOverlay !== 'function') return null;
+        ov = ReelsOverlayMod.createDecorOverlay({
+            decor_style: defaultStyleId,
+            x: 0,
+            y: 0,
+            w: 1080,
+            h: 1920,
+            start: 0,
+            end: 9999,
+        });
+        if (this.videoCanvas && typeof this.videoCanvas.addOverlay === 'function') {
+            this.videoCanvas.addOverlay(ov);
+        } else if (this.videoCanvas?.overlayMgr?.overlays) {
+            this.videoCanvas.overlayMgr.overlays.push(ov);
+        }
+        this._selectedDecorId = ov.id;
+        if (this.linkedOverlayPanel) {
+            this.linkedOverlayPanel._refreshList();
+        }
+        return ov;
+    }
+
+    _renderUI() {
+        if (!this.container) return;
+        const styles = window.ReelsOverlay?.DECOR_OVERLAY_STYLES || {};
+        const styleEntries = Object.entries(styles);
+
+        const catBadgeMap = {
+            dark_particles: { bg: 'linear-gradient(135deg,#090d16,#1e293b)', border: '#475569', text: '#e2e8f0', tag: '🖤 黑色&粒子' },
+            film_grain:     { bg: 'linear-gradient(135deg,#271c12,#451a03)', border: '#d97706', text: '#fde68a', tag: '🎞️ 电影颗粒' },
+            stars:          { bg: 'linear-gradient(135deg,#1e1b4b,#3b0764)', border: '#eab308', text: '#fef08a', tag: '🌟 星芒光斑' },
+            xmas:           { bg: 'linear-gradient(135deg,#14532d,#7f1d1d)', border: '#f87171', text: '#fef9c3', tag: '🎄 圣诞限定' },
+            frame:          { bg: 'linear-gradient(135deg,#292524,#44403c)', border: '#d4af37', text: '#fde68a', tag: '⚜️ 复古画框' },
+        };
+
+        const cardsHtml = styleEntries.map(([id, cfg], idx) => {
+            const theme = catBadgeMap[cfg.category] || catBadgeMap.stars;
+            return `
+                <button type="button" class="rdp-preset-card" data-style-id="${id}" data-cat="${cfg.category || 'stars'}"
+                    style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:7px 8px;border-radius:7px;background:${theme.bg};border:1px solid ${theme.border};color:${theme.text};cursor:pointer;text-align:left;transition:all 0.15s;">
+                    <div style="display:flex;width:100%;justify-content:space-between;align-items:center;gap:4px;">
+                        <span style="font-size:10px;opacity:0.82;padding:1px 5px;border-radius:4px;background:rgba(0,0,0,0.35);">${idx + 1}. ${theme.tag}</span>
+                        <span style="display:inline-flex;gap:3px;">
+                            <i style="width:9px;height:9px;border-radius:50%;background:${cfg.color1 || '#FFD700'};display:inline-block;border:1px solid rgba(255,255,255,0.4);"></i>
+                            <i style="width:9px;height:9px;border-radius:50%;background:${cfg.color2 || '#FFFFFF'};display:inline-block;border:1px solid rgba(255,255,255,0.4);"></i>
+                        </span>
+                    </div>
+                    <div style="font-size:11.5px;font-weight:700;line-height:1.25;word-break:break-word;">${cfg.name}</div>
+                </button>
+            `;
+        }).join('');
+
+        const selectOptionsHtml = styleEntries.map(([id, cfg], idx) =>
+            `<option value="${id}">${idx + 1}. ${cfg.name}</option>`
+        ).join('');
+
+        this.container.innerHTML = `
+            <div class="rop-root rdp-root" style="display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--text-primary,#e2e8f0);">
+                <!-- 顶部独立启用总开关（与 T字幕、🖼️覆层 完全独立，打勾预览并导出，不打勾不显示不导出） -->
+                <div id="rdp-master-bar" style="padding:9px 11px;background:linear-gradient(135deg,rgba(16,185,129,0.18),rgba(59,130,246,0.16));border:1px solid rgba(52,211,153,0.48);border-radius:8px;display:flex;flex-direction:column;gap:5px;">
+                    <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;margin:0;">
+                        <span style="display:flex;align-items:center;gap:7px;font-weight:800;font-size:12.5px;color:#ecfdf5;">
+                            <input type="checkbox" id="rdp-master-enable" checked style="width:16px;height:16px;accent-color:#10b981;cursor:pointer;">
+                            <span>启用点缀与颗粒 (打勾=预览并导出 / 不打勾=不显示不导出)</span>
+                        </span>
+                        <span id="rdp-master-status-badge" style="font-size:10.5px;padding:2px 7px;border-radius:999px;background:rgba(16,185,129,0.28);color:#6ee7b7;border:1px solid rgba(52,211,153,0.5);font-weight:700;white-space:nowrap;">已启用·参与导出</span>
+                    </label>
+                    <div style="font-size:11px;color:#cbd5e1;line-height:1.35;">
+                        📌 <b>独立中间装饰层</b>：与【T 字幕】【🖼️ 覆层】完全分开控制（关闭覆层预览不影响点缀）；固定位于<b>视频素材前面、T字幕与覆层后面</b>，绝不遮挡字幕。
+                    </div>
+                </div>
+
+                <!-- 顶部作用范围与多层管理栏 -->
+                <div style="padding:8px 10px;background:var(--bg-tertiary,#181a24);border:1px solid var(--border-color,#2d3142);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                        <div style="font-weight:800;font-size:13px;color:#fde68a;">✨ 点缀、黑色模板与电影颗粒 (30款)</div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="font-size:11px;color:var(--text-secondary);">样式作用:</span>
+                            <select id="rdp-style-scope" class="rop-select" style="width:auto;padding:2px 6px;font-size:11px;">
+                                <option value="folder">当前队列</option>
+                                <option value="all">所有队列</option>
+                                <option value="task">仅当前任务</option>
+                            </select>
+                            <label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;margin:0;">
+                                <input type="checkbox" id="rdp-apply-all" checked>
+                                <span>同步</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;">
+                        <button type="button" id="rdp-add-layer-btn" class="rop-btn" style="flex:1;padding:5px 8px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:1px solid #34d399;border-radius:6px;cursor:pointer;">➕ 叠加新点缀/颗粒层</button>
+                        <button type="button" id="rdp-fit-full-btn" class="rop-btn" style="padding:5px 7px;font-size:11px;background:var(--bg-secondary,#252836);color:#e2e8f0;border:1px solid #475569;border-radius:6px;cursor:pointer;" title="铺满 1080×1920 全画面">📐 全屏</button>
+                        <button type="button" id="rdp-fit-card-btn" class="rop-btn" style="padding:5px 7px;font-size:11px;background:var(--bg-secondary,#252836);color:#e2e8f0;border:1px solid #475569;border-radius:6px;cursor:pointer;" title="贴合中间内容框 940×1260">🎯 贴合中间</button>
+                        <button type="button" id="rdp-clear-layers-btn" class="rop-btn" style="padding:5px 7px;font-size:11px;background:rgba(239,68,68,0.16);color:#fca5a5;border:1px solid rgba(239,68,68,0.4);border-radius:6px;cursor:pointer;" title="清除当前任务的全部点缀/颗粒层">🗑️ 清空</button>
+                    </div>
+
+                    <div id="rdp-layer-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+                </div>
+
+                <!-- 30款模板分类筛选与可视化卡片库 -->
+                <div style="padding:8px 10px;background:var(--bg-tertiary,#181a24);border:1px solid var(--border-color,#2d3142);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap;">
+                        <span style="font-size:11.5px;font-weight:700;color:#93c5fd;">🎨 30款预设库 (点击任意卡片立即应用)：</span>
+                        <select id="rdp-style-select" class="rop-select" style="max-width:210px;font-size:11px;padding:2px 6px;">
+                            ${selectOptionsHtml}
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
+                        <button type="button" class="rdp-cat-btn active" data-cat="all" style="padding:3px 7px;font-size:11px;border-radius:5px;border:1px solid #6366f1;background:#4f46e5;color:#fff;cursor:pointer;font-weight:700;">全部 (30)</button>
+                        <button type="button" class="rdp-cat-btn" data-cat="dark_particles" style="padding:3px 7px;font-size:11px;border-radius:5px;border:1px solid #475569;background:#1e293b;color:#e2e8f0;cursor:pointer;">🖤 黑色模板&粒子 (7)</button>
+                        <button type="button" class="rdp-cat-btn" data-cat="film_grain" style="padding:3px 7px;font-size:11px;border-radius:5px;border:1px solid #b45309;background:#271c12;color:#fde68a;cursor:pointer;">🎞️ 电影&回忆颗粒 (7)</button>
+                        <button type="button" class="rdp-cat-btn" data-cat="stars" style="padding:3px 7px;font-size:11px;border-radius:5px;border:1px solid #a16207;background:#1e1b4b;color:#fef08a;cursor:pointer;">🌟 发光星芒&光斑 (6)</button>
+                        <button type="button" class="rdp-cat-btn" data-cat="xmas" style="padding:3px 7px;font-size:11px;border-radius:5px;border:1px solid #15803d;background:#14532d;color:#fef9c3;cursor:pointer;">🎄 圣诞装饰 (5)</button>
+                        <button type="button" class="rdp-cat-btn" data-cat="frame" style="padding:3px 7px;font-size:11px;border-radius:5px;border:1px solid #a16207;background:#292524;color:#fde68a;cursor:pointer;">⚜️ 复古画框 (5)</button>
+                    </div>
+                    <div id="rdp-preset-grid" style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:6px;max-height:255px;overflow-y:auto;padding-right:2px;">
+                        ${cardsHtml}
+                    </div>
+                </div>
+
+                <!-- 专区1: 🖤 黑色氛围模板 & 宽银幕暗角调节 -->
+                <div class="rop-group" style="padding:8px 10px;background:var(--bg-tertiary,#181a24);border:1px solid var(--border-color,#2d3142);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px 0;">
+                        <div class="rop-group-title" style="margin:0;color:#f87171;">🖤 1. 黑色氛围模板 & 电影暗角遮罩</div>
+                        <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:#fecaca;cursor:pointer;margin:0;" title="勾选后启用黑色氛围模板和电影暗角；取消勾选则关闭黑底暗角">
+                            <input type="checkbox" id="rdp-dark-enabled" checked style="width:14px;height:14px;accent-color:#ef4444;cursor:pointer;">
+                            <span>启用黑色模板</span>
+                        </label>
+                    </div>
+                    <div class="rop-grid">
+                        <label title="四周暗黑遮罩与上下宽银幕暗角浓度">黑色模板浓度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-dark-vignette" class="rop-range" min="0" max="100" step="2" value="78"><input type="number" class="rop-num-readout" data-link="rdp-dark-vignette" min="0" max="100" step="2" value="78"></div>
+
+                        <label title="暗角向画面中心聚拢扩散的范围">暗角扩散范围%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-vignette-spread" class="rop-range" min="10" max="95" step="5" value="62"><input type="number" class="rop-num-readout" data-link="rdp-vignette-spread" min="10" max="95" step="5" value="62"></div>
+
+                        <label>暗底氛围色调</label>
+                        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                            <input type="color" id="rdp-dark-tint" class="rop-color" value="#05070C" style="width:32px;height:24px;">
+                            <button type="button" class="rdp-tint-chip" data-tint="#05070C" style="padding:2px 5px;font-size:10px;background:#05070C;color:#e2e8f0;border:1px solid #475569;border-radius:4px;cursor:pointer;">纯黑</button>
+                            <button type="button" class="rdp-tint-chip" data-tint="#0B0503" style="padding:2px 5px;font-size:10px;background:#1c0a05;color:#fdba74;border:1px solid #9a3412;border-radius:4px;cursor:pointer;">黑金余烬</button>
+                            <button type="button" class="rdp-tint-chip" data-tint="#261507" style="padding:2px 5px;font-size:10px;background:#261507;color:#fde68a;border:1px solid #b45309;border-radius:4px;cursor:pointer;">怀旧深褐</button>
+                            <button type="button" class="rdp-tint-chip" data-tint="#040814" style="padding:2px 5px;font-size:10px;background:#040814;color:#93c5fd;border:1px solid #1d4ed8;border-radius:4px;cursor:pointer;">暗夜蓝</button>
+                            <button type="button" class="rdp-tint-chip" data-tint="#040C08" style="padding:2px 5px;font-size:10px;background:#040C08;color:#86efac;border:1px solid #15803d;border-radius:4px;cursor:pointer;">森林暗绿</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 专区2: 🎞️ 电影颗粒 & 回忆颗粒感调节 -->
+                <div class="rop-group" style="padding:8px 10px;background:var(--bg-tertiary,#181a24);border:1px solid var(--border-color,#2d3142);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px 0;">
+                        <div class="rop-group-title" style="margin:0;color:#fbbf24;">🎞️ 2. 电影颗粒 & 怀旧回忆颗粒感</div>
+                        <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:#fde68a;cursor:pointer;margin:0;" title="勾选后启用电影胶片颗粒与怀旧暖调；取消勾选则关闭颗粒噪点">
+                            <input type="checkbox" id="rdp-grain-enabled" checked style="width:14px;height:14px;accent-color:#f59e0b;cursor:pointer;">
+                            <span>启用电影颗粒</span>
+                        </label>
+                    </div>
+                    <div class="rop-grid">
+                        <label title="35mm/8mm胶片噪点与回忆颗粒感强度">电影颗粒强度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-grain-intensity" class="rop-range" min="0" max="100" step="2" value="24"><input type="number" class="rop-num-readout" data-link="rdp-grain-intensity" min="0" max="100" step="2" value="24"></div>
+
+                        <label title="胶片颗粒的粗细大小">颗粒粗细度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-grain-size" class="rop-range" min="50" max="250" step="5" value="100"><input type="number" class="rop-num-readout" data-link="rdp-grain-size" min="50" max="250" step="5" value="100"></div>
+
+                        <label title="老照片泛黄暖调回忆感">怀旧泛黄暖调%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-grain-warmth" class="rop-range" min="0" max="100" step="5" value="0"><input type="number" class="rop-num-readout" data-link="rdp-grain-warmth" min="0" max="100" step="5" value="0"></div>
+
+                        <label>📽️ 启用老电影划痕/扫描线</label><input type="checkbox" id="rdp-film-scratches">
+                        <label>🌅 启用复古胶片边缘漏光</label><input type="checkbox" id="rdp-light-leak">
+                    </div>
+                </div>
+
+                <!-- 专区3: ✨ 飘浮粒子 & 发光星芒 & 圣诞装饰组合 -->
+                <div class="rop-group" style="padding:8px 10px;background:var(--bg-tertiary,#181a24);border:1px solid var(--border-color,#2d3142);border-radius:8px;">
+                    <div class="rop-group-title" style="margin:0 0 6px 0;color:#38bdf8;">✨ 3. 子效果自由勾选开关 (打勾即启用，自由混搭您想要的效果)</div>
+                    <div class="rop-grid">
+                        <label>✨ 启用飘浮粒子</label><input type="checkbox" id="rdp-floating-particles" checked>
+                        <label>飘浮粒子形态</label>
+                        <select id="rdp-particle-mode" class="rop-select">
+                            <option value="dust">🖤 悬浮微尘粒子 (Dust)</option>
+                            <option value="embers">🔥 升腾火星余烬 (Embers)</option>
+                            <option value="fireflies">✨ 森林萤火虫 (Fireflies)</option>
+                            <option value="ash">🌨️ 银白灰烬细雪 (Ash)</option>
+                            <option value="neon">⚡ 赛博霓虹微粒 (Neon)</option>
+                            <option value="sunset_bokeh">🌇 落日暖阳大光斑 (Bokeh)</option>
+                            <option value="prism">💎 钻石棱镜星芒 (Prism)</option>
+                        </select>
+                        <label>🌟 启用发光闪烁星芒</label><input type="checkbox" id="rdp-glow-stars">
+                        <label>❄️ 启用漫天飘雪与冰晶</label><input type="checkbox" id="rdp-snowflakes">
+                        <label>🎀 启用四角主题挂饰</label><input type="checkbox" id="rdp-corner-ornaments">
+                        <label>🌿 启用边缘花环/串灯/画框</label><input type="checkbox" id="rdp-edge-garland">
+                    </div>
+                </div>
+
+                <!-- 专区4: 📐 分布区域 / 密度 / 尺寸 / 速度 / 边距 / 配色 -->
+                <div class="rop-group" style="padding:8px 10px;background:var(--bg-tertiary,#181a24);border:1px solid var(--border-color,#2d3142);border-radius:8px;">
+                    <div class="rop-group-title" style="margin:0 0 6px 0;color:#a78bfa;">📐 4. 密度 / 尺寸 / 速度 / 边距 / 颜色精调</div>
+                    <div class="rop-grid">
+                        <label>分布位置</label>
+                        <select id="rdp-layout" class="rop-select">
+                            <option value="edges_and_float">四周边缘环绕 + 少量轻柔漂浮</option>
+                            <option value="edges_only">仅四周边缘环绕 (中心留空)</option>
+                            <option value="corners_only">仅四角精致点缀</option>
+                            <option value="top_bottom">仅上下边缘点缀 (顶部+底部)</option>
+                            <option value="full_scatter">全画面均匀漫天分布 (适合粒子/颗粒)</option>
+                        </select>
+
+                        <label>粒子/点缀密度</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-density" class="rop-range" min="5" max="200" step="5" value="75"><input type="number" class="rop-num-readout" data-link="rdp-density" min="5" max="200" step="5" value="75"></div>
+
+                        <label>元素尺寸缩放%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-size" class="rop-range" min="25" max="250" step="5" value="100"><input type="number" class="rop-num-readout" data-link="rdp-size" min="20" max="300" step="5" value="100"></div>
+
+                        <label>发光光晕强度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-glow" class="rop-range" min="0" max="200" step="5" value="100"><input type="number" class="rop-num-readout" data-link="rdp-glow" min="0" max="200" step="5" value="100"></div>
+
+                        <label>飘动/闪烁速度%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-speed" class="rop-range" min="0" max="250" step="10" value="100"><input type="number" class="rop-num-readout" data-link="rdp-speed" min="0" max="300" step="10" value="100"></div>
+
+                        <label>距画布边缘px</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-margin" class="rop-range" min="0" max="220" step="4" value="36"><input type="number" class="rop-num-readout" data-link="rdp-margin" min="0" max="300" step="4" value="36"></div>
+
+                        <label>中心留白保护%</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-center-clear" class="rop-range" min="0" max="90" step="5" value="40"><input type="number" class="rop-num-readout" data-link="rdp-center-clear" min="0" max="95" step="5" value="40"></div>
+
+                        <label>图层总不透明度</label>
+                        <div class="rop-slider-combo"><input type="range" id="rdp-opacity" class="rop-range" min="0" max="255" step="5" value="255"><input type="number" class="rop-num-readout" data-link="rdp-opacity" min="0" max="255" step="5" value="255"></div>
+
+                        <label>主色调</label><input type="color" id="rdp-color1" class="rop-color" value="#E2E8F0">
+                        <label>副色/星核色</label><input type="color" id="rdp-color2" class="rop-color" value="#FFFDF5">
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    _syncMasterEnableUI(enabled) {
+        const isOn = enabled !== false;
+        const masterCheck = this.container?.querySelector('#rdp-master-enable');
+        if (masterCheck) masterCheck.checked = isOn;
+        const badge = this.container?.querySelector('#rdp-master-status-badge');
+        if (badge) {
+            badge.textContent = isOn ? '已启用·参与导出' : '已关闭·导出不带';
+            badge.style.background = isOn ? 'rgba(16,185,129,0.28)' : 'rgba(239,68,68,0.24)';
+            badge.style.color = isOn ? '#6ee7b7' : '#fca5a5';
+            badge.style.borderColor = isOn ? 'rgba(52,211,153,0.5)' : 'rgba(248,113,113,0.5)';
+        }
+        const bar = this.container?.querySelector('#rdp-master-bar');
+        if (bar) {
+            bar.style.borderColor = isOn ? 'rgba(52,211,153,0.48)' : 'rgba(248,113,113,0.45)';
+        }
+    }
+
+    _bindEvents() {
+        if (!this.container) return;
+
+        // 顶部独立启用总开关（与底部预览栏 #reels-decor-toggle 和 V2 [data-role="decor"] 双向联动）
+        const masterCheck = this.container.querySelector('#rdp-master-enable');
+        if (masterCheck) {
+            masterCheck.addEventListener('change', () => {
+                const enabled = Boolean(masterCheck.checked);
+                this._syncMasterEnableUI(enabled);
+                if (typeof window.reelsOnDecorToggleChange === 'function') {
+                    window.reelsOnDecorToggleChange(masterCheck);
+                }
+            });
+        }
+
+        // 绑定 range <-> number readout 双向同步
+        this.container.querySelectorAll('.rop-num-readout[data-link]').forEach(numEl => {
+            const rangeId = numEl.dataset.link;
+            const rangeEl = this.container.querySelector('#' + rangeId);
+            if (!rangeEl) return;
+            const onRangeOrNumInput = (val) => {
+                // 当用户主动拉大黑色模板浓度或颗粒强度时，自动打勾对应分区的启用开关
+                if ((rangeId === 'rdp-dark-vignette' || rangeId === 'rdp-vignette-spread') && Number(val) > 0) {
+                    const darkEn = this.container.querySelector('#rdp-dark-enabled');
+                    if (darkEn && !darkEn.checked) darkEn.checked = true;
+                }
+                if ((rangeId === 'rdp-grain-intensity' || rangeId === 'rdp-grain-warmth') && Number(val) > 0) {
+                    const grainEn = this.container.querySelector('#rdp-grain-enabled');
+                    if (grainEn && !grainEn.checked) grainEn.checked = true;
+                }
+                this._syncToDecorOverlay();
+            };
+            rangeEl.addEventListener('input', () => {
+                numEl.value = rangeEl.value;
+                onRangeOrNumInput(rangeEl.value);
+            });
+            numEl.addEventListener('input', () => {
+                rangeEl.value = numEl.value;
+                onRangeOrNumInput(numEl.value);
+            });
+        });
+
+        // 绑定复选框、下拉框、颜色选择器
+        const inputIds = [
+            'rdp-dark-enabled', 'rdp-dark-tint',
+            'rdp-grain-enabled', 'rdp-film-scratches', 'rdp-light-leak',
+            'rdp-floating-particles', 'rdp-particle-mode',
+            'rdp-glow-stars', 'rdp-snowflakes', 'rdp-corner-ornaments', 'rdp-edge-garland',
+            'rdp-layout', 'rdp-color1', 'rdp-color2',
+        ];
+        inputIds.forEach(id => {
+            const el = this.container.querySelector('#' + id);
+            if (!el) return;
+            el.addEventListener('input', () => this._syncToDecorOverlay());
+            el.addEventListener('change', () => this._syncToDecorOverlay());
+        });
+
+        // 快捷氛围暗底色块
+        this.container.querySelectorAll('.rdp-tint-chip').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tint = btn.dataset.tint || '#05070C';
+                const tintEl = this.container.querySelector('#rdp-dark-tint');
+                if (tintEl) tintEl.value = tint;
+                const darkEn = this.container.querySelector('#rdp-dark-enabled');
+                if (darkEn) darkEn.checked = true;
+                const vigEl = this.container.querySelector('#rdp-dark-vignette');
+                if (vigEl && Number(vigEl.value) < 35) {
+                    vigEl.value = 75;
+                    const num = this.container.querySelector('.rop-num-readout[data-link="rdp-dark-vignette"]');
+                    if (num) num.value = 75;
+                }
+                this._syncToDecorOverlay();
+            });
+        });
+
+        // 分类筛选按钮
+        this.container.querySelectorAll('.rdp-cat-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this._activeCategory = btn.dataset.cat || 'all';
+                this.container.querySelectorAll('.rdp-cat-btn').forEach(b => {
+                    const active = (b === btn);
+                    b.classList.toggle('active', active);
+                    b.style.boxShadow = active ? '0 0 0 2px rgba(99,102,241,0.55)' : 'none';
+                });
+                this.container.querySelectorAll('.rdp-preset-card').forEach(card => {
+                    const match = (this._activeCategory === 'all') || (card.dataset.cat === this._activeCategory);
+                    card.style.display = match ? 'flex' : 'none';
+                });
+            });
+        });
+
+        // 30款预设卡片点击：一键应用（若无图层则自动创建）
+        this.container.querySelectorAll('.rdp-preset-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.preventDefault();
+                const styleId = card.dataset.styleId || 'dark_floating_dust';
+                this.applyPreset(styleId);
+            });
+        });
+
+        // 下拉菜单选择预设
+        const styleSel = this.container.querySelector('#rdp-style-select');
+        if (styleSel) {
+            styleSel.addEventListener('change', () => {
+                this.applyPreset(styleSel.value || 'dark_floating_dust');
+            });
+        }
+
+        // 样式作用范围同步
+        const scopeSel = this.container.querySelector('#rdp-style-scope');
+        if (scopeSel) {
+            scopeSel.addEventListener('change', () => {
+                const mainScope = document.getElementById('rop-style-scope');
+                if (mainScope && mainScope.value !== scopeSel.value) {
+                    mainScope.value = scopeSel.value;
+                    mainScope.dispatchEvent(new Event('change'));
+                }
+                const ov = this._getSelectedDecor();
+                if (ov) this._syncScopeAndRender(ov);
+            });
+        }
+
+        // 添加叠加图层按钮
+        const addBtn = this.container.querySelector('#rdp-add-layer-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const ReelsOverlayMod = window.ReelsOverlay;
+                if (!ReelsOverlayMod?.createDecorOverlay) return;
+                const currentCount = this._getDecorOverlays().length;
+                const defaultCycle = ['dark_floating_dust', 'cinema_35mm_grain', 'xmas_holly_pine_garland', 'glowing_starfield'];
+                const nextStyle = defaultCycle[currentCount % defaultCycle.length];
+                const ov = ReelsOverlayMod.createDecorOverlay({
+                    decor_style: nextStyle,
+                    x: 0,
+                    y: 0,
+                    w: 1080,
+                    h: 1920,
+                    start: 0,
+                    end: 9999,
+                });
+                if (this.videoCanvas && typeof this.videoCanvas.addOverlay === 'function') {
+                    this.videoCanvas.addOverlay(ov);
+                } else if (this.videoCanvas?.overlayMgr?.overlays) {
+                    this.videoCanvas.overlayMgr.overlays.push(ov);
+                }
+                this._selectedDecorId = ov.id;
+                this._syncScopeAndRender(ov);
+                this.refresh();
+                if (this.linkedOverlayPanel) this.linkedOverlayPanel._refreshList();
+            });
+        }
+
+        // 铺满全屏 / 贴合中间
+        const fitFullBtn = this.container.querySelector('#rdp-fit-full-btn');
+        if (fitFullBtn) {
+            fitFullBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const ov = this._ensureDecorOverlay();
+                if (!ov) return;
+                ov.x = 0; ov.y = 0; ov.w = 1080; ov.h = 1920; ov.decor_margin = 36;
+                this._syncFromDecorOverlay(ov);
+                this._syncScopeAndRender(ov);
+            });
+        }
+        const fitCardBtn = this.container.querySelector('#rdp-fit-card-btn');
+        if (fitCardBtn) {
+            fitCardBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const ov = this._ensureDecorOverlay();
+                if (!ov) return;
+                ov.x = 70; ov.y = 330; ov.w = 940; ov.h = 1260; ov.decor_margin = 16;
+                this._syncFromDecorOverlay(ov);
+                this._syncScopeAndRender(ov);
+            });
+        }
+
+        // 清空点缀层
+        const clearBtn = this.container.querySelector('#rdp-clear-layers-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const decors = this._getDecorOverlays();
+                decors.forEach(d => {
+                    if (this.videoCanvas && typeof this.videoCanvas.removeOverlay === 'function') {
+                        this.videoCanvas.removeOverlay(d.id);
+                    }
+                });
+                // 若勾选了同步到作用范围，也同步清理队列内其它任务的 decor 层
+                const applyAll = this.container.querySelector('#rdp-apply-all')?.checked !== false;
+                if (applyAll && this.linkedOverlayPanel && typeof this.linkedOverlayPanel._getStyleApplyScopeTasks === 'function') {
+                    const scopedTasks = this.linkedOverlayPanel._getStyleApplyScopeTasks() || [];
+                    scopedTasks.forEach(t => {
+                        if (t && Array.isArray(t.overlays)) {
+                            t.overlays = t.overlays.filter(o => o && o.type !== 'decor');
+                        }
+                    });
+                }
+                this._selectedDecorId = null;
+                this.refresh();
+                if (this.linkedOverlayPanel) this.linkedOverlayPanel._refreshList();
+                if (typeof this.videoCanvas?.onOverlayChange === 'function') {
+                    this.videoCanvas.onOverlayChange(null);
+                }
+            });
+        }
+    }
+
+    applyPreset(styleId) {
+        // 点击预设时若顶部总开关处于关闭状态，自动帮用户勾选启用以便立即看到效果
+        const masterCheck = this.container?.querySelector('#rdp-master-enable');
+        if (masterCheck && !masterCheck.checked) {
+            masterCheck.checked = true;
+            this._syncMasterEnableUI(true);
+            if (typeof window.reelsOnDecorToggleChange === 'function') {
+                window.reelsOnDecorToggleChange(masterCheck);
+            }
+        }
+        const ov = this._ensureDecorOverlay(styleId);
+        if (!ov) return;
+        ov.disabled = false;
+        if (ov.opacity !== undefined && ov.opacity <= 0) ov.opacity = 255;
+        if (typeof window.ReelsOverlay?.applyDecorStylePreset === 'function') {
+            window.ReelsOverlay.applyDecorStylePreset(ov, styleId);
+        } else {
+            ov.decor_style = styleId;
+        }
+        this._syncFromDecorOverlay(ov);
+        this._syncScopeAndRender(ov);
+        this._renderLayerList();
+        if (this.linkedOverlayPanel) {
+            this.linkedOverlayPanel._refreshList();
+            if (this.linkedOverlayPanel._selectedOv?.id === ov.id) {
+                this.linkedOverlayPanel._syncFromOverlay(ov);
+            }
+        }
+    }
+
+    _setVal(id, val) {
+        const el = this.container?.querySelector('#' + id);
+        if (!el) return;
+        if (el.type === 'checkbox') {
+            el.checked = Boolean(val);
+        } else {
+            el.value = val;
+            const readout = this.container.querySelector(`.rop-num-readout[data-link="${id}"]`);
+            if (readout) readout.value = val;
+        }
+    }
+
+    _getVal(id) {
+        const el = this.container?.querySelector('#' + id);
+        if (!el) return undefined;
+        if (el.type === 'checkbox') return el.checked;
+        if (el.type === 'range' || el.type === 'number') return Number(el.value);
+        return el.value;
+    }
+
+    _syncFromDecorOverlay(ov) {
+        if (!ov || !this.container) return;
+        this._syncing = true;
+        try {
+            const st = ov.decor_style || 'dark_floating_dust';
+            const preset = window.ReelsOverlay?.DECOR_OVERLAY_STYLES?.[st] || {};
+            const darkVignetteVal = ov.decor_dark_vignette ?? preset.dark_vignette ?? 0;
+            const grainIntensityVal = ov.decor_grain_intensity ?? preset.grain_intensity ?? 0;
+            const grainWarmthVal = ov.decor_grain_warmth ?? preset.grain_warmth ?? 0;
+            this._setVal('rdp-style-select', st);
+            this._setVal('rdp-dark-enabled', ov.decor_dark_enabled !== undefined ? Boolean(ov.decor_dark_enabled) : (Number(darkVignetteVal) > 0));
+            this._setVal('rdp-dark-vignette', darkVignetteVal);
+            this._setVal('rdp-vignette-spread', ov.decor_vignette_spread ?? preset.vignette_spread ?? 55);
+            this._setVal('rdp-dark-tint', ov.decor_dark_tint || preset.dark_tint || '#05070C');
+            this._setVal('rdp-grain-enabled', ov.decor_grain_enabled !== undefined ? Boolean(ov.decor_grain_enabled) : (Number(grainIntensityVal) > 0 || Number(grainWarmthVal) > 0));
+            this._setVal('rdp-grain-intensity', grainIntensityVal);
+            this._setVal('rdp-grain-size', ov.decor_grain_size ?? preset.grain_size ?? 100);
+            this._setVal('rdp-grain-warmth', grainWarmthVal);
+            this._setVal('rdp-film-scratches', ov.decor_film_scratches !== undefined ? Boolean(ov.decor_film_scratches) : Boolean(preset.film_scratches));
+            this._setVal('rdp-light-leak', ov.decor_light_leak !== undefined ? Boolean(ov.decor_light_leak) : Boolean(preset.light_leak));
+            this._setVal('rdp-floating-particles', ov.decor_floating_particles !== undefined ? Boolean(ov.decor_floating_particles) : Boolean(preset.floating_particles));
+            this._setVal('rdp-particle-mode', ov.decor_particle_mode || preset.particle_mode || 'dust');
+            this._setVal('rdp-glow-stars', ov.decor_glow_stars !== undefined ? Boolean(ov.decor_glow_stars) : Boolean(preset.glow_stars));
+            this._setVal('rdp-snowflakes', ov.decor_snowflakes !== undefined ? Boolean(ov.decor_snowflakes) : Boolean(preset.snowflakes));
+            this._setVal('rdp-corner-ornaments', ov.decor_corner_ornaments !== undefined ? Boolean(ov.decor_corner_ornaments) : Boolean(preset.corner_ornaments));
+            this._setVal('rdp-edge-garland', ov.decor_edge_garland !== undefined ? Boolean(ov.decor_edge_garland) : Boolean(preset.edge_garland));
+            this._setVal('rdp-layout', ov.decor_layout || preset.layout || 'edges_and_float');
+            this._setVal('rdp-density', ov.decor_density ?? preset.density ?? 55);
+            this._setVal('rdp-size', ov.decor_size ?? 100);
+            this._setVal('rdp-glow', ov.decor_glow ?? 100);
+            this._setVal('rdp-speed', ov.decor_speed ?? 100);
+            this._setVal('rdp-margin', ov.decor_margin ?? 36);
+            this._setVal('rdp-center-clear', ov.decor_center_clear ?? preset.center_clear ?? 65);
+            this._setVal('rdp-opacity', ov.opacity ?? 255);
+            this._setVal('rdp-color1', ov.decor_color1 || preset.color1 || '#FFD700');
+            this._setVal('rdp-color2', ov.decor_color2 || preset.color2 || '#FFFDF5');
+
+            // 高亮当前预设卡片
+            this.container.querySelectorAll('.rdp-preset-card').forEach(card => {
+                const isSelected = card.dataset.styleId === st;
+                card.style.boxShadow = isSelected ? '0 0 0 2px #fde047, 0 4px 12px rgba(250,204,21,0.35)' : 'none';
+                card.style.transform = isSelected ? 'translateY(-1px)' : 'none';
+            });
+        } finally {
+            this._syncing = false;
+        }
+    }
+
+    _syncToDecorOverlay() {
+        if (this._syncing) return;
+        const ov = this._ensureDecorOverlay(this._getVal('rdp-style-select') || 'dark_floating_dust');
+        if (!ov) return;
+        ov.decor_style = this._getVal('rdp-style-select') || ov.decor_style || 'dark_floating_dust';
+        ov.decor_dark_enabled = Boolean(this._getVal('rdp-dark-enabled'));
+        ov.decor_dark_vignette = Number(this._getVal('rdp-dark-vignette') ?? 0);
+        ov.decor_vignette_spread = Number(this._getVal('rdp-vignette-spread') ?? 55);
+        ov.decor_dark_tint = this._getVal('rdp-dark-tint') || '#05070C';
+        ov.decor_grain_enabled = Boolean(this._getVal('rdp-grain-enabled'));
+        ov.decor_grain_intensity = Number(this._getVal('rdp-grain-intensity') ?? 0);
+        ov.decor_grain_size = Number(this._getVal('rdp-grain-size') ?? 100);
+        ov.decor_grain_warmth = Number(this._getVal('rdp-grain-warmth') ?? 0);
+        ov.decor_film_scratches = Boolean(this._getVal('rdp-film-scratches'));
+        ov.decor_light_leak = Boolean(this._getVal('rdp-light-leak'));
+        ov.decor_floating_particles = Boolean(this._getVal('rdp-floating-particles'));
+        ov.decor_particle_mode = this._getVal('rdp-particle-mode') || 'dust';
+        ov.decor_glow_stars = Boolean(this._getVal('rdp-glow-stars'));
+        ov.decor_snowflakes = Boolean(this._getVal('rdp-snowflakes'));
+        ov.decor_corner_ornaments = Boolean(this._getVal('rdp-corner-ornaments'));
+        ov.decor_edge_garland = Boolean(this._getVal('rdp-edge-garland'));
+        ov.decor_layout = this._getVal('rdp-layout') || 'edges_and_float';
+        ov.decor_density = Number(this._getVal('rdp-density') ?? 55);
+        ov.decor_size = Number(this._getVal('rdp-size') ?? 100);
+        ov.decor_glow = Number(this._getVal('rdp-glow') ?? 100);
+        ov.decor_speed = Number(this._getVal('rdp-speed') ?? 100);
+        ov.decor_margin = Number(this._getVal('rdp-margin') ?? 36);
+        ov.decor_center_clear = Number(this._getVal('rdp-center-clear') ?? 65);
+        ov.opacity = Number(this._getVal('rdp-opacity') ?? 255);
+        ov.decor_color1 = this._getVal('rdp-color1') || '#FFD700';
+        ov.decor_color2 = this._getVal('rdp-color2') || '#FFFDF5';
+
+        this._renderLayerList();
+        this._syncScopeAndRender(ov);
+        if (this.linkedOverlayPanel) {
+            this.linkedOverlayPanel._refreshList();
+            if (this.linkedOverlayPanel._selectedOv?.id === ov.id) {
+                this.linkedOverlayPanel._syncFromOverlay(ov);
+            }
+        }
+    }
+
+    _syncScopeAndRender(ov) {
+        const applyAll = this.container?.querySelector('#rdp-apply-all')?.checked !== false;
+        if (applyAll && ov && this.linkedOverlayPanel && typeof this.linkedOverlayPanel._applyGenericOverlayStyleToAllTasks === 'function') {
+            const scope = this.container?.querySelector('#rdp-style-scope')?.value || 'folder';
+            const mainScope = document.getElementById('rop-style-scope');
+            if (mainScope) mainScope.value = scope;
+            if (scope !== 'task') {
+                this.linkedOverlayPanel._applyGenericOverlayStyleToAllTasks(ov);
+            }
+        }
+        if (typeof this.videoCanvas?.onOverlayChange === 'function') {
+            this.videoCanvas.onOverlayChange(ov);
+        }
+    }
+
+    _renderLayerList() {
+        const listEl = this.container?.querySelector('#rdp-layer-list');
+        if (!listEl) return;
+        const decors = this._getDecorOverlays();
+        const styles = window.ReelsOverlay?.DECOR_OVERLAY_STYLES || {};
+        if (!decors.length) {
+            listEl.innerHTML = `<div style="padding:6px 8px;border-radius:6px;background:rgba(99,102,241,0.12);border:1px dashed rgba(99,102,241,0.4);color:#c7d2fe;font-size:11px;">💡 当前任务暂未添加点缀/颗粒层。直接点击下方任意 30 款卡片即可一键添加并实时预览！</div>`;
+            return;
+        }
+        const selected = this._getSelectedDecor();
+        listEl.innerHTML = decors.map((d, idx) => {
+            const isSel = selected && selected.id === d.id;
+            const title = styles[d.decor_style]?.name || d.name || `点缀图层 #${idx + 1}`;
+            const isHidden = Boolean(d.disabled) || (d.opacity !== undefined && d.opacity <= 0);
+            return `
+                <div class="rdp-layer-item" data-ov-id="${d.id}"
+                    style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;background:${isSel ? 'rgba(79,70,229,0.28)' : 'rgba(255,255,255,0.04)'};border:1px solid ${isSel ? '#818cf8' : 'rgba(255,255,255,0.1)'};">
+                    <label style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;cursor:pointer;margin:0;" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="rdp-layer-enable-check" data-ov-id="${d.id}" ${!isHidden ? 'checked' : ''} title="打勾启用该点缀层 / 取消勾选隐藏并跳过该层" style="width:14px;height:14px;accent-color:#10b981;cursor:pointer;flex-shrink:0;">
+                        <span class="rdp-layer-title-span" data-ov-id="${d.id}" style="font-size:11px;font-weight:${isSel ? '700' : '500'};color:${isHidden ? '#64748b' : '#f8fafc'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            图层 ${idx + 1}: ${title}
+                        </span>
+                    </label>
+                    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+                        <button type="button" class="rdp-layer-vis-btn" data-ov-id="${d.id}" title="显示/隐藏该层" style="background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:12px;padding:0 3px;">${isHidden ? '🚫' : '👁️'}</button>
+                        <button type="button" class="rdp-layer-del-btn" data-ov-id="${d.id}" title="删除该点缀层" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:12px;padding:0 3px;">✕</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        listEl.querySelectorAll('.rdp-layer-item, .rdp-layer-title-span').forEach(row => {
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('button') || e.target.classList.contains('rdp-layer-enable-check')) return;
+                this._selectedDecorId = row.dataset.ovId || row.closest('.rdp-layer-item')?.dataset.ovId;
+                const ov = this._getSelectedDecor();
+                if (ov) this._syncFromDecorOverlay(ov);
+                this._renderLayerList();
+            });
+        });
+
+        const toggleLayerVisibility = (id, forceEnabled = null) => {
+            const ov = this._getDecorOverlays().find(o => o.id === id);
+            if (!ov) return;
+            const currentlyHidden = Boolean(ov.disabled) || (ov.opacity !== undefined && ov.opacity <= 0);
+            const nextEnabled = forceEnabled !== null ? Boolean(forceEnabled) : currentlyHidden;
+            if (nextEnabled) {
+                ov.disabled = false;
+                if (ov.opacity !== undefined && ov.opacity <= 0) {
+                    ov.opacity = ov._prevOpacity || 255;
+                }
+            } else {
+                ov.disabled = true;
+            }
+            this._syncFromDecorOverlay(ov);
+            this._renderLayerList();
+            this._syncScopeAndRender(ov);
+        };
+
+        listEl.querySelectorAll('.rdp-layer-enable-check').forEach(chk => {
+            chk.addEventListener('change', (e) => {
+                e.stopPropagation();
+                toggleLayerVisibility(chk.dataset.ovId, chk.checked);
+            });
+        });
+
+        listEl.querySelectorAll('.rdp-layer-vis-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleLayerVisibility(btn.dataset.ovId, null);
+            });
+        });
+
+        listEl.querySelectorAll('.rdp-layer-del-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.ovId;
+                if (this.videoCanvas && typeof this.videoCanvas.removeOverlay === 'function') {
+                    this.videoCanvas.removeOverlay(id);
+                }
+                if (this._selectedDecorId === id) this._selectedDecorId = null;
+                this.refresh();
+                if (this.linkedOverlayPanel) this.linkedOverlayPanel._refreshList();
+            });
+        });
+    }
+
+    refresh() {
+        const mainScope = document.getElementById('rop-style-scope');
+        const rdpScope = this.container?.querySelector('#rdp-style-scope');
+        if (mainScope && rdpScope) rdpScope.value = mainScope.value;
+        const globalToggle = document.getElementById('reels-decor-toggle');
+        if (globalToggle) {
+            this._syncMasterEnableUI(globalToggle.checked);
+        }
+        this._renderLayerList();
+        const ov = this._getSelectedDecor();
+        if (ov) {
+            this._syncFromDecorOverlay(ov);
+        }
+    }
+}
+
 // Export
-if (typeof window !== 'undefined') window.ReelsOverlayPanel = ReelsOverlayPanel;
+if (typeof window !== 'undefined') {
+    window.ReelsOverlayPanel = ReelsOverlayPanel;
+    window.ReelsDecorPanel = ReelsDecorPanel;
+}
