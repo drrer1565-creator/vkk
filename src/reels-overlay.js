@@ -3724,6 +3724,8 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
 
     // ── 计算标题占用高度 ──
     let titleOccupiedH = 0;
+    let _fullTitleBlockH = 0;
+    let _titleGap = parseFloat(ov.scroll_title_gap ?? 20);
     let scrollTitleText = (ov.scroll_title || '').trim();
     if (ov.scroll_title_uppercase !== false) scrollTitleText = scrollTitleText.toUpperCase();
     const titleIndependent = ov.scroll_title_independent === true;
@@ -3752,7 +3754,9 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
             actualTitleFontSize = actualTrySize;
             if (!ov.scroll_title_auto_fit || !(tMaxH > 0) || blockH <= tMaxH) break;
         }
-        titleOccupiedH = titleIndependent ? 0 : (titleLines.length * tLineH + tGap);
+        _fullTitleBlockH = titleLines.length * tLineH;
+        _titleGap = tGap;
+        titleOccupiedH = titleIndependent ? 0 : (_fullTitleBlockH + tGap);
     }
 
     // ── 自动缩放字号：确保文字在裁切区内全部可见 ──
@@ -3787,6 +3791,42 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
         lines = _wrapText(ctx, content, textW, parseFloat(ov.scroll_letter_spacing || 0));
     }
 
+    // ── 预计算固定标题实际绘制高度与正文裁切窗口 (供仅包裹正文区 & 画板长度使用) ──
+    const _titleFixed = ov.scroll_title_fixed !== false && Boolean(scrollTitleText);
+    const _titleCustomDeltaY = (ov.scroll_title_y != null && Number.isFinite(parseFloat(ov.scroll_title_y)))
+        ? (parseFloat(ov.scroll_title_y) - parseFloat(ov.y ?? (_origClipY - offsetY)))
+        : 0;
+    const _fixedTitleTopY = (!ov.bg_body_only && !titleIndependent && (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0))
+        ? (clipY + _titleCustomDeltaY)
+        : (ov.scroll_title_y != null ? (parseFloat(ov.scroll_title_y) + offsetY) : _origClipY);
+    const _titleBottomWithGapY = _titleFixed
+        ? Math.max(_origClipY + _fullTitleBlockH + _titleGap, _fixedTitleTopY + _fullTitleBlockH + Math.max(12, _titleGap))
+        : _origClipY;
+
+    let bodyClipTopBase = (_titleFixed && !titleIndependent) ? (clipY + titleOccupiedH) : clipY;
+    let bodyClipBotBase = clipY + clipH;
+    if (!ov.bg_fullscreen && ov.bg_body_only) {
+        const baseBodyY = _titleBottomWithGapY;
+        const baseBodyBot = _origClipY + _origClipH;
+        if (_rawBgH > 0) {
+            const targetBodyCardH = Math.max(60, _rawBgH);
+            const targetBodyCardY = Math.max(baseBodyY, baseBodyBot - targetBodyCardH) + _bgOffY;
+            const innerY = Math.min(24, Math.max(8, targetBodyCardH * 0.035));
+            bodyClipTopBase = targetBodyCardY + innerY;
+            bodyClipBotBase = targetBodyCardY + targetBodyCardH - innerY;
+        } else {
+            bodyClipTopBase = baseBodyY - Math.min(0, _padT0) + _bgOffY;
+            bodyClipBotBase = baseBodyBot + Math.min(0, _padB0) + _bgOffY;
+        }
+    }
+    if ((_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0) && fromY > bodyClipBotBase - 16) {
+        const featherB_clamp = Math.max(0, parseFloat(ov.feather_bottom ?? 0)) * 0.5;
+        fromY = Math.max(bodyClipTopBase, bodyClipBotBase - featherB_clamp - lineHeight * 0.35);
+    }
+    if (ov.bg_body_only && _rawBgH > 0 && fromY >= toY && fromY < bodyClipTopBase) {
+        fromY = Math.min(bodyClipBotBase - lineHeight * 0.35, bodyClipTopBase + Math.max(0, parseFloat(ov.feather_top ?? 0)) * 0.4);
+    }
+
     // ── 自动停止：到达最终位置后冻结 ──
     let effectiveToY = toY;
     ctx.save();
@@ -3818,7 +3858,7 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
         // Never reverse an upward scroll if a short text is already fully inside.
         const featherBottom = Math.max(0, Number(ov.feather_bottom) || 0) + Math.max(0, Number(ov.feather_bottom_offset) || 0);
         const bottomClearance = featherBottom + lineHeight * 0.4;
-        effectiveToY = Math.min(fromY, clipY + clipH - bottomClearance - 1 - bodyBottomOffset);
+        effectiveToY = Math.min(fromY, bodyClipBotBase - bottomClearance - 1 - bodyBottomOffset);
     } else if (ov.scroll_auto_stop) {
         // 正文行高度
         let totalTextH = lines.length * lineHeight;
@@ -3833,8 +3873,8 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
         const featherB = parseFloat(ov.feather_bottom ?? 0) + parseFloat(ov.feather_bottom_offset ?? 0);
 
         // 固定标题模式下正文 clip 区会缩小
-        const bodyClipTop = (titleFixed && !titleIndependent) ? (clipY + titleOccupiedH) : clipY;
-        const bodyClipBot = clipY + clipH;
+        const bodyClipTop = bodyClipTopBase;
+        const bodyClipBot = bodyClipBotBase;
         const bodyClipH = bodyClipBot - bodyClipTop;
 
         // 向上滚 (fromY > toY)
@@ -3863,25 +3903,7 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
 
     const curAxisX = fromX + (toX - fromX) * progress;
     const curX  = useCenterAnchor ? curAxisX - textW / 2 : curAxisX;
-    const _titleFixed = ov.scroll_title_fixed !== false && (ov.scroll_title || '').trim();
     const featherT_static = Math.max(0, parseFloat(ov.feather_top ?? 0)) + Math.max(0, parseFloat(ov.feather_top_offset ?? 0));
-    let bodyClipTopBase = (_titleFixed && !titleIndependent) ? (clipY + titleOccupiedH) : clipY;
-    let bodyClipBotBase = clipY + clipH;
-    if (!ov.bg_fullscreen && ov.bg_body_only && (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0)) {
-        const baseBodyY = (_titleFixed && !titleIndependent) ? (_origClipY + titleOccupiedH) : _origClipY;
-        const baseBodyH = (_titleFixed && !titleIndependent) ? Math.max(40, _origClipH - titleOccupiedH) : _origClipH;
-        const targetBodyCardH = _rawBgH > 0 ? Math.max(60, _rawBgH) : Math.max(60, baseBodyH + _padT0 + _padB0);
-        const targetBodyCardY = _rawBgH > 0
-            ? (baseBodyY + baseBodyH / 2 - targetBodyCardH / 2 + _bgOffY)
-            : (baseBodyY - _padT0 + _bgOffY);
-        const innerY = Math.min(24, Math.max(8, targetBodyCardH * 0.035));
-        bodyClipTopBase = targetBodyCardY + innerY;
-        bodyClipBotBase = targetBodyCardY + targetBodyCardH - innerY;
-    }
-    if ((_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0) && fromY > bodyClipBotBase - 16) {
-        const featherB_clamp = Math.max(0, parseFloat(ov.feather_bottom ?? 0)) * 0.5;
-        fromY = Math.max(bodyClipTopBase, bodyClipBotBase - featherB_clamp - lineHeight * 0.35);
-    }
     let curY;
     let _scrollOriginFromY = fromY;
     if (ov.scroll_static) {
@@ -3973,29 +3995,56 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
     if (ov._scrollBindingMeasureOnly) return;
 
     // ── 统一计算卡片背景与边框几何尺寸 (支持显式宽度/长度、负边距、仅包裹正文区) ──
-    const _baseCardRefX = _origClipX;
-    const _baseCardRefW = _origClipW;
-    const _baseCardRefY = (ov.bg_body_only && _titleFixed && !titleIndependent)
-        ? (_origClipY + titleOccupiedH)
-        : _origClipY;
-    const _baseCardRefH = (ov.bg_body_only && _titleFixed && !titleIndependent)
-        ? Math.max(40, _origClipH - titleOccupiedH)
-        : _origClipH;
-    const _cardW = ov.bg_fullscreen
-        ? canvasW
-        : (_rawBgW > 0 ? Math.max(60, _rawBgW) : Math.max(60, _baseCardRefW + _padL0 + _padR0));
-    const _cardH = ov.bg_fullscreen
-        ? canvasH
-        : (_rawBgH > 0 ? Math.max(60, _rawBgH) : Math.max(60, _baseCardRefH + _padT0 + _padB0));
-    const _cardX = ov.bg_fullscreen
-        ? 0
-        : (_rawBgW > 0 ? (_baseCardRefX + _baseCardRefW / 2 - _cardW / 2 + _bgOffX) : (_baseCardRefX - _padL0 + _bgOffX));
-    const _cardY = ov.bg_fullscreen
-        ? 0
-        : (_rawBgH > 0 ? (_baseCardRefY + _baseCardRefH / 2 - _cardH / 2 + _bgOffY) : (_baseCardRefY - _padT0 + _bgOffY));
+    let _cardW, _cardH, _cardX, _cardY;
+    if (ov.bg_fullscreen) {
+        _cardW = canvasW;
+        _cardH = canvasH;
+        _cardX = 0;
+        _cardY = 0;
+    } else {
+        const _baseCardRefX = _origClipX;
+        const _baseCardRefW = _origClipW;
+        _cardW = _rawBgW > 0 ? Math.max(60, _rawBgW) : Math.max(60, _baseCardRefW + _padL0 + _padR0);
+        _cardX = _rawBgW > 0
+            ? (_baseCardRefX + _baseCardRefW / 2 - _cardW / 2 + _bgOffX)
+            : (_baseCardRefX - _padL0 + _bgOffX);
+
+        if (ov.bg_body_only) {
+            const baseBodyY = _titleBottomWithGapY;
+            const baseBodyBot = _origClipY + _origClipH;
+            if (_rawBgH > 0) {
+                _cardH = Math.max(60, _rawBgH);
+                _cardY = Math.max(baseBodyY, baseBodyBot - _cardH) + _bgOffY;
+            } else {
+                // 自动高度 + 仅包裹正文区：严格位于标题下方，且紧密包裹当前可见的正文区，不遮挡中间空白视频画面
+                const padTopVis = Math.max(16, Math.min(36, _padT0 > 0 ? _padT0 * 0.5 : 22));
+                const padBotVis = Math.max(16, Math.min(40, _padB0 > 0 ? _padB0 * 0.6 : 26));
+                const minTopAllowed = baseBodyY - Math.min(0, _padT0) + _bgOffY;
+                const maxBotAllowed = baseBodyBot + Math.max(0, _padB0) + _bgOffY;
+                if (lines && lines.length > 0) {
+                    const textTopY = curY - padTopVis + _bgOffY;
+                    const textBotY = curY + lines.length * lineHeight + padBotVis + _bgOffY;
+                    const clampedTop = Math.max(minTopAllowed, Math.min(maxBotAllowed - 80, textTopY));
+                    const clampedBot = Math.max(clampedTop + 80, Math.min(maxBotAllowed, textBotY));
+                    _cardY = clampedTop;
+                    _cardH = Math.max(80, clampedBot - clampedTop);
+                } else {
+                    _cardY = minTopAllowed;
+                    _cardH = Math.max(80, maxBotAllowed - minTopAllowed);
+                }
+            }
+        } else {
+            const _baseCardRefY = _origClipY;
+            const _baseCardRefH = _origClipH;
+            _cardH = _rawBgH > 0 ? Math.max(60, _rawBgH) : Math.max(60, _baseCardRefH + _padT0 + _padB0);
+            _cardY = _rawBgH > 0
+                ? (_baseCardRefY + _baseCardRefH / 2 - _cardH / 2 + _bgOffY)
+                : (_baseCardRefY - _padT0 + _bgOffY);
+        }
+    }
     const _cardRad = ov.bg_fullscreen ? 0 : parseFloat(ov.bg_radius ?? 12);
 
-    if (!ov.bg_fullscreen && (ov.bg_enabled || ov.bg_border_enabled || _rawBgW > 0 || _rawBgH > 0)) {
+    if (!ov.bg_fullscreen && (ov.bg_enabled || ov.bg_border_enabled || ov.bg_body_only || _rawBgW > 0 || _rawBgH > 0)) {
         ov._renderedX = _cardX;
         ov._renderedY = _cardY;
         ov._renderedW = _cardW;
@@ -4174,8 +4223,8 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
             const titleBlockH = titleLines.length * tLineH;
 
             // ── 1. 绘制固定标题 (在覆层顶部，不受裁切) ──
-            // 标题X/Y 只要填了值就生效，不需要勾选"独立位置"
-            const titleDrawY = ov.scroll_title_y != null ? parseFloat(ov.scroll_title_y) + offsetY : clipY;
+            // 标题X/Y：当卡片未勾选“仅包裹正文区”且调节了画板长度/偏移时，非独立标题跟随卡片顶部移动
+            const titleDrawY = _fixedTitleTopY;
             const titleAxisX = ov.scroll_title_x != null
                 ? parseFloat(ov.scroll_title_x) + offsetX
                 : (legacyDefaultLeftX ? (clipX + clipW / 2) : fromX);
@@ -4360,12 +4409,13 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
             ? ov._taskSegments
             : (typeof window !== 'undefined' && window._reelsState?.tasks?.[window._reelsState?.selectedIdx]?.segments) || null;
         const _twContext = { currentTime, start, end, effectiveDuration, segments: _twSegments };
-        const bodyClipY = (ov.bg_body_only && (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0))
+        const _titleDeductedH = titleIndependent ? 0 : Math.min(Math.max(0, clipH - 80), titleBlockH + tGap);
+        const bodyClipY = ov.bg_body_only
             ? bodyClipTopBase
-            : (titleIndependent ? clipY : (clipY + titleBlockH + tGap));
-        const bodyClipH = (ov.bg_body_only && (_rawBgH > 0 || _padT0 < 0 || _padB0 < 0 || _bgOffY !== 0))
-            ? (bodyClipBotBase - bodyClipTopBase)
-            : (titleIndependent ? clipH : (clipH - titleBlockH - tGap));
+            : (clipY + _titleDeductedH);
+        const bodyClipH = ov.bg_body_only
+            ? Math.max(40, bodyClipBotBase - bodyClipTopBase)
+            : Math.max(40, clipH - _titleDeductedH);
         if (bodyClipH > 0) {
             const ovProxy = Object.assign({}, ov, { _skipTitle: true });
             const hasFeather = featherTop > 0 || featherBottom > 0 || featherTopOff > 0 || featherBotOff > 0 || featherLeft > 0 || featherRight > 0 || featherLeftOff > 0 || featherRightOff > 0;
@@ -5574,13 +5624,19 @@ function _drawScrollTextBlock(ctx, ov, lines, textX, textY, textW, lineHeight, f
         const bbgPadBot = parseFloat(ov.scroll_body_bg_pad_bottom ?? (isBackingStyle ? 10 : 0));
         const bbgRad = parseFloat(ov.scroll_body_bg_radius ?? 12);
         const bodyBlockH = lines.length * lineHeight;
+        const rawBlockW = textW + bbgPadH * 2;
+        const rawBlockH = bodyBlockH + bbgPadTop + bbgPadBot;
+        const effBlockW = (Number(ov.bg_width) > 0) ? Math.max(60, Number(ov.bg_width)) : rawBlockW;
+        const effBlockH = (Number(ov.bg_height) > 0) ? Math.max(60, Number(ov.bg_height)) : rawBlockH;
+        const effBlockX = (textX - bbgPadH) + (rawBlockW - effBlockW) / 2 + (parseFloat(ov.bg_offset_x) || 0);
+        const effBlockY = (drawY - bbgPadTop) + (parseFloat(ov.bg_offset_y) || 0);
         if (useBlockBoardForBodyBg) {
             ReelsBrushEngine.drawThemedCardBackground(
                 ctx,
-                textX - bbgPadH,
-                drawY - bbgPadTop,
-                textW + bbgPadH * 2,
-                bodyBlockH + bbgPadTop + bbgPadBot,
+                effBlockX,
+                effBlockY,
+                effBlockW,
+                effBlockH,
                 bbgRad,
                 {
                     style: bbgStyle,
@@ -5635,7 +5691,7 @@ function _drawScrollTextBlock(ctx, ov, lines, textX, textY, textW, lineHeight, f
                     by += lineHeight;
                 }
             } else {
-                _roundRect(ctx, textX - bbgPadH, drawY - bbgPadTop, textW + bbgPadH * 2, bodyBlockH + bbgPadTop + bbgPadBot, bbgRad);
+                _roundRect(ctx, effBlockX, effBlockY, effBlockW, effBlockH, bbgRad);
                 ctx.fill();
             }
             ctx.restore();

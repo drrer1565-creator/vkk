@@ -681,21 +681,23 @@ class ReelsOverlayPanel {
                             <button type="button" class="rop-btn rop-scroll-card-bg-preset" data-bg-preset="xmas_cream_holly_letter" style="flex:1 1 45%;padding:4px 6px;font-size:11px;background:linear-gradient(135deg,#fcf8ee,#efe6d5);color:#991b1b;font-weight:700;border:1px solid #15803d;border-radius:5px;cursor:pointer;">🦌 圣诞冬青信纸卡</button>
                         </div>
                         <div style="display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px 6px;align-items:center;font-size:11px;margin-bottom:5px;padding:4px 6px;border-radius:5px;background:rgba(0,0,0,0.22);">
-                            <span style="color:#fde68a;white-space:nowrap;" title="0=自动跟随覆层宽度；调小可露出左右视频边缘与手撕边/边框">画板宽度</span>
+                            <span style="color:#fde68a;white-space:nowrap;" title="往左拉变窄、往右拉变宽；点“自动”恢复自适应宽度">画板宽度</span>
                             <div style="display:flex;align-items:center;gap:3px;">
-                                <input type="range" id="rop-scroll-bg-width-quick" class="rop-range" min="0" max="1080" step="10" value="0" style="flex:1;min-width:45px;">
-                                <input type="number" id="rop-scroll-bg-width-quick-num" class="rop-input" min="0" max="1920" step="10" value="0" style="width:52px;padding:1px 3px;font-size:11px;" title="0=自动">
+                                <input type="range" id="rop-scroll-bg-width-quick" class="rop-range" min="120" max="1080" step="10" value="940" style="flex:1;min-width:42px;">
+                                <input type="number" id="rop-scroll-bg-width-quick-num" class="rop-input" min="0" max="1920" step="10" value="940" style="width:48px;padding:1px 3px;font-size:11px;" title="输入具体像素宽度，或输入0恢复自动">
+                                <button type="button" id="rop-scroll-bg-width-auto-btn" class="rop-btn" style="padding:1px 4px;font-size:10px;background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.18);border-radius:3px;cursor:pointer;" title="恢复自动宽度">自动</button>
                             </div>
-                            <span style="color:#fde68a;white-space:nowrap;" title="0=自动跟随覆层高度；可直接调节背景画板与边框的上下长度">画板长度</span>
+                            <span style="color:#fde68a;white-space:nowrap;" title="往左拉缩短画板与边框上下长度、往右拉加长；点“自动”恢复自适应高度">画板长度</span>
                             <div style="display:flex;align-items:center;gap:3px;">
-                                <input type="range" id="rop-scroll-bg-height-quick" class="rop-range" min="0" max="1920" step="10" value="0" style="flex:1;min-width:45px;">
-                                <input type="number" id="rop-scroll-bg-height-quick-num" class="rop-input" min="0" max="1920" step="10" value="0" style="width:52px;padding:1px 3px;font-size:11px;" title="0=自动">
+                                <input type="range" id="rop-scroll-bg-height-quick" class="rop-range" min="120" max="1920" step="10" value="500" style="flex:1;min-width:42px;">
+                                <input type="number" id="rop-scroll-bg-height-quick-num" class="rop-input" min="0" max="1920" step="10" value="500" style="width:48px;padding:1px 3px;font-size:11px;" title="输入具体像素长度，或输入0恢复自动">
+                                <button type="button" id="rop-scroll-bg-height-auto-btn" class="rop-btn" style="padding:1px 4px;font-size:10px;background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.18);border-radius:3px;cursor:pointer;" title="恢复自动长度">自动</button>
                             </div>
                             <label style="grid-column:span 2;display:flex;align-items:center;gap:4px;cursor:pointer;color:#fef08a;margin:0;" title="开启后，报纸版面、报头线、撕边纹理与圣诞装饰会跟着字幕一起往上循环移动">
                                 <input type="checkbox" id="rop-scroll-bg-scroll-follow-quick" checked>
                                 <span>🔄 背景随字幕向上循环滚动</span>
                             </label>
-                            <label style="grid-column:span 2;display:flex;align-items:center;gap:4px;cursor:pointer;color:#cbd5e1;margin:0;" title="开启后，大背景/边框只包裹下方滚动正文区，不包裹顶部标题">
+                            <label style="grid-column:span 2;display:flex;align-items:center;gap:4px;cursor:pointer;color:#cbd5e1;margin:0;" title="开启后，大背景/边框只包裹下方滚动正文区，不包裹顶部标题，也不遮挡中间空白视频区">
                                 <input type="checkbox" id="rop-scroll-bg-body-only-quick">
                                 <span>📐 仅包裹正文区(不含标题)</span>
                             </label>
@@ -1191,9 +1193,9 @@ class ReelsOverlayPanel {
                             <span style="font-size:11px;color:var(--text-muted);">背景/边框不含顶部标题</span>
                         </div>
                         <label title="0=自动跟随覆层宽度；设置具体像素可直接控制背景画板与边框的宽度">画板/边框宽(0=自动)</label>
-                        <div class="rop-slider-combo"><input type="range" id="rop-scroll-bg-width" class="rop-range" min="0" max="1080" step="10" value="0"><input type="number" class="rop-num-readout" data-link="rop-scroll-bg-width" min="0" max="1920" step="10" value="0"></div>
+                        <div class="rop-slider-combo"><input type="range" id="rop-scroll-bg-width" class="rop-range" min="120" max="1080" step="10" value="940"><input type="number" class="rop-num-readout" data-link="rop-scroll-bg-width" min="0" max="1920" step="10" value="940"></div>
                         <label title="0=自动跟随覆层高度；设置具体像素可直接控制背景画板与边框的上下长度">画板/边框长(0=自动)</label>
-                        <div class="rop-slider-combo"><input type="range" id="rop-scroll-bg-height" class="rop-range" min="0" max="1920" step="10" value="0"><input type="number" class="rop-num-readout" data-link="rop-scroll-bg-height" min="0" max="1920" step="10" value="0"></div>
+                        <div class="rop-slider-combo"><input type="range" id="rop-scroll-bg-height" class="rop-range" min="120" max="1920" step="10" value="500"><input type="number" class="rop-num-readout" data-link="rop-scroll-bg-height" min="0" max="1920" step="10" value="500"></div>
                         <label title="微调背景画板与边框的左右位置">水平偏移X</label><input type="number" id="rop-scroll-bg-offset-x" class="rop-input" min="-1000" max="1000" step="5" value="0">
                         <label title="微调背景画板与边框的上下位置">垂直偏移Y</label><input type="number" id="rop-scroll-bg-offset-y" class="rop-input" min="-1000" max="1000" step="5" value="0">
                         <label>圆角</label><input type="number" id="rop-scroll-bg-radius" class="rop-input" min="0" max="200" value="12">
@@ -2295,8 +2297,8 @@ class ReelsOverlayPanel {
             'rop-scroll-feather-top', 'rop-scroll-feather-bottom', 'rop-scroll-feather-top-offset', 'rop-scroll-feather-bottom-offset',
             'rop-scroll-feather-left', 'rop-scroll-feather-right', 'rop-scroll-feather-left-offset', 'rop-scroll-feather-right-offset',
             'rop-scroll-bg-enabled', 'rop-scroll-bg-style', 'rop-scroll-bg-color', 'rop-scroll-bg-opacity',
-            'rop-scroll-bg-scroll-follow', 'rop-scroll-bg-body-only',
-            'rop-scroll-bg-width', 'rop-scroll-bg-height', 'rop-scroll-bg-offset-x', 'rop-scroll-bg-offset-y',
+            'rop-scroll-bg-scroll-follow',
+            'rop-scroll-bg-offset-x', 'rop-scroll-bg-offset-y',
             'rop-scroll-bg-radius', 'rop-scroll-bg-pad-top', 'rop-scroll-bg-pad-bottom',
             'rop-scroll-bg-pad-left', 'rop-scroll-bg-pad-right', 'rop-scroll-bg-fullscreen',
             'rop-scroll-bg-border-enabled', 'rop-scroll-bg-border-sides', 'rop-scroll-bg-border-color', 'rop-scroll-bg-border-width',
@@ -2500,8 +2502,14 @@ class ReelsOverlayPanel {
                 this._val('rop-scroll-bg-scroll-follow', true);
                 this._val('rop-scroll-bg-opacity', 96);
                 this._val('rop-scroll-bg-radius', 20);
-                if (Number(this._get('rop-scroll-bg-width') || 0) <= 0 && (this._selectedOv?.w ?? 1080) >= 1020) {
-                    this._val('rop-scroll-bg-width', 940);
+                if (this._getScrollBgStoredSize('width') <= 0 && (this._selectedOv?.w ?? 1080) >= 1020) {
+                    this._setScrollBgSizeField('width', 940, this._selectedOv);
+                }
+                const hasFixedTitle = Boolean((this._selectedOv?.scroll_title || '').trim()) && this._selectedOv?.scroll_title_fixed !== false;
+                const hasLargeMiddleVideoGap = hasFixedTitle && ((Number(this._selectedOv?.scroll_from_y ?? 960) - Number(this._selectedOv?.y ?? 400)) >= 420);
+                if (hasLargeMiddleVideoGap && this._selectedOv?.bg_body_only === undefined) {
+                    this._val('rop-scroll-bg-body-only', true);
+                    this._val('rop-scroll-bg-body-only-quick', true);
                 }
                 if (Number(this._get('rop-scroll-bg-pad-top') || 0) < 36) this._val('rop-scroll-bg-pad-top', 48);
                 if (Number(this._get('rop-scroll-bg-pad-bottom') || 0) < 36) this._val('rop-scroll-bg-pad-bottom', 48);
@@ -2571,6 +2579,63 @@ class ReelsOverlayPanel {
             });
         });
         // 顶部快捷调节栏 ↔ 卡片背景/正文底衬参数双向联动
+        const ensureScrollBgVisibleOnEdit = () => {
+            if (!this._selectedOv || this._selectedOv.type !== 'scroll') return;
+            const bgOn = Boolean(this._get('rop-scroll-bg-enabled'));
+            const borderOn = Boolean(this._get('rop-scroll-bg-border-enabled'));
+            const bodyBgOn = Boolean(this._get('rop-scroll-body-bg-enabled'));
+            if (!bgOn && !borderOn && !bodyBgOn) {
+                this._val('rop-scroll-bg-enabled', true);
+            }
+        };
+        const bindScrollBgDimControls = (dim) => {
+            const mainRange = this.container.querySelector('#rop-scroll-bg-' + dim);
+            const mainNum = this.container.querySelector(`.rop-num-readout[data-link="rop-scroll-bg-${dim}"]`);
+            const qRange = this.container.querySelector('#rop-scroll-bg-' + dim + '-quick');
+            const qNum = this.container.querySelector('#rop-scroll-bg-' + dim + '-quick-num');
+            const autoBtn = this.container.querySelector('#rop-scroll-bg-' + dim + '-auto-btn');
+            const applyDimVal = (rawVal, fromRange = false) => {
+                const n = Number(rawVal);
+                if (!Number.isFinite(n)) return;
+                ensureScrollBgVisibleOnEdit();
+                if (!fromRange && n <= 0) {
+                    if (this._selectedOv) this._selectedOv['bg_' + dim] = 0;
+                    this._setScrollBgSizeField(dim, 0, this._selectedOv);
+                } else {
+                    const clamped = Math.max(fromRange ? 120 : 60, Math.round(n));
+                    if (this._selectedOv) this._selectedOv['bg_' + dim] = clamped;
+                    this._setScrollBgSizeField(dim, clamped, this._selectedOv);
+                }
+                this._syncToOverlay();
+            };
+            if (qRange) {
+                qRange.addEventListener('input', () => applyDimVal(qRange.value, true));
+                qRange.addEventListener('change', () => applyDimVal(qRange.value, true));
+            }
+            if (qNum) {
+                qNum.addEventListener('input', () => applyDimVal(qNum.value, false));
+                qNum.addEventListener('change', () => applyDimVal(qNum.value, false));
+            }
+            if (mainRange) {
+                mainRange.addEventListener('input', () => applyDimVal(mainRange.value, true));
+                mainRange.addEventListener('change', () => applyDimVal(mainRange.value, true));
+            }
+            if (mainNum) {
+                mainNum.addEventListener('input', () => applyDimVal(mainNum.value, false));
+                mainNum.addEventListener('change', () => applyDimVal(mainNum.value, false));
+            }
+            if (autoBtn) {
+                autoBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (this._selectedOv) this._selectedOv['bg_' + dim] = 0;
+                    this._setScrollBgSizeField(dim, 0, this._selectedOv);
+                    this._syncToOverlay();
+                });
+            }
+        };
+        bindScrollBgDimControls('width');
+        bindScrollBgDimControls('height');
+
         const bindQuickPair = (quickRangeId, quickNumId, targetIds, onQuickInput) => {
             const qRange = this.container.querySelector('#' + quickRangeId);
             const qNum = this.container.querySelector('#' + quickNumId);
@@ -2594,20 +2659,39 @@ class ReelsOverlayPanel {
                 qNum.addEventListener('change', () => applyQuickVal(qNum.value));
             }
         };
-        bindQuickPair('rop-scroll-bg-width-quick', 'rop-scroll-bg-width-quick-num', ['rop-scroll-bg-width']);
-        bindQuickPair('rop-scroll-bg-height-quick', 'rop-scroll-bg-height-quick-num', ['rop-scroll-bg-height']);
         bindQuickPair('rop-scroll-body-bg-pad-h-quick', 'rop-scroll-body-bg-pad-h-quick-num', ['rop-scroll-body-bg-pad-h']);
         bindQuickPair('rop-scroll-body-bg-pad-v-quick', 'rop-scroll-body-bg-pad-v-quick-num', ['rop-scroll-body-bg-pad-top', 'rop-scroll-body-bg-pad-bottom']);
-        const bindQuickCheckbox = (quickChkId, targetChkId) => {
+        const bindQuickCheckbox = (quickChkId, targetChkId, onToggle) => {
             const qChk = this.container.querySelector('#' + quickChkId);
-            if (!qChk) return;
-            qChk.addEventListener('change', () => {
-                this._val(targetChkId, qChk.checked);
-                this._syncToOverlay();
-            });
+            const tChk = this.container.querySelector('#' + targetChkId);
+            if (qChk) {
+                qChk.addEventListener('change', () => {
+                    this._val(targetChkId, qChk.checked);
+                    if (typeof onToggle === 'function') onToggle(qChk.checked);
+                    this._syncToOverlay();
+                });
+            }
+            if (tChk) {
+                tChk.addEventListener('change', () => {
+                    this._val(quickChkId, tChk.checked);
+                    if (typeof onToggle === 'function') onToggle(tChk.checked);
+                    this._syncToOverlay();
+                });
+            }
         };
         bindQuickCheckbox('rop-scroll-bg-scroll-follow-quick', 'rop-scroll-bg-scroll-follow');
-        bindQuickCheckbox('rop-scroll-bg-body-only-quick', 'rop-scroll-bg-body-only');
+        bindQuickCheckbox('rop-scroll-bg-body-only-quick', 'rop-scroll-bg-body-only', (checked) => {
+            ensureScrollBgVisibleOnEdit();
+            if (this._selectedOv) this._selectedOv.bg_body_only = Boolean(checked);
+            const curStoredH = this._getScrollBgStoredSize('height');
+            const fullH = Number(this._selectedOv?.h) || 1120;
+            if (checked && curStoredH > fullH * 0.65) {
+                if (this._selectedOv) this._selectedOv.bg_height = 0;
+                this._setScrollBgSizeField('height', 0, this._selectedOv);
+            } else if (curStoredH <= 0) {
+                this._setScrollBgSizeField('height', 0, this._selectedOv);
+            }
+        });
 
         // ✨ 点缀装饰图层快捷预设按钮与尺寸按钮
         const applyDecorStylePreset = (styleId) => {
@@ -3055,7 +3139,7 @@ class ReelsOverlayPanel {
         // Slider ↔ Number readout bidirectional linking
         this.container.querySelectorAll('.rop-num-readout').forEach(numEl => {
             const linkId = numEl.dataset.link;
-            if (!linkId) return;
+            if (!linkId || linkId === 'rop-scroll-bg-width' || linkId === 'rop-scroll-bg-height') return;
             const rangeEl = this.container.querySelector('#' + linkId);
             if (!rangeEl) return;
             // Range → Number
@@ -4520,6 +4604,60 @@ class ReelsOverlayPanel {
         return value;
     }
 
+    _getDefaultScrollBgSize(dim, ov = this._selectedOv) {
+        if (dim === 'width') {
+            const baseW = Number(ov?.w ?? this._get('rop-w')) || 1000;
+            const padL = Number(ov?.bg_padding_left ?? this._get('rop-scroll-bg-pad-left') ?? 16);
+            const padR = Number(ov?.bg_padding_right ?? this._get('rop-scroll-bg-pad-right') ?? 16);
+            return Math.round(Math.max(120, Math.min(1080, baseW + padL + padR)) / 10) * 10;
+        }
+        const baseH = Number(ov?.h ?? this._get('rop-h')) || 1120;
+        const bodyOnly = Boolean(ov?.bg_body_only ?? this._get('rop-scroll-bg-body-only'));
+        if (bodyOnly) {
+            const renderedH = Number(ov?._renderedH) || 0;
+            const targetH = (renderedH >= 120 && renderedH < baseH) ? renderedH : (baseH * 0.45);
+            return Math.round(Math.max(120, Math.min(1920, targetH)) / 10) * 10;
+        }
+        const padT = Number(ov?.bg_padding_top ?? this._get('rop-scroll-bg-pad-top') ?? 55);
+        const padB = Number(ov?.bg_padding_bottom ?? this._get('rop-scroll-bg-pad-bottom') ?? 55);
+        return Math.round(Math.max(120, Math.min(1920, baseH + padT + padB)) / 10) * 10;
+    }
+
+    _setScrollBgSizeField(dim, storedValue, ov = this._selectedOv) {
+        const isAuto = !(Number(storedValue) > 0);
+        const defVal = this._getDefaultScrollBgSize(dim, ov);
+        const displayVal = isAuto ? defVal : Math.round(Number(storedValue));
+        const mainId = 'rop-scroll-bg-' + dim;
+        const quickRangeId = 'rop-scroll-bg-' + dim + '-quick';
+        const quickNumId = 'rop-scroll-bg-' + dim + '-quick-num';
+        this._val(mainId, displayVal);
+        this._val(quickRangeId, displayVal);
+        this._val(quickNumId, displayVal);
+        for (const id of [mainId, quickRangeId, quickNumId]) {
+            const el = this.container.querySelector('#' + id);
+            if (el) {
+                el.dataset.isAuto = isAuto ? '1' : '0';
+                el.dataset.userEdited = isAuto ? '0' : '1';
+                el.dataset.default = String(defVal);
+            }
+        }
+        const readout = this.container.querySelector(`.rop-num-readout[data-link="${mainId}"]`);
+        if (readout) readout.dataset.default = String(defVal);
+    }
+
+    _getScrollBgStoredSize(dim) {
+        const mainId = 'rop-scroll-bg-' + dim;
+        const el = this.container.querySelector('#' + mainId);
+        if (!el) return 0;
+        const rawVal = parseFloat(el.value);
+        if (!Number.isFinite(rawVal) || rawVal <= 0) return 0;
+        const defaultValue = Math.max(120, parseFloat(el.dataset.default) || 120);
+        if (el.dataset.isAuto === '1' && el.dataset.userEdited !== '1' && Math.abs(rawVal - defaultValue) < 1) {
+            return 0;
+        }
+        return Math.max(60, Math.round(rawVal));
+    }
+
     _resolvePanelWeight(rawWeight, rawBold, defaultBold = 700, defaultNormal = 400) {
         const parsed = parseInt(rawWeight, 10);
         let w = Number.isFinite(parsed) ? parsed : (rawBold ? defaultBold : defaultNormal);
@@ -5139,12 +5277,6 @@ class ReelsOverlayPanel {
             this._val('rop-scroll-bg-scroll-follow-quick', ov.bg_scroll_follow !== false);
             this._val('rop-scroll-bg-body-only', ov.bg_body_only === true);
             this._val('rop-scroll-bg-body-only-quick', ov.bg_body_only === true);
-            this._val('rop-scroll-bg-width', ov.bg_width ?? 0);
-            this._val('rop-scroll-bg-width-quick', ov.bg_width ?? 0);
-            this._val('rop-scroll-bg-width-quick-num', ov.bg_width ?? 0);
-            this._val('rop-scroll-bg-height', ov.bg_height ?? 0);
-            this._val('rop-scroll-bg-height-quick', ov.bg_height ?? 0);
-            this._val('rop-scroll-bg-height-quick-num', ov.bg_height ?? 0);
             this._val('rop-scroll-bg-offset-x', ov.bg_offset_x ?? 0);
             this._val('rop-scroll-bg-offset-y', ov.bg_offset_y ?? 0);
             this._val('rop-scroll-bg-radius', ov.bg_radius ?? 12);
@@ -5152,6 +5284,8 @@ class ReelsOverlayPanel {
             this._val('rop-scroll-bg-pad-bottom', ov.bg_padding_bottom ?? 55);
             this._val('rop-scroll-bg-pad-left', ov.bg_padding_left ?? 16);
             this._val('rop-scroll-bg-pad-right', ov.bg_padding_right ?? 16);
+            this._setScrollBgSizeField('width', ov.bg_width ?? 0, ov);
+            this._setScrollBgSizeField('height', ov.bg_height ?? 0, ov);
             this._val('rop-scroll-bg-fullscreen', ov.bg_fullscreen || false);
             // 卡片边框
             this._val('rop-scroll-bg-border-enabled', ov.bg_border_enabled || false);
@@ -5742,23 +5876,21 @@ class ReelsOverlayPanel {
             ov.bg_opacity = Math.round(this._get('rop-scroll-bg-opacity') / 100 * 255);
             ov.bg_scroll_follow = this._get('rop-scroll-bg-scroll-follow') !== false;
             ov.bg_body_only = !!this._get('rop-scroll-bg-body-only');
-            ov.bg_width = Number(this._get('rop-scroll-bg-width')) || 0;
-            ov.bg_height = Number(this._get('rop-scroll-bg-height')) || 0;
-            ov.bg_offset_x = Number(this._get('rop-scroll-bg-offset-x')) || 0;
-            ov.bg_offset_y = Number(this._get('rop-scroll-bg-offset-y')) || 0;
-            ov.bg_radius = this._get('rop-scroll-bg-radius');
             ov.bg_padding_top = this._get('rop-scroll-bg-pad-top');
             ov.bg_padding_bottom = this._get('rop-scroll-bg-pad-bottom');
             ov.bg_padding_left = this._get('rop-scroll-bg-pad-left');
             ov.bg_padding_right = this._get('rop-scroll-bg-pad-right');
+            ov.bg_width = this._getScrollBgStoredSize('width');
+            ov.bg_height = this._getScrollBgStoredSize('height');
+            ov.bg_offset_x = Number(this._get('rop-scroll-bg-offset-x')) || 0;
+            ov.bg_offset_y = Number(this._get('rop-scroll-bg-offset-y')) || 0;
+            ov.bg_radius = this._get('rop-scroll-bg-radius');
             ov.bg_fullscreen = this._get('rop-scroll-bg-fullscreen');
             // 同步顶部快捷栏显示
             this._val('rop-scroll-bg-scroll-follow-quick', ov.bg_scroll_follow);
             this._val('rop-scroll-bg-body-only-quick', ov.bg_body_only);
-            this._val('rop-scroll-bg-width-quick', ov.bg_width);
-            this._val('rop-scroll-bg-width-quick-num', ov.bg_width);
-            this._val('rop-scroll-bg-height-quick', ov.bg_height);
-            this._val('rop-scroll-bg-height-quick-num', ov.bg_height);
+            this._setScrollBgSizeField('width', ov.bg_width, ov);
+            this._setScrollBgSizeField('height', ov.bg_height, ov);
             this._val('rop-scroll-body-bg-pad-h-quick', ov.scroll_body_bg_pad_h ?? 24);
             this._val('rop-scroll-body-bg-pad-h-quick-num', ov.scroll_body_bg_pad_h ?? 24);
             const _syncQuickPadV = ov.scroll_body_bg_pad_top ?? ov.scroll_body_bg_pad_bottom ?? 11;
@@ -5972,7 +6104,7 @@ class ReelsOverlayPanel {
 
     _getOverlayStyleScope() {
         if (this.videoCanvas?.scopedTask) return 'task';
-        const el = this.container?.querySelector('#rop-style-scope') || document.getElementById('rop-style-scope');
+        const el = this.container?.querySelector('#rop-style-scope') || (typeof document !== 'undefined' ? document.getElementById('rop-style-scope') : null);
         return el ? (el.value || 'folder') : 'folder';
     }
 
