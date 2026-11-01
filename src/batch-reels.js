@@ -9657,7 +9657,7 @@ function _renderTaskList(options = {}) {
     let lastFolderQueueId = null;
     container.innerHTML = tasks.map((task, i) => {
         const selected = i === _reelsState.selectedIdx;
-        const hasBg = !!(task.bgPath || task.videoPath);
+        const hasBg = _hasReelsTaskMedia(task);
         const hasAudio = !!task.audioPath;
         const hasSrt = !!task.srtPath && (task.segments || []).length > 0;
         const hasTxt = !!task.txtContent;
@@ -9763,11 +9763,7 @@ function _renderTaskList(options = {}) {
             const groupTasks = tasks.filter(item => isLegacyTask ? !item._batchTabId : item._batchTabId === batchGroupId);
             const groupSelected = groupTasks.filter(item => item._exportSelected !== false).length;
             const groupIndeterminate = groupSelected > 0 && groupSelected < groupTasks.length;
-            const incompleteInGroup = groupTasks.filter(item => {
-                const hasAudio = Boolean(item.audioPath || item.audioFile);
-                const hasSub = item.subtitleMode === 'none' || Boolean(item.srtPath || item.srtFile || (Array.isArray(item.segments) && item.segments.length > 0));
-                return !hasAudio || !hasSub;
-            }).length;
+            const incompleteInGroup = groupTasks.filter(_isReelsTaskIncomplete).length;
             const encodedGroupId = encodeURIComponent(batchGroupId);
             batchGroupHeader = `
                 <div class="reels-batch-group-header"
@@ -9784,7 +9780,7 @@ function _renderTaskList(options = {}) {
                         title="本组总开关：勾选则本组全部参与导出，取消则本组全部不导出">
                     <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${groupName}">${isLegacyTask ? '🕘' : '📑'} ${groupName}</span>
                     <span style="margin-left:auto;color:#94a3b8;font-weight:400;">${groupSelected}/${groupTasks.length}</span>
-                    ${incompleteInGroup > 0 ? `<button class="btn" draggable="false" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); reelsRemoveIncompleteTasksInGroup(decodeURIComponent('${encodedGroupId}'))" style="padding:1px 5px;font-size:10px;border:1px solid rgba(251,191,36,0.45);background:rgba(245,158,11,0.16);color:#fcd34d;cursor:pointer;" title="一键清理本组内缺少音频(VO)或字幕(SRT)的未完成任务 (${incompleteInGroup}条)">🧹清理空行(${incompleteInGroup})</button>` : ''}
+                    ${incompleteInGroup > 0 ? `<button class="btn" draggable="false" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); reelsRemoveIncompleteTasksInGroup(decodeURIComponent('${encodedGroupId}'))" style="padding:1px 5px;font-size:10px;border:1px solid rgba(251,191,36,0.45);background:rgba(245,158,11,0.16);color:#fcd34d;cursor:pointer;" title="一键清理本组内没有视频/图片素材(BG)的空行 (${incompleteInGroup}条)">🧹清理空行(${incompleteInGroup})</button>` : ''}
                     <button class="btn" draggable="false" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); reelsRemoveBatchGroup(decodeURIComponent('${encodedGroupId}'))" style="padding:1px 5px;font-size:10px;border:none;background:transparent;color:#f87171;opacity:0.8;cursor:pointer;" title="删除本组全部任务">🗑</button>
                 </div>`;
             lastFolderQueueId = null;
@@ -9890,25 +9886,24 @@ function _areAllReelsTaskGroupsCollapsed() {
     return true;
 }
 
-function _isReelsTaskIncomplete(item) {
-    if (!item) return true;
-    const workMode = _reelsState?.workMode || 'srt';
-    const hasBg = Boolean(item.bgPath || item.videoPath || (Array.isArray(item.bgPaths) && item.bgPaths.length > 0));
-    const hasAudio = Boolean(item.audioPath || item.audioFile);
-    const hasSrt = Boolean(item.srtPath || item.srtFile || (Array.isArray(item.segments) && item.segments.length > 0));
-    const hasTxt = Boolean(
-        (item.txtContent && String(item.txtContent).trim()) ||
-        (item.ttsText && String(item.ttsText).trim()) ||
-        (item.aiScript && String(item.aiScript).trim())
+function _hasReelsTaskMedia(item) {
+    if (!item) return false;
+    return Boolean(
+        (item.bgPath && String(item.bgPath).trim()) ||
+        (item.videoPath && String(item.videoPath).trim()) ||
+        item.bgFile ||
+        item.videoFile ||
+        (Array.isArray(item.bgPaths) && item.bgPaths.some(p => p && String(p).trim())) ||
+        (Array.isArray(item.bgClipPool) && item.bgClipPool.some(p => p && String(p).trim())) ||
+        (item.contentVideoPath && String(item.contentVideoPath).trim()) ||
+        (item.concatVideoPath && String(item.concatVideoPath).trim()) ||
+        (Array.isArray(item.clipPool) && item.clipPool.some(p => p && String(p).trim()))
     );
-    if (!hasBg) return true;
-    if (workMode === 'voiced_bg') {
-        return item.subtitleMode !== 'none' && !hasSrt && !hasTxt;
-    }
-    if (workMode === 'dubbed_text') {
-        return !hasAudio || (item.subtitleMode !== 'none' && !hasSrt && !hasTxt);
-    }
-    return !hasAudio || (item.subtitleMode !== 'none' && !hasSrt);
+}
+window._hasReelsTaskMedia = _hasReelsTaskMedia;
+
+function _isReelsTaskIncomplete(item) {
+    return !_hasReelsTaskMedia(item);
 }
 window._isReelsTaskIncomplete = _isReelsTaskIncomplete;
 
@@ -9921,13 +9916,13 @@ function _updateToggleAllGroupsBtnUI() {
             cleanBtn.style.background = 'rgba(245,158,11,0.28)';
             cleanBtn.style.borderColor = 'rgba(251,191,36,0.75)';
             cleanBtn.style.color = '#fde68a';
-            cleanBtn.title = `检测到 ${incompleteCount} 条缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空行，点击一键清理`;
+            cleanBtn.title = `检测到 ${incompleteCount} 条没有视频/图片素材(BG)的空行，点击一键清理`;
         } else {
             cleanBtn.textContent = '🧹 一键清理';
             cleanBtn.style.background = 'rgba(245,158,11,0.14)';
             cleanBtn.style.borderColor = 'rgba(251,191,36,0.35)';
             cleanBtn.style.color = '#fcd34d';
-            cleanBtn.title = '一键清理所有缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空任务';
+            cleanBtn.title = '一键清理所有没有视频/图片素材(BG)的空行';
         }
     }
     const btn = document.getElementById('reels-toggle-all-groups-btn');
@@ -10556,7 +10551,7 @@ function reelsRemoveIncompleteTasksInGroup(groupId) {
     const groupName = isLegacy ? '已有任务（未归档）' : (targets[0]?._batchTabName || groupId);
     return _removeTasksByPredicate(
         isIncomplete,
-        `确定清理分组「${groupName}」中缺少音频(VO)或字幕(SRT)的 ${targets.length} 条空任务吗？`
+        `确定清理分组「${groupName}」中没有视频/图片素材(BG)的 ${targets.length} 条空任务吗？`
     );
 }
 window.reelsRemoveIncompleteTasksInGroup = reelsRemoveIncompleteTasksInGroup;
@@ -10569,10 +10564,10 @@ function reelsOneClickCleanupTasks() {
         const groupDesc = groupNames.slice(0, 5).join('、') + (groupNames.length > 5 ? ` 等 ${groupNames.length} 个分组` : '');
         const removedCount = _removeTasksByPredicate(
             _isReelsTaskIncomplete,
-            `检测到 ${incompleteTasks.length} 条残缺/空任务（缺少配音 VO、字幕 SRT 或背景 BG，分布在：${groupDesc}）。\n\n确定一键清理这 ${incompleteTasks.length} 条残缺任务吗？`
+            `检测到 ${incompleteTasks.length} 条没有视频/图片素材(BG)的空任务（分布在：${groupDesc}）。\n\n确定一键清理这 ${incompleteTasks.length} 条空任务吗？`
         );
         if (removedCount > 0 && typeof showToast === 'function') {
-            showToast(`🧹 已一键清理 ${removedCount} 条残缺空任务`, 'success');
+            showToast(`🧹 已一键清理 ${removedCount} 条无素材空任务`, 'success');
         }
         return removedCount;
     }
@@ -10586,7 +10581,7 @@ function reelsOneClickCleanupTasks() {
     if (uncheckedTasks.length > 0 && uncheckedTasks.length < tasks.length) {
         const removedUnchecked = _removeTasksByPredicate(
             t => t && t._exportSelected === false,
-            `当前没有发现缺少素材（BG/VO/SRT）的残缺空任务。\n\n检测到有 ${uncheckedTasks.length} 条【未勾选导出】的任务，是否一键清理这些未勾选的任务？`
+            `当前没有发现缺少视频/图片素材(BG)的空任务。\n\n检测到有 ${uncheckedTasks.length} 条【未勾选导出】的任务，是否一键清理这些未勾选的任务？`
         );
         if (removedUnchecked > 0 && typeof showToast === 'function') {
             showToast(`🧹 已一键清理 ${removedUnchecked} 条未勾选任务`, 'success');
@@ -10594,7 +10589,7 @@ function reelsOneClickCleanupTasks() {
         return removedUnchecked;
     }
 
-    alert('✨ 当前所有任务素材完整（BG / VO / SRT 齐全），没有需要清理的残缺空行！');
+    alert('✨ 当前所有任务均已包含视频/图片素材，没有需要清理的空行！');
     return 0;
 }
 window.reelsOneClickCleanupTasks = reelsOneClickCleanupTasks;

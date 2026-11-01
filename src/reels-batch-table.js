@@ -384,15 +384,18 @@ function _isBatchTableRowIncomplete(t) {
         return window._isReelsTaskIncomplete(t);
     }
     if (!t) return true;
-    const hasBg = Boolean(t.bgPath || t.videoPath || (Array.isArray(t.bgPaths) && t.bgPaths.length > 0));
-    const hasAudio = Boolean(t.audioPath || t.audioFile);
-    const hasSrt = Boolean(t.srtPath || t.srtFile || (Array.isArray(t.segments) && t.segments.length > 0));
-    const hasTxt = Boolean(
-        (t.txtContent && String(t.txtContent).trim()) ||
-        (t.ttsText && String(t.ttsText).trim()) ||
-        (t.aiScript && String(t.aiScript).trim())
+    const hasBg = Boolean(
+        (t.bgPath && String(t.bgPath).trim()) ||
+        (t.videoPath && String(t.videoPath).trim()) ||
+        t.bgFile ||
+        t.videoFile ||
+        (Array.isArray(t.bgPaths) && t.bgPaths.some(p => p && String(p).trim())) ||
+        (Array.isArray(t.bgClipPool) && t.bgClipPool.some(p => p && String(p).trim())) ||
+        (t.contentVideoPath && String(t.contentVideoPath).trim()) ||
+        (t.concatVideoPath && String(t.concatVideoPath).trim()) ||
+        (Array.isArray(t.clipPool) && t.clipPool.some(p => p && String(p).trim()))
     );
-    return !hasBg || !hasAudio || (t.subtitleMode !== 'none' && !hasSrt && !hasTxt);
+    return !hasBg;
 }
 
 function reelsCleanAllTabsIncompleteTasks(opts = {}) {
@@ -411,11 +414,11 @@ function reelsCleanAllTabsIncompleteTasks(opts = {}) {
     }
     if (removedTasks.length === 0) {
         if (!opts.silentWhenZero) {
-            alert('✨ 当前所有标签页的任务素材均完整（BG / VO / SRT 齐全），没有需要清理的残缺空行！');
+            alert('✨ 当前所有标签页的任务均已包含视频/图片素材，没有需要清理的空行！');
         }
         return 0;
     }
-    if (!confirm(`在其他标签页中检测到共 ${removedTasks.length} 条残缺/空任务（分布在：${affectedTabNames.slice(0, 6).join('、')}${affectedTabNames.length > 6 ? ' 等' : ''}）。\n\n确定一键清理这 ${removedTasks.length} 条残缺任务吗？`)) {
+    if (!confirm(`在其他标签页中检测到共 ${removedTasks.length} 条没有视频/图片素材(BG)的空任务（分布在：${affectedTabNames.slice(0, 6).join('、')}${affectedTabNames.length > 6 ? ' 等' : ''}）。\n\n确定一键清理这 ${removedTasks.length} 条空任务吗？`)) {
         return 0;
     }
     for (const tab of _batchTableState.tabs || []) {
@@ -432,7 +435,7 @@ function reelsCleanAllTabsIncompleteTasks(opts = {}) {
     }
     if (typeof _renderTaskList === 'function') _renderTaskList({ preserveScroll: true });
     if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
-    if (typeof showToast === 'function') showToast(`🧹 已一键清理 ${removedTasks.length} 条残缺空任务`, 'success');
+    if (typeof showToast === 'function') showToast(`🧹 已一键清理 ${removedTasks.length} 条无素材空任务`, 'success');
     return removedTasks.length;
 }
 window.reelsCleanAllTabsIncompleteTasks = reelsCleanAllTabsIncompleteTasks;
@@ -446,7 +449,7 @@ function _rbtCleanIncompleteRows() {
     if (badIndices.length > 0) {
         const activeTab = _getActiveTab();
         const tabLabel = activeTab?.name || '当前标签页';
-        if (!confirm(`在「${tabLabel}」中检测到 ${badIndices.length} 条残缺/空行（缺少配音 VO、字幕 SRT 或背景 BG）。\n\n确定一键清理这 ${badIndices.length} 条残缺空行吗？`)) {
+        if (!confirm(`在「${tabLabel}」中检测到 ${badIndices.length} 条没有视频/图片素材(BG)的空行。\n\n确定一键清理这 ${badIndices.length} 条无素材空行吗？`)) {
             return 0;
         }
         const removedTasks = [];
@@ -461,7 +464,7 @@ function _rbtCleanIncompleteRows() {
         _renderBatchTable();
         if (typeof _renderTaskList === 'function') _renderTaskList({ preserveScroll: true });
         if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
-        if (typeof showToast === 'function') showToast(`🧹 已一键清理 ${removedTasks.length} 条残缺空行`, 'success');
+        if (typeof showToast === 'function') showToast(`🧹 已一键清理 ${removedTasks.length} 条无素材空行`, 'success');
         return removedTasks.length;
     }
     return reelsCleanAllTabsIncompleteTasks({ silentWhenZero: false });
@@ -1439,7 +1442,7 @@ function _renderBatchTable() {
                         <span class="rbt-batch-rowbreak"></span>
                         <span class="rbt-batch-subgroup">工程管理</span>
                         <button class="rbt-btn" id="rbt-add-row-btn" style="padding:2px 8px;font-size:11px;background:rgba(40,80,40,0.6);border:1px solid rgba(80,180,80,0.3);color:#a0e0b0;">添加行</button>
-                        <button class="rbt-btn" id="rbt-clean-empty-btn" style="padding:2px 8px;font-size:11px;background:rgba(245,158,11,0.18);border:1px solid rgba(251,191,36,0.45);color:#fcd34d;font-weight:600;" title="一键清理缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空行">🧹 一键清理空行</button>
+                        <button class="rbt-btn" id="rbt-clean-empty-btn" style="padding:2px 8px;font-size:11px;background:rgba(245,158,11,0.18);border:1px solid rgba(251,191,36,0.45);color:#fcd34d;font-weight:600;" title="一键清理没有视频/图片素材(BG)的空行">🧹 一键清理空行</button>
                         <button class="rbt-btn" id="rbt-clear-btn" style="padding:2px 8px;font-size:11px;background:rgba(120,40,40,0.6);border:1px solid rgba(220,80,80,0.3);color:#f48484;" title="清空全部">清空</button>
                         <span style="color:rgba(255,255,255,0.2);margin:0 2px;">|</span>
                         <button class="rbt-btn rbt-btn-primary" id="rbt-save-queue-btn">保存队列</button>
@@ -1686,7 +1689,7 @@ function _renderBatchTable() {
                         <button class="rbt-btn" id="rbt-invert-select" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;">反选</button>
                         <button class="rbt-btn" id="rbt-deselect-all" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;">取消</button>
                         <button class="rbt-btn" id="rbt-delete-selected" disabled style="padding:2px 9px;font-size:11px;background:rgba(239,68,68,0.14);border:1px solid rgba(239,68,68,0.35);color:#f87171;font-weight:600;">🗑 删除选中</button>
-                        <button class="rbt-btn" id="rbt-clean-empty-bar-btn" style="padding:2px 9px;font-size:11px;background:rgba(245,158,11,0.16);border:1px solid rgba(251,191,36,0.4);color:#fcd34d;font-weight:600;" title="一键清理缺少配音(VO)、字幕(SRT)或背景(BG)的残缺空行">🧹 一键清理空行</button>
+                        <button class="rbt-btn" id="rbt-clean-empty-bar-btn" style="padding:2px 9px;font-size:11px;background:rgba(245,158,11,0.16);border:1px solid rgba(251,191,36,0.4);color:#fcd34d;font-weight:600;" title="一键清理没有视频/图片素材(BG)的空行">🧹 一键清理空行</button>
                         <span style="color:rgba(255,255,255,0.2);margin:0 2px;">|</span>
                         <button class="rbt-btn" id="rbt-ai-preset-btn" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;" title="一键覆盖选中行参数">任务预设设置</button>
                         <button class="rbt-btn" id="rbt-import-task-preset-btn" style="padding:2px 6px;font-size:10px;background:rgba(100,100,255,0.1);border:1px solid rgba(100,100,255,0.2);color:#8b8bfa;" title="导入任务组合预设 JSON 文件">📥</button>
