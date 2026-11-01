@@ -1840,7 +1840,7 @@
             // 与 WYSIWYG 输出一致：普通覆层只在时间范围内显示；
             // 滚动覆层到达结束时间后保留最终位置。
             if (time < start || (ov.type !== 'scroll' && time > end)) continue;
-                ctx.save();
+                if (typeof ctx?.save === 'function') ctx.save();
                 try {
                     // Preview must never inherit a stale/concurrent export marker,
                     // otherwise ReelsOverlay intentionally suppresses guide boxes.
@@ -1853,7 +1853,7 @@
                 } catch (err) {
                     console.warn('[PreviewV2] overlay render failed', err);
                 } finally {
-                    ctx.restore();
+                    if (typeof ctx?.restore === 'function') ctx.restore();
                 }
         }
         if (!phase.inCover && !phase.inHook && passMode !== 'middle') drawOverlaySelection(ctx, drawable, time, w, h);

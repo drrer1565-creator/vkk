@@ -797,7 +797,7 @@ function _restoreGroupedProjectionFromTabs(tabIds) {
     _batchTableState.tabs.forEach((tab, tabOrder) => {
         if (!ids.includes(tab.id)) return;
         (tab.tasks || []).forEach((task, taskOrder) => {
-            _ensureTaskId(task);
+            if (typeof _ensureTaskId === 'function') _ensureTaskId(task);
             const cloned = _cloneBatchTasks([task])[0];
             if (!cloned) return;
             cloned.id = task.id;
