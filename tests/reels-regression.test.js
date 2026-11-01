@@ -1,0 +1,2263 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const ROOT = path.resolve(__dirname, '..');
+
+function loadBrowserScript(relPath, sandboxExtras = {}) {
+    const code = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
+    const windowObj = sandboxExtras.window || {};
+    const documentObj = sandboxExtras.document || {
+        head: { appendChild() {}, querySelector: () => null },
+        body: { appendChild() {} },
+        createElement: () => ({
+            style: {},
+            dataset: {},
+            classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+            appendChild() {},
+            addEventListener() {},
+            setAttribute() {},
+            getContext: () => ({
+                font: '',
+                globalAlpha: 1,
+                save() {},
+                restore() {},
+                beginPath() {},
+                closePath() {},
+                moveTo() {},
+                lineTo() {},
+                quadraticCurveTo() {},
+                bezierCurveTo() {},
+                arc() {},
+                arcTo() {},
+                rect() {},
+                clip() {},
+                fill() {},
+                stroke() {},
+                fillRect() {},
+                strokeRect() {},
+                clearRect() {},
+                fillText() {},
+                strokeText() {},
+                translate() {},
+                rotate() {},
+                scale() {},
+                setLineDash() {},
+                createPattern: () => ({}),
+                createLinearGradient: () => ({ addColorStop() {} }),
+                createRadialGradient: () => ({ addColorStop() {} }),
+                measureText: (txt) => ({ width: String(txt || '').length * 10 }),
+            }),
+        }),
+        getElementById: () => null,
+        querySelectorAll: () => [],
+    };
+    const sandbox = {
+        console,
+        setTimeout,
+        clearTimeout,
+        Promise,
+        Map,
+        Set,
+        URL,
+        Math,
+        Date,
+        Intl,
+        JSON,
+        Array,
+        Object,
+        String,
+        Number,
+        Boolean,
+        RegExp,
+        Error,
+        parseFloat,
+        parseInt,
+        isNaN,
+        isFinite,
+        encodeURIComponent,
+        decodeURIComponent,
+        navigator: { onLine: true },
+        FontFace: class MockFontFace {
+            constructor(family, source, descriptors = {}) {
+                this.family = family;
+                this.source = source;
+                this.descriptors = descriptors;
+            }
+            async load() { return this; }
+        },
+        localStorage: {
+            _store: new Map(),
+            getItem(k) { return this._store.has(k) ? this._store.get(k) : null; },
+            setItem(k, v) { this._store.set(k, String(v)); },
+            removeItem(k) { this._store.delete(k); },
+        },
+        CSS: { escape: (s) => String(s) },
+        ...sandboxExtras,
+        window: windowObj,
+        document: documentObj,
+    };
+    sandbox.window.window = sandbox.window;
+    sandbox.window.document = sandbox.document;
+    sandbox.window.localStorage = sandbox.localStorage;
+    vm.createContext(sandbox);
+    vm.runInContext(code, sandbox, { filename: relPath });
+    return sandbox;
+}
+
+test('Item 4: Wide color gamut detection & BT.709 auto-conversion', async () => {
+    const hdrPreview = require(path.join(ROOT, 'electron/services/reels-hdr-preview.js'));
+    const { classifyVideoColorProfile, buildBt709ConversionFilter, createPreviewService } = hdrPreview;
+
+    // 1. HLG
+    const hlg = classifyVideoColorProfile({
+        color_transfer: 'arib-std-b67',
+        color_primaries: 'bt2020',
+        color_space: 'bt2020nc',
+        pix_fmt: 'yuv420p10le',
+    });
+    assert.equal(hlg.needsConversion, true);
+    assert.equal(hlg.isHdr, true);
+    assert.equal(hlg.reason, 'hlg');
+    assert.match(buildBt709ConversionFilter(hlg), /libplacebo=.*colorspace=bt709:color_primaries=bt709:color_trc=bt709/);
+
+    // 2. PQ (SMPTE 2084)
+    const pq = classifyVideoColorProfile({
+        color_transfer: 'smpte2084',
+        color_primaries: 'bt2020',
+        color_space: 'bt2020nc',
+    });
+    assert.equal(pq.needsConversion, true);
+    assert.equal(pq.isHdr, true);
+    assert.equal(pq.reason, 'pq');
+
+    // 3. BT.2020 SDR
+    const bt2020Sdr = classifyVideoColorProfile({
+        color_transfer: 'bt709',
+        color_primaries: 'bt2020',
+        color_space: 'bt2020nc',
+    });
+    assert.equal(bt2020Sdr.needsConversion, true);
+    assert.equal(bt2020Sdr.isHdr, false);
+    assert.equal(bt2020Sdr.isWideGamut, true);
+    assert.equal(bt2020Sdr.reason, 'bt2020-sdr');
+
+    // 4. Display P3
+    const p3 = classifyVideoColorProfile({
+        color_transfer: 'iec61966-2-1',
+        color_primaries: 'smpte432',
+        color_space: 'bt709',
+    });
+    assert.equal(p3.needsConversion, true);
+    assert.equal(p3.isWideGamut, true);
+    assert.equal(p3.reason, 'p3');
+
+    // 5. Partial metadata fallback (only matrix or 10-bit wide gamut hint)
+    const partial = classifyVideoColorProfile({
+        color_transfer: 'unknown',
+        color_primaries: '',
+        color_space: 'bt2020nc',
+    });
+    assert.equal(partial.needsConversion, true);
+    assert.equal(partial.hasIncompleteMetadata, true);
+    assert.equal(partial.safeInputPrimaries, 'bt2020');
+    assert.match(buildBt709ConversionFilter(partial), /out_color_matrix=bt709:out_range=tv,format=yuv420p/);
+
+    // 6. Standard BT.709 passthrough
+    const bt709 = classifyVideoColorProfile({
+        color_transfer: 'bt709',
+        color_primaries: 'bt709',
+        color_space: 'bt709',
+        pix_fmt: 'yuv420p',
+    });
+    assert.equal(bt709.needsConversion, false);
+    assert.equal(bt709.reason, 'bt709');
+
+    // Verify BT.709 video is directly returned without invoking ffmpeg
+    const tmpFile = path.join(ROOT, 'package.json'); // existing file on disk
+    let ffmpegCalls = 0;
+    const prepare = createPreviewService(async (cmd) => {
+        if (cmd === 'ffprobe') {
+            return {
+                stdout: JSON.stringify({
+                    streams: [{
+                        color_transfer: 'bt709',
+                        color_primaries: 'bt709',
+                        color_space: 'bt709',
+                        pix_fmt: 'yuv420p',
+                    }],
+                }),
+            };
+        }
+        ffmpegCalls++;
+        return { stdout: '' };
+    }, () => path.join(ROOT, 'tests/.tmp-cache'));
+    const resultPath = await prepare(tmpFile);
+    assert.equal(resultPath, tmpFile);
+    assert.equal(ffmpegCalls, 0);
+});
+
+test('Items 5, 6, 7, 8, 9, 10: T-subtitle style engine, animations, connected box & canvas rendering', () => {
+    const sandbox = loadBrowserScript('src/reels-style-engine.js');
+    loadBrowserScript('src/reels-anim-engine.js', sandbox);
+    loadBrowserScript('src/reels-canvas-renderer.js', sandbox);
+
+    const StyleEngine = sandbox.window.ReelsStyleEngine;
+    const AnimEngine = sandbox.window.ReelsAnimEngine;
+    const ReelsCanvasRenderer = sandbox.window.ReelsCanvasRenderer;
+
+    // Style defaults & preset compatibility
+    const defaultStyle = StyleEngine.DEFAULT_SUBTITLE_STYLE;
+    assert.equal(defaultStyle.text_gradient_scope, 'line');
+    assert.equal(defaultStyle.uppercase, false);
+    assert.equal(defaultStyle.highlight_enabled, true);
+    assert.equal(defaultStyle.box_connected, true);
+    assert.equal(defaultStyle.box_concave_radius, 10);
+    assert.equal(defaultStyle.box_snap_threshold, 18);
+    assert.equal(defaultStyle.char_anim_intensity, 1.0);
+    assert.equal(defaultStyle.char_anim_duration, 0.28);
+    assert.equal(defaultStyle.char_anim_stagger, 0.04);
+
+    // 6 new per-character animations
+    const newCharAnims = [
+        'char_float_up',
+        'char_pop_elastic',
+        'char_wave',
+        'char_drop_bounce',
+        'char_squash_bounce',
+        'char_center_spread',
+    ];
+    for (const animKey of newCharAnims) {
+        assert.equal(AnimEngine.isCharAnimType(animKey), true, `${animKey} should be recognized by isCharAnimType`);
+
+        const activeState = AnimEngine.computeCharAnimTransform(animKey, 0.05, 0, 6, 0, 3.0, {
+            intensity: 1.5,
+            duration: 0.3,
+            stagger: 0.04,
+            fontSize: 80,
+        });
+        assert.ok(activeState, `computeCharAnimTransform returned null for ${animKey}`);
+        assert.equal(typeof activeState.dx, 'number');
+        assert.equal(typeof activeState.dy, 'number');
+        assert.equal(typeof activeState.scaleX, 'number');
+        assert.equal(typeof activeState.scaleY, 'number');
+        assert.equal(typeof activeState.alpha, 'number');
+    }
+
+    // Connected adaptive box path & snap threshold
+    const drawnTexts = [];
+    const gradientSpans = [];
+    const fillStyles = [];
+    const arcToCorners = [];
+    const mockCtx = {
+        canvas: { width: 1080, height: 1920 },
+        font: '700 74px "Arial", sans-serif',
+        textBaseline: 'top',
+        lineJoin: 'round',
+        miterLimit: 2,
+        lineWidth: 1,
+        strokeStyle: '#000',
+        _fillStyle: '#fff',
+        get fillStyle() { return this._fillStyle; },
+        set fillStyle(v) { this._fillStyle = v; fillStyles.push(v); },
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        beginPath() {},
+        closePath() {},
+        moveTo() {},
+        lineTo() {},
+        arcTo(x1, y1, x2, y2, r) { arcToCorners.push({ x1, y1, x2, y2, r }); },
+        quadraticCurveTo() {},
+        fill() {},
+        stroke() {},
+        fillRect() {},
+        clearRect() {},
+        measureText: (txt) => ({
+            width: String(txt || '').length * 20,
+            actualBoundingBoxAscent: 55,
+            actualBoundingBoxDescent: 15,
+        }),
+        createLinearGradient: (x0, y0, x1, y1) => {
+            const g = { x0, y0, x1, y1, stops: [], addColorStop(p, c) { this.stops.push([p, c]); } };
+            gradientSpans.push(g);
+            return g;
+        },
+        fillText: (txt) => { drawnTexts.push(String(txt)); },
+        strokeText: () => {},
+    };
+    const mockCanvas = {
+        width: 1080,
+        height: 1920,
+        getContext: () => mockCtx,
+    };
+    const renderer = new ReelsCanvasRenderer(mockCanvas);
+
+    // 1) Adjacent lines within snapThreshold=18 align into a single 4-corner outer contour
+    arcToCorners.length = 0;
+    renderer._buildConnectedAdaptiveBoxPath(
+        mockCtx,
+        [
+            { left: 100, right: 400, top: 200, bottom: 260 },
+            { left: 106, right: 394, top: 264, bottom: 324 }, // diff=6 <= 18
+        ],
+        12,
+        10,
+        18
+    );
+    assert.equal(arcToCorners.length, 4, 'Adjacent lines within snapThreshold should snap into 4 outer corners without small steps');
+
+    // 2) Adjacent lines differing beyond snapThreshold=18 form an 8-corner stepped connected contour (with concave radius)
+    arcToCorners.length = 0;
+    renderer._buildConnectedAdaptiveBoxPath(
+        mockCtx,
+        [
+            { left: 100, right: 500, top: 200, bottom: 260 },
+            { left: 180, right: 420, top: 264, bottom: 324 }, // diff=80 > 18
+        ],
+        12,
+        9,
+        18
+    );
+    assert.equal(arcToCorners.length, 8, 'Lines differing beyond snapThreshold should form a connected contour with 8 corners');
+    assert.ok(arcToCorners.some(c => Math.abs(c.r - 9) < 0.01), 'Concave corners should use concaveRadius');
+
+    // Non-destructive uppercase, highlight toggle, and line vs word gradient rendering
+    const segment = {
+        start: 0,
+        end: 5,
+        text: 'hello world',
+        words: [
+            { word: 'hello', start: 0, end: 2 },
+            { word: 'world', start: 2, end: 5 },
+        ],
+    };
+
+    const styleLineGrad = StyleEngine.mergeStyle({
+        uppercase: true,
+        highlight_enabled: false,
+        color_text: '#ff0000,#00ff00',
+        color_high: '#ff00ff',
+        text_gradient_scope: 'line',
+        text_gradient_direction: 'horizontal',
+        anim_in_type: 'none',
+    });
+
+    drawnTexts.length = 0;
+    gradientSpans.length = 0;
+    fillStyles.length = 0;
+    renderer.renderSubtitle(styleLineGrad, segment, 1.0, 1080, 1920);
+
+    // Original segment must remain lowercase (non-destructive)
+    assert.equal(segment.text, 'hello world');
+    assert.equal(segment.words[0].word, 'hello');
+    assert.equal(segment.words[1].word, 'world');
+    // Rendered text must be uppercase (drawn either whole-word or per-char when letter_spacing > 0)
+    const combinedDrawn = drawnTexts.join('');
+    assert.ok(combinedDrawn.includes('HELLO'), 'Expected HELLO to be drawn when uppercase=true');
+    assert.ok(combinedDrawn.includes('WORLD'), 'Expected WORLD to be drawn when uppercase=true');
+    assert.equal(combinedDrawn.includes('hello'), false);
+    // Highlight color should NOT be used when highlight_enabled=false
+    assert.equal(fillStyles.includes('#ff00ff'), false);
+    // Line gradient span should cover the full line width (> single word width)
+    const lineGradSpan = Math.max(...gradientSpans.map(g => Math.abs(g.x1 - g.x0)));
+    gradientSpans.length = 0;
+
+    const styleWordGrad = StyleEngine.mergeStyle({
+        uppercase: true,
+        highlight_enabled: false,
+        color_text: '#ff0000,#00ff00',
+        text_gradient_scope: 'word',
+        text_gradient_direction: 'horizontal',
+        anim_in_type: 'none',
+    });
+    renderer.renderSubtitle(styleWordGrad, segment, 1.0, 1080, 1920);
+    const wordGradSpan = Math.max(...gradientSpans.map(g => Math.abs(g.x1 - g.x0)));
+    assert.ok(lineGradSpan > wordGradSpan, `Expected line gradient span (${lineGradSpan}) > word gradient span (${wordGradSpan})`);
+});
+
+test('Items 11 & 12: Unified font catalog, change detection, and Google Fonts on-demand cache', async () => {
+    const scanFontsArgs = [];
+    const selectEls = new Map();
+    const expectedIds = [
+        'reels-font-family',
+        'reels-fullpage-typewriter-title-font',
+        'rop-font',
+        'rop-title-font',
+        'rop-body-font',
+        'rop-footer-font',
+        'rop-scroll-title-font',
+        'rop-scroll-font',
+    ];
+    for (const id of expectedIds) {
+        const parent = {
+            classList: { contains: () => true },
+            querySelector: () => ({ textContent: '', style: {} }),
+            insertBefore() {},
+            appendChild() {},
+        };
+        selectEls.set(id, {
+            id,
+            value: 'Montserrat',
+            innerHTML: '',
+            style: {},
+            dataset: {},
+            selectedOptions: [{ textContent: 'Montserrat' }],
+            parentElement: parent,
+            classList: { add() {}, remove() {}, contains: () => false },
+            appendChild() {},
+        });
+    }
+
+    const appendedLinks = [];
+    const sandbox = loadBrowserScript('src/reels-font-manager.js', {
+        window: {
+            addEventListener() {},
+            electronAPI: {
+                scanFonts: async (opts) => {
+                    scanFontsArgs.push(opts || {});
+                    return [
+                        { family: 'CustomEmbeddedFont', path: 'C:/fonts/custom.ttf', system: false },
+                        { family: 'Arial', path: 'C:/Windows/Fonts/arial.ttf', system: true },
+                    ];
+                },
+                fetchGoogleFonts: async () => ")]}'\n" + JSON.stringify({ familyMetadataList: [] }),
+                toFileUrl: (p) => `file:///${String(p).replace(/\\/g, '/')}`,
+            },
+        },
+        document: {
+            head: {
+                appendChild: (el) => {
+                    appendedLinks.push(el);
+                    if (typeof el.onload === 'function') el.onload();
+                },
+                querySelector: (sel) => {
+                    const m = sel.match(/href="([^"]+)"/);
+                    if (!m) return null;
+                    return appendedLinks.find(l => l.href === m[1]) || null;
+                },
+            },
+            body: { appendChild() {} },
+            fonts: { add() {}, load: async () => {}, ready: Promise.resolve() },
+            getElementById: (id) => selectEls.get(id) || null,
+            querySelectorAll: (sel) => {
+                if (sel.startsWith('#')) {
+                    const el = selectEls.get(sel.slice(1));
+                    return el ? [el] : [];
+                }
+                return [];
+            },
+            createElement: (tag) => ({
+                tagName: tag,
+                style: {},
+                dataset: {},
+                innerHTML: '',
+                children: [],
+                classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+                appendChild(c) { this.children.push(c); },
+                remove() {},
+                addEventListener() {},
+                getContext: () => ({
+                    font: '',
+                    measureText: (txt) => ({ width: String(txt || '').length * 10 }),
+                }),
+            }),
+        },
+    });
+
+    assert.deepEqual(Array.from(sandbox.window.UNIFIED_FONT_SELECT_IDS), expectedIds);
+
+    const fm = sandbox.window.getFontManager();
+    await fm.register();
+    assert.equal(scanFontsArgs.length, 1);
+
+    const catalog = fm.getUnifiedFontCatalog();
+    assert.ok(catalog.groups.embedded.includes('CustomEmbeddedFont'));
+    assert.ok(catalog.groups.system.includes('Arial'));
+    assert.ok(catalog.groups.google.length > 0);
+
+    // Calling refreshCatalogIfChanged(true) passes skipSystemRescan: true so Windows fonts are not rescanned
+    await fm.refreshCatalogIfChanged(true);
+    assert.equal(scanFontsArgs.length, 2);
+    assert.equal(scanFontsArgs[1].skipSystemRescan, true);
+
+    // Google Font on-demand load should deduplicate stylesheet injection
+    const linksBefore = appendedLinks.length;
+    await Promise.all([fm.loadGoogleFont(' Anton '), fm.loadGoogleFont('Anton')]);
+    const antonLinks = appendedLinks.slice(linksBefore).filter(l => String(l.href || '').includes('Anton'));
+    assert.equal(antonLinks.length, 1, 'Google Font stylesheet should only be injected once per family');
+});
+
+test('Item 13: Scroll text real-time preview responds immediately to uppercase and letter spacing', () => {
+    const drawnTexts = [];
+    const mockCtx = {
+        canvas: { width: 1080, height: 1920 },
+        font: '',
+        direction: 'ltr',
+        globalAlpha: 1,
+        globalCompositeOperation: 'source-over',
+        fillStyle: '#fff',
+        strokeStyle: '#000',
+        lineWidth: 1,
+        lineJoin: 'round',
+        miterLimit: 2,
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        beginPath() {},
+        closePath() {},
+        rect() {},
+        fillRect() {},
+        clearRect() {},
+        drawImage() {},
+        clip() {},
+        moveTo() {},
+        lineTo() {},
+        arcTo() {},
+        quadraticCurveTo() {},
+        fill() {},
+        stroke() {},
+        strokeRect() {},
+        setLineDash() {},
+        createLinearGradient: () => ({ addColorStop() {} }),
+        measureText: (txt) => ({ width: String(txt || '').length * 18 }),
+        fillText: (txt) => { drawnTexts.push(String(txt)); },
+        strokeText: () => {},
+    };
+
+    const sandbox = loadBrowserScript('src/reels-overlay.js', {
+        document: {
+            createElement: () => ({
+                width: 1080,
+                height: 1920,
+                style: {},
+                dataset: {},
+                classList: { add() {}, remove() {}, contains: () => false },
+                appendChild() {},
+                getContext: () => mockCtx,
+            }),
+        },
+    });
+    const ReelsOverlay = sandbox.window.ReelsOverlay;
+
+    const ov = ReelsOverlay.createScrollOverlay({
+        content: 'hello scroll world test line wrapping',
+        scroll_uppercase: false,
+        scroll_letter_spacing: 0,
+        fontsize: 36,
+        text_width: 300,
+        start: 0,
+        end: 10,
+        _exporting: true,
+    });
+
+    ReelsOverlay.drawOverlay(mockCtx, ov, 1.0, 1080, 1920);
+    assert.ok(drawnTexts.some(t => t.includes('hello')), 'Should draw lowercase when scroll_uppercase=false');
+
+    // Toggle scroll_uppercase to true without changing fontsize
+    drawnTexts.length = 0;
+    ov.scroll_uppercase = true;
+    ReelsOverlay.drawOverlay(mockCtx, ov, 1.0, 1080, 1920);
+    assert.ok(drawnTexts.some(t => t.includes('HELLO')), 'Should immediately draw uppercase when scroll_uppercase=true without changing fontsize');
+
+    // Increase scroll_letter_spacing without changing fontsize -> more wrapped lines
+    const linesBefore = drawnTexts.length;
+    drawnTexts.length = 0;
+    ov.scroll_letter_spacing = 25;
+    ReelsOverlay.drawOverlay(mockCtx, ov, 1.0, 1080, 1920);
+    assert.ok(drawnTexts.length > linesBefore, 'Increasing scroll_letter_spacing should immediately re-wrap and draw with new spacing');
+
+    // Verify reels-overlay-panel.js binds rop-scroll-uppercase & rop-scroll-letterspacing
+    const panelCode = fs.readFileSync(path.join(ROOT, 'src/reels-overlay-panel.js'), 'utf8');
+    assert.match(panelCode, /rop-scroll-uppercase/);
+    assert.match(panelCode, /rop-scroll-letterspacing/);
+});
+
+test('Items 1, 2, 3: Batch Reels workspace persistence on delete, natural sort, thumbnail concurrency & focus stability', () => {
+    // 1. Deleted tasks must not reappear when workspace is saved with 0 tasks
+    const os = require('node:os');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vk-regression-'));
+    try {
+        // Test countWorkspaceTasks and readUnifiedBatchWorkspace empty-workspace priority logic
+        const sharedProfile = require(path.join(ROOT, 'electron/services/sharedProfile.js'));
+        assert.equal(sharedProfile.countWorkspaceTasks({ tabs: [{ id: 'tab_1', tasks: [] }] }), 0);
+        assert.equal(sharedProfile.countWorkspaceTasks({ tabs: [{ id: 'tab_1', tasks: [{ id: 't1' }] }] }), 1);
+
+        const sharedProfileCode = fs.readFileSync(path.join(ROOT, 'electron/services/sharedProfile.js'), 'utf8');
+        assert.match(sharedProfileCode, /newestOverall\.taskCount\s*===\s*0/);
+    } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+
+    // 2. Verify static thumbnail cache, concurrency limiter, single hover video, and row-targeted drop in reels-batch-table.js
+    const batchTableCode = fs.readFileSync(path.join(ROOT, 'src/reels-batch-table.js'), 'utf8');
+    assert.match(batchTableCode, /_rbtResolveStaticVideoThumbnail/);
+    assert.match(batchTableCode, /_rbtRunWithThumbConcurrency/);
+    assert.match(batchTableCode, /stopHoverPreviewVideo/);
+    assert.match(batchTableCode, /reelsSyncTaskRemovalToBatchTabs/);
+    assert.match(batchTableCode, /isRowDirectBgDrop/);
+
+    // 3. Verify overlay template name focus protection in reels-overlay-panel.js & reels-bulk-create.js
+    const overlayPanelCode = fs.readFileSync(path.join(ROOT, 'src/reels-overlay-panel.js'), 'utf8');
+    assert.match(overlayPanelCode, /ropEditorEventGuard/);
+    assert.match(overlayPanelCode, /rop-tpl-name-input/);
+
+    // 4. Verify reverse-dropped audio files keep their native paths paired and sort into 019..023
+    const fnMatch = batchTableCode.match(/function _naturalSortByName\(a,\s*b\)\s*\{[\s\S]*?\n\}/);
+    assert.ok(fnMatch, '_naturalSortByName should exist in reels-batch-table.js');
+    const naturalSortByName = new Function(`return (${fnMatch[0]})`)();
+
+    const reverseDroppedNames = [
+        '023_Imagine Jesus smiling at you as you share this verse.mp3',
+        '022_Your daughter needs this prayer today.mp3',
+        '021_Oh my God, woman watching this, stop for a second.mp3',
+        '020_Repeat after me.mp3',
+        '019_A warning from God, but 99_ will skip it.mp3',
+    ];
+    const droppedPaths = reverseDroppedNames.map(n => `C:\\Users\\User\\Audio\\${n}`);
+    const rawFiles = reverseDroppedNames.map(n => ({ name: n }));
+    rawFiles.forEach((f, idx) => { f._nativePath = droppedPaths[idx]; });
+    const sortedFiles = rawFiles.sort(naturalSortByName);
+
+    assert.deepEqual(
+        sortedFiles.map(f => f._nativePath.split('\\').pop()),
+        [
+            '019_A warning from God, but 99_ will skip it.mp3',
+            '020_Repeat after me.mp3',
+            '021_Oh my God, woman watching this, stop for a second.mp3',
+            '022_Your daughter needs this prayer today.mp3',
+            '023_Imagine Jesus smiling at you as you share this verse.mp3',
+        ]
+    );
+
+    // 5. Verify ReelsOverlayPanel defines _esc and all this._xxx() methods, and renders preset select & scroll overlay list
+    const vm = require('node:vm');
+    const selectEl = { value: '', innerHTML: '' };
+    const listEl = {
+        innerHTML: '',
+        querySelectorAll: () => [],
+    };
+    const mockContainer = {
+        innerHTML: '',
+        querySelector: (sel) => {
+            if (sel === '#rop-group-preset-select') return selectEl;
+            if (sel === '#rop-overlay-list') return listEl;
+            return null;
+        },
+        querySelectorAll: () => [],
+    };
+    const panelSandbox = {
+        window: {},
+        document: {
+            getElementById: () => null,
+            querySelector: () => null,
+            querySelectorAll: () => [],
+            addEventListener: () => {},
+            createElement: () => ({ textContent: '', id: '' }),
+            head: { appendChild: () => {} },
+        },
+        localStorage: {
+            getItem: (k) => k === 'reels_overlay_group_presets'
+                ? JSON.stringify({ '下滚定版': [{ type: 'scroll', content: 'Amen' }] })
+                : null,
+            setItem: () => {},
+        },
+        requestAnimationFrame: (cb) => { cb(); return 1; },
+        cancelAnimationFrame: () => {},
+        console,
+    };
+    panelSandbox.window = panelSandbox;
+    vm.createContext(panelSandbox);
+    vm.runInContext(`${overlayPanelCode}\nwindow.ReelsOverlayPanel = ReelsOverlayPanel;`, panelSandbox);
+
+    const ReelsOverlayPanel = panelSandbox.ReelsOverlayPanel;
+    assert.equal(typeof ReelsOverlayPanel.prototype._esc, 'function', 'ReelsOverlayPanel.prototype._esc must be a function');
+    assert.equal(ReelsOverlayPanel.prototype._esc('<script>"test"</script>'), '&lt;script&gt;&quot;test&quot;&lt;/script&gt;');
+
+    const fakePanel = Object.create(ReelsOverlayPanel.prototype);
+    fakePanel.container = mockContainer;
+    fakePanel._selectedOv = { id: 'ov_scroll_1' };
+    fakePanel.videoCanvas = {
+        overlayMgr: {
+            overlays: [
+                { id: 'ov_scroll_1', type: 'scroll', content: '滚动字幕内容测试' },
+            ],
+        },
+    };
+
+    fakePanel._refreshOverlayGroupPresetSelect();
+    assert.match(selectEl.innerHTML, /下滚定版/, 'Preset select should render custom presets from reels_overlay_group_presets');
+
+    fakePanel._refreshList();
+    assert.match(listEl.innerHTML, /ov_scroll_1/, 'Overlay list should render scroll overlay item');
+    assert.match(listEl.innerHTML, /滚动: 滚动字幕内容测试/, 'Overlay list should display scroll overlay label');
+
+    // 6. Verify CodeCacheGuard rotates stale Code Cache on version upgrade or incomplete boot while preserving user projects & presets
+    const codeCacheGuard = require(path.join(ROOT, 'electron/services/codeCacheGuard.js'));
+    const cacheTestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vk-codecache-'));
+    try {
+        const codeCacheDir = path.join(cacheTestDir, 'Code Cache');
+        const presetsDir = path.join(cacheTestDir, 'videokit-presets');
+        fs.mkdirSync(path.join(codeCacheDir, 'js'), { recursive: true });
+        fs.writeFileSync(path.join(codeCacheDir, 'js', 'stale_bytecode'), 'old-v8-cache', 'utf8');
+        fs.mkdirSync(presetsDir, { recursive: true });
+        fs.writeFileSync(path.join(presetsDir, 'local-storage-presets.json'), '{"keep":true}', 'utf8');
+
+        // First upgrade from untracked version with existing Code Cache -> should rotate
+        const firstRun = codeCacheGuard.ensureFreshCodeCacheOnStartup({
+            userDataDir: cacheTestDir,
+            appVersion: '4.4.43-fix',
+            electronVersion: '33.4.11',
+            chromeVersion: '130.0.0',
+            isPackaged: true,
+        });
+        assert.equal(firstRun.rotated, true, 'Should rotate existing Code Cache on first tracked upgrade');
+        assert.equal(fs.existsSync(codeCacheDir), false, 'Old Code Cache should be moved out of the way');
+        assert.ok(fs.existsSync(firstRun.backupPath), 'Backup Code Cache directory should be preserved');
+        assert.equal(
+            fs.readFileSync(path.join(presetsDir, 'local-storage-presets.json'), 'utf8'),
+            '{"keep":true}',
+            'User presets and project files must never be modified'
+        );
+
+        // Recreate Code Cache as Chromium would, then run again with same version -> should NOT rotate
+        fs.mkdirSync(codeCacheDir, { recursive: true });
+        const secondRun = codeCacheGuard.ensureFreshCodeCacheOnStartup({
+            userDataDir: cacheTestDir,
+            appVersion: '4.4.43-fix',
+            electronVersion: '33.4.11',
+            chromeVersion: '130.0.0',
+            isPackaged: true,
+        });
+        assert.equal(secondRun.rotated, false, 'Should not rotate Code Cache when version and runtime are unchanged');
+        assert.equal(fs.existsSync(codeCacheDir), true, 'Code Cache should remain intact on normal launch');
+
+        // Simulate version update -> should rotate Code Cache AND clear GPUCache / DawnGraphiteCache / DawnWebGPUCache
+        fs.mkdirSync(path.join(cacheTestDir, 'GPUCache'), { recursive: true });
+        fs.writeFileSync(path.join(cacheTestDir, 'GPUCache', 'shader.bin'), 'stale-gpu', 'utf8');
+        const upgradeRun = codeCacheGuard.ensureFreshCodeCacheOnStartup({
+            userDataDir: cacheTestDir,
+            appVersion: '4.4.44',
+            electronVersion: '33.4.11',
+            chromeVersion: '130.0.0',
+            isPackaged: true,
+        });
+        assert.equal(upgradeRun.rotated, true, 'Should rotate Code Cache when appVersion changes');
+        assert.equal(fs.existsSync(path.join(cacheTestDir, 'GPUCache')), false, 'Should clear auxiliary GPUCache on version upgrade');
+
+        // Verify main.js and updater.js post-update startup & white-screen recovery guards
+        const mainJsSrc = fs.readFileSync(path.join(ROOT, 'electron/main.js'), 'utf8');
+        assert.ok(
+            mainJsSrc.includes('typeof window.switchTab === "function" && window._reelsState') ||
+            mainJsSrc.includes('typeof window.reelsSelectTask === "function" && typeof window.ReelsStyleEngine?.mergeStyle === "function" && window._reelsState'),
+            'main.js must verify JS bundle execution, not just static HTML DOM'
+        );
+        assert.ok(mainJsSrc.includes('app._updateRestartApproved'), 'main.js close handler must not block update restart');
+        assert.ok(mainJsSrc.includes('app.releaseSingleInstanceLock()'), 'main.js must release single-instance lock on quit/close');
+        const updaterJsSrc = fs.readFileSync(path.join(ROOT, 'electron/updater.js'), 'utf8');
+        assert.ok(updaterJsSrc.includes('await prepareForUpdateRestart()'), 'updater.js must flush workspace and release locks before quitAndInstall');
+        assert.ok(updaterJsSrc.includes('autoUpdater.quitAndInstall(false, true)'), 'updater.js must pass isForceRunAfter=true to quitAndInstall');
+    } finally {
+        fs.rmSync(cacheTestDir, { recursive: true, force: true });
+    }
+});
+
+
+
+
+test('Mixed typography presets retain settings, reveal cumulatively, and keep stable layout', () => {
+    const sandbox = loadBrowserScript('src/reels-style-engine.js', { window: { addEventListener() {} } });
+    loadBrowserScript('src/reels-presets-init.js', sandbox);
+    loadBrowserScript('src/reels-canvas-renderer.js', sandbox);
+    const engine = sandbox.window.ReelsStyleEngine;
+    const presets = sandbox.window.REELS_BUILTIN_PRESETS;
+    const ctx = { globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+        measureText(text) { return { width: String(text).length * (parseFloat(this.font.match(/([\d.]+)px/)[1])) * .6 }; } };
+    const renderer = new sandbox.window.ReelsCanvasRenderer({ getContext: () => ctx });
+    let drawn = [];
+    renderer._drawWord = (_, text, x, y) => drawn.push({ text, x, y, font: ctx.font });
+    const words = 'I thank you for this 14th day of October'.split(' ');
+    const seg = { start: 0, end: 10, text: words.join(' '), words: words.map((word, i) => ({ word, start: i, end: i + .8 })) };
+    for (const [name, preset] of Object.entries(presets).filter(([name]) => name.startsWith('动态混排'))) {
+        const style = engine.mergeStyle(preset);
+        assert.equal(engine.saveNamedSubtitlePreset('test mixed', style), true);
+        assert.equal(engine.applySubtitlePreset('test mixed').mixed_layout, preset.mixed_layout);
+        drawn = []; renderer.renderSubtitle(style, seg, .4, 1080, 1920);
+        assert.deepEqual(drawn.map(x => x.text), ['I'], name);
+        const first = drawn[0];
+        drawn = []; renderer.renderSubtitle(style, seg, 9, 1080, 1920);
+        assert.deepEqual(drawn.map(x => x.text), words, name);
+        assert.deepEqual(drawn[0], first, 'revealing later words must not move earlier words');
+        assert.ok(drawn.every(x => Number.isFinite(x.x) && Number.isFinite(x.y)));
+        drawn = []; renderer.renderSubtitle(style, seg, 10, 1080, 1920);
+        assert.equal(drawn.length, 0, 'group clears at end');
+        drawn = []; renderer.renderSubtitle(style, { ...seg, edited_text: 'Changed script' }, 9, 1080, 1920);
+        assert.deepEqual(drawn.map(x => x.text), ['Changed', 'script']);
+    }
+    assert.equal(engine.applySubtitlePreset('默认白字').mixed_layout, 'none');
+    drawn = [];
+    renderer.renderSubtitle(engine.mergeStyle({ mixed_layout: 'stack' }), { start: 0, end: 3, text: '中文混排测试' }, 2.99, 1080, 1920);
+    assert.equal(drawn.map(x => x.text).join(''), '中文混排测试');
+
+    // Smart copy-adaptive behavior:
+    // 1) Long 13-word sentence never leaves a 1-word orphan screen
+    const longWords = 'Stop scrolling right now, because God hears every single prayer you whisper today'.split(' ');
+    const longTokens = longWords.map((w, i) => ({
+        text: w,
+        clean: w.replace(/\W+/g, '').toLowerCase(),
+        start: i * 0.5,
+        end: (i + 1) * 0.5,
+        isCjk: false,
+        hasClauseBreak: w.endsWith(','),
+        hasStrongBreak: false,
+        weight: renderer._scoreMixedLayoutToken({ text: w }, i, longWords.length),
+    }));
+    const groups = renderer._partitionMixedLayoutGroups(longTokens);
+    assert.ok(groups.length >= 2, '13-word sentence should split into multiple readable screens');
+    assert.ok(groups.every(g => g.length >= 3), 'No screen group should be a 1-word or 2-word orphan');
+
+    // 2) Focus mode picks impact keyword ("prayer") over stop words ("for", "a") and centers rows
+    const shortWords = ['Wait', 'for', 'a', 'miracle', 'today'];
+    const shortTokens = shortWords.map((w, i) => ({
+        text: w,
+        clean: w.toLowerCase(),
+        weight: renderer._scoreMixedLayoutToken({ text: w }, i, shortWords.length),
+    }));
+    const focusRows = renderer._buildSmartMixedRows(shortTokens, 'focus');
+    assert.equal(focusRows.length, 3, '5-word focus phrase should build a clean 3-row poster');
+    const heroRow = focusRows.find(r => r.emphasisFlags.every(Boolean));
+    assert.ok(heroRow && heroRow.tokens.some(t => t.clean === 'miracle'), 'Hero focus row should highlight the keyword "miracle"');
+
+    // 3) 4 short balanced words -> Left-Right-Left-Right interleaved [词1] / [词2] / [词3] / [词4]
+    drawn = [];
+    renderer.renderSubtitle(
+        engine.mergeStyle({ mixed_layout: 'cycle' }),
+        { start: 0, end: 4, text: 'Stop and pray now' },
+        3.9,
+        1080,
+        1920
+    );
+    assert.deepEqual(drawn.map(x => x.text), ['Stop', 'and', 'pray', 'now']);
+    assert.equal(drawn[0].x, 0, '[词1] should be on the left column');
+    assert.ok(drawn[1].x > 0, '[词2] should be staggered to the right column');
+    assert.equal(drawn[2].x, 0, '[词3] should be on the left column');
+    assert.equal(drawn[3].x, drawn[1].x, '[词4] should align with [词2] on the right column');
+
+    // 4) 4 words with a long word + short word -> must NOT use 4-row Left-Right-Left-Right zigzag
+    const mismatchWords = ['Wait', 'for', 'breakthrough', 'now'];
+    const mismatchTokens = mismatchWords.map((w, i) => ({
+        text: w,
+        clean: w.toLowerCase(),
+        isCjk: false,
+        weight: renderer._scoreMixedLayoutToken({ text: w }, i, mismatchWords.length),
+    }));
+    assert.equal(renderer._isFourShortWordsBalanced(mismatchTokens), false, 'Long word + short word should not qualify as 4 balanced short words');
+    assert.notEqual(renderer._selectSmartMixedMode(mismatchTokens, 'cycle', 1), 'stairs', 'Cycle mode should avoid stairs when 4 words have long+short mismatch');
+    const mismatchStairsRows = renderer._buildSmartMixedRows(mismatchTokens, 'stairs');
+    assert.ok(mismatchStairsRows.length < 4, 'Even in explicit stairs mode, 4 words with long+short mismatch should group into <4 rows');
+
+    // 5) Stack mode (top big / middle small / bottom big) packs middle short words together onto one row
+    const stackWords = ['Stop', 'right', 'now', 'and', 'pray'];
+    const stackTokens = stackWords.map((w, i) => ({
+        text: w,
+        clean: w.toLowerCase(),
+        isCjk: false,
+        weight: renderer._scoreMixedLayoutToken({ text: w }, i, stackWords.length),
+    }));
+    const stackRows = renderer._buildSmartMixedRows(stackTokens, 'stack');
+    assert.equal(stackRows.length, 3, '5-word stack phrase should pack middle words onto a single middle row (3 rows total)');
+    assert.deepEqual(stackRows[0].tokens.map(t => t.text), ['Stop']);
+    assert.deepEqual(stackRows[1].tokens.map(t => t.text), ['right', 'now', 'and'], 'Middle row should combine all 3 short words together');
+    assert.deepEqual(stackRows[2].tokens.map(t => t.text), ['pray']);
+
+    // 6) Mixed layout pairs with rich entrance/exit animations without shifting word coordinates
+    loadBrowserScript('src/reels-anim-engine.js', sandbox);
+    const baselineDrawn = [];
+    renderer._drawWord = (_, text, x, y) => baselineDrawn.push({ text, x, y, font: ctx.font });
+    renderer.renderSubtitle(
+        engine.mergeStyle({ mixed_layout: 'stack', anim_in_type: 'none', anim_out_type: 'none' }),
+        { start: 0, end: 5, text: 'Stop right now and pray' },
+        4.6,
+        1080,
+        1920
+    );
+    for (const animType of ['fade', 'slide_up', 'slide_left', 'pop', 'word_pop_random_pulse', 'char_bounce', 'letter_jump', 'floating', 'bullet_reveal', 'blur_sharp']) {
+        drawn = [];
+        renderer._drawWord = (_, text, x, y) => drawn.push({ text, x, y, font: ctx.font });
+        renderer.renderSubtitle(
+            engine.mergeStyle({
+                mixed_layout: 'stack',
+                anim_in_type: animType,
+                anim_in_duration: 0.3,
+                anim_out_type: 'pop',
+                anim_out_duration: 0.25,
+            }),
+            { start: 0, end: 5, text: 'Stop right now and pray' },
+            4.6,
+            1080,
+            1920
+        );
+        assert.deepEqual(drawn, baselineDrawn, `Mixed layout coordinates must remain identical with anim_in_type=${animType}`);
+    }
+    // Bullet reveal reveals the entire middle row ('right now and') together when the first word of that row starts
+    drawn = [];
+    renderer.renderSubtitle(
+        engine.mergeStyle({ mixed_layout: 'stack', anim_in_type: 'bullet_reveal', anim_in_duration: 0.25 }),
+        { start: 0, end: 5, text: 'Stop right now and pray' },
+        1.2,
+        1080,
+        1920
+    );
+    assert.deepEqual(drawn.map(x => x.text), ['Stop', 'right', 'now', 'and'], 'bullet_reveal should reveal the whole middle row together');
+
+    // 7) Read-along highlight (朗读高亮) tracks the active spoken word across gaps and toggles cleanly on first click
+    const coloredDraws = [];
+    renderer._drawWord = (_, text, x, y, color) => coloredDraws.push({ text, x, y, color });
+    const gapSeg = {
+        start: 0,
+        end: 3,
+        text: 'Stop and pray',
+        words: [
+            { word: 'Stop', start: 0.15, end: 0.60 },
+            { word: 'and', start: 0.95, end: 1.35 },
+            { word: 'pray', start: 1.75, end: 2.30 },
+        ],
+    };
+    const hlOnStyle = engine.mergeStyle({
+        mixed_layout: 'stack',
+        color_text: '#FFFFFF',
+        color_high: '#FFD700',
+        highlight_enabled: true,
+        karaoke_highlight: true,
+    });
+    // At t=0.0 (paused at segment start before words[0].start=0.15): first word appears and is highlighted
+    coloredDraws.length = 0;
+    renderer.renderSubtitle(hlOnStyle, gapSeg, 0.0, 1080, 1920);
+    assert.deepEqual(coloredDraws.map(d => ({ text: d.text, color: d.color })), [
+        { text: 'Stop', color: '#FFD700' },
+    ]);
+    // At t=0.75 (inside silence gap between 'Stop' end=0.60 and 'and' start=0.95): 'Stop' stays highlighted
+    coloredDraws.length = 0;
+    renderer.renderSubtitle(hlOnStyle, gapSeg, 0.75, 1080, 1920);
+    assert.deepEqual(coloredDraws.map(d => ({ text: d.text, color: d.color })), [
+        { text: 'Stop', color: '#FFD700' },
+    ]);
+    // At t=2.0 (speaking 'pray'): only 'pray' is highlighted in #FFD700, earlier emphasis word 'Stop' returns to #FFFFFF
+    coloredDraws.length = 0;
+    renderer.renderSubtitle(hlOnStyle, gapSeg, 2.0, 1080, 1920);
+    assert.deepEqual(coloredDraws.map(d => ({ text: d.text, color: d.color })), [
+        { text: 'Stop', color: '#FFFFFF' },
+        { text: 'and', color: '#FFFFFF' },
+        { text: 'pray', color: '#FFD700' },
+    ]);
+    // Toggling highlight_enabled=false immediately turns all words to color_text (#FFFFFF)
+    coloredDraws.length = 0;
+    renderer.renderSubtitle({ ...hlOnStyle, highlight_enabled: false }, gapSeg, 2.0, 1080, 1920);
+    assert.ok(coloredDraws.every(d => d.color === '#FFFFFF'), 'All words should use color_text when highlight_enabled is false');
+
+    // 8) Microsoft Edge-TTS uses Sec-MS-GEC v2 token format and keys preview cache by voice/rate/pitch
+    const edgeTtsSrc = fs.readFileSync(path.join(ROOT, 'electron/services/edgeTts.js'), 'utf8');
+    assert.ok(edgeTtsSrc.includes('`2-${CHROMIUM_FULL_VERSION}`'), 'edgeTts.js must use Sec-MS-GEC-Version v2');
+    assert.ok(edgeTtsSrc.includes('_cs64Digest(strToHash, digest)'), 'edgeTts.js must generate CS64+SHA256 Sec-MS-GEC v2 tokens');
+    const msTtsSrc = fs.readFileSync(path.join(ROOT, 'src/microsoft-tts.js'), 'utf8');
+    assert.ok(msTtsSrc.includes('row._previewCacheKey === cacheKey'), 'microsoft-tts.js must key preview cache by voice, rate, pitch, and text');
+
+    // 9) Google TTS service & standalone Google Voice Studio tab support Gemini AI voices, Cloud TTS voices, and 20-preset keyless Google Translate voices
+    const googleTts = require(path.join(ROOT, 'electron/services/googleTts.js'));
+    assert.equal(googleTts.GEMINI_VOICES.length, 30, 'Should provide 30 prebuilt Gemini AI voices');
+    assert.equal(googleTts.GEMINI_PERSONA_VOICES.length, 24, 'Should provide 24 curated Gemini persona voices');
+    assert.ok(googleTts.GOOGLE_CLOUD_VOICES.length >= 40, 'Should provide flagship Google Cloud TTS voices');
+    assert.ok(googleTts.GOOGLE_TRANSLATE_VOICES.length >= 50, 'Should provide 52 keyless Google Translate locales');
+    assert.equal(googleTts.GOOGLE_TRANSLATE_VOICE_PRESETS.length, 20, 'Should provide 20 Female & Male presets per locale in keyless mode');
+    const wavBuf = googleTts.wrapPcm16ToWav(Buffer.alloc(4800), 24000, 1);
+    assert.equal(wavBuf.subarray(0, 4).toString('ascii'), 'RIFF', 'wrapPcm16ToWav should produce valid RIFF WAV header');
+    assert.equal(wavBuf.length, 4844, 'wrapPcm16ToWav should add 44-byte WAV header');
+    const indexHtml = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+    assert.ok(indexHtml.includes('data-tab="google-tts"'), 'index.html should include the 谷歌配音 tab button');
+    assert.ok(indexHtml.includes('id="google-tts-panel"'), 'index.html should include the #google-tts-panel container');
+    assert.ok(indexHtml.includes('id="gemini-tts-keys"'), 'index.html should include the dedicated #gemini-tts-keys setting in Settings');
+    assert.ok(indexHtml.includes('id="gg-api-keys"'), 'index.html should include the inline #gg-api-keys drawer in Google Voice Studio');
+    assert.ok(indexHtml.includes('src="google-tts.js"'), 'index.html should load google-tts.js');
+
+    // 10) Clearing or replacing background media purges timeline/renderPlan cache, resets video alignment state, and clears v2 transcription & HDR preview caches
+    const ReelsRenderPlan = require(path.join(ROOT, 'src/reels-render-plan.js'));
+    const ReelsTaskDerivation = require(path.join(ROOT, 'src/reels-task-derivation.js'));
+
+    const cachedTask = {
+        bgPath: 'C:/videos/old_cached.mp4',
+        videoPath: 'C:/videos/old_cached.mp4',
+        audioPath: 'C:/audio/voice.mp3',
+    };
+    ReelsRenderPlan.syncLegacyFields(cachedTask);
+    const getBgClipPaths = (tl) => tl.tracks
+        .flatMap(t => t.clips || [])
+        .filter(c => c._extra?.role === 'background')
+        .map(c => tl.sources[c.sourceId]?.path);
+    assert.deepEqual(getBgClipPaths(cachedTask.timeline), ['C:/videos/old_cached.mp4']);
+
+    // Replacing bgPath with a new video must update timeline tracks and never revert to old_cached.mp4 on syncLegacyFields
+    cachedTask.bgPath = 'C:/videos/new_today.mp4';
+    cachedTask.videoPath = 'C:/videos/new_today.mp4';
+    ReelsRenderPlan.syncLegacyFields(cachedTask);
+    assert.equal(cachedTask.bgPath, 'C:/videos/new_today.mp4', 'syncLegacyFields must not overwrite new bgPath with old cached timeline clip');
+    assert.equal(cachedTask.videoPath, 'C:/videos/new_today.mp4', 'syncLegacyFields must keep new videoPath');
+    assert.deepEqual(getBgClipPaths(cachedTask.timeline), ['C:/videos/new_today.mp4']);
+
+    // Clearing bgPath must remove background & source_audio clips from timeline
+    cachedTask.bgPath = '';
+    cachedTask.videoPath = '';
+    ReelsRenderPlan.syncLegacyFields(cachedTask);
+    assert.equal(cachedTask.bgPath, '', 'Cleared bgPath must stay empty after syncLegacyFields');
+    assert.deepEqual(getBgClipPaths(cachedTask.timeline), [], 'Background track clips must be emptied when bgPath is cleared');
+
+    // ReelsTaskDerivation.resetContent must also strip template timeline & renderPlan
+    const derived = ReelsTaskDerivation.resetContent({
+        bgPath: 'C:/videos/template.mp4',
+        timeline: cachedTask.timeline,
+        renderPlan: cachedTask.renderPlan,
+    });
+    assert.equal(derived.timeline, undefined, 'Derived task must not inherit template timeline');
+    assert.equal(derived.renderPlan, undefined, 'Derived task must not inherit template renderPlan');
+
+    // Verify reelsPurgeTaskBackgroundMedia and v2 cache cleanup hooks exist
+    const batchTableSrc = fs.readFileSync(path.join(ROOT, 'src/reels-batch-table.js'), 'utf8');
+    assert.ok(batchTableSrc.includes('window.reelsPurgeTaskBackgroundMedia =') && batchTableSrc.includes('_rbtPurgeTaskBackgroundMedia'), 'reels-batch-table.js must expose reelsPurgeTaskBackgroundMedia');
+    const apiRouterSrc = fs.readFileSync(path.join(ROOT, 'electron/apiRouter.js'), 'utf8');
+    assert.ok(apiRouterSrc.includes('hdrPreview.clearReelsPreviewCache(rawPaths, clearAll)'), 'subtitle/clear-cache must also purge HDR preview cache');
+    assert.ok(apiRouterSrc.includes('`_${fileName}_${audioCacheKey}_`'), 'subtitle/clear-cache must delete v2 transcription cache files');
+
+    // 11) Video duration probing prefers shorter v:0 stream duration over longer audio/container format.duration & pads direct loop fade with tpad
+    const ffmpegSrc = fs.readFileSync(path.join(ROOT, 'electron/services/ffmpeg.js'), 'utf8');
+    assert.ok(ffmpegSrc.includes('Math.min(streamDur, formatDur)'), 'ffmpeg.js getDuration must use Math.min(streamDur, formatDur) for videos with longer audio tracks');
+    const rawvideoSrc = fs.readFileSync(path.join(ROOT, 'electron/services/ffmpeg-rawvideo.js'), 'utf8');
+    assert.ok(rawvideoSrc.includes('Math.min(streamDur, formatDur)'), 'ffmpeg-rawvideo.js getMediaDuration must use Math.min(streamDur, formatDur)');
+    assert.ok(rawvideoSrc.includes('tpad=stop_mode=clone:stop_duration='), 'normalizedDirectBackgroundFilter must pad background streams with tpad to prevent premature EOF (exit code 0)');
+
+    // 12) Highlight word zoom (highlight_scale_enabled + highlight_scale), unread transparency (hide_until_spoken + unread_opacity), and alignment (left/center/right/smart_left_center)
+    assert.ok(indexHtml.includes('id="reels-highlight-scale-enabled"'), 'index.html should include #reels-highlight-scale-enabled');
+    assert.ok(indexHtml.includes('id="reels-highlight-scale"'), 'index.html should include #reels-highlight-scale');
+    assert.ok(indexHtml.includes('id="reels-hide-until-spoken"'), 'index.html should include #reels-hide-until-spoken');
+    assert.ok(indexHtml.includes('id="reels-text-align"'), 'index.html should include #reels-text-align');
+    assert.ok(indexHtml.includes('value="smart_left_center"'), 'index.html should include smart_left_center option');
+
+    const overlayPanelSrc = fs.readFileSync(path.join(ROOT, 'src/reels-overlay-panel.js'), 'utf8');
+    assert.ok(overlayPanelSrc.includes('id="rop-scroll-tw-hide-unread"'), 'reels-overlay-panel.js should include #rop-scroll-tw-hide-unread');
+    assert.ok(overlayPanelSrc.includes('id="rop-scroll-tw-active-scale-enabled"'), 'reels-overlay-panel.js should include #rop-scroll-tw-active-scale-enabled');
+    assert.ok(overlayPanelSrc.includes('value="smart_left_center"'), 'reels-overlay-panel.js should include smart_left_center option');
+
+    // Verify regular subtitle active word zoom and hide_until_spoken
+    renderer._drawWord = (_, text, x, y) => drawn.push({ text, x, y, font: ctx.font });
+    {
+        const scaleOps = [];
+        const origScale = ctx.scale;
+        ctx.scale = (sx, sy) => scaleOps.push({ sx, sy });
+        const segZoom = {
+            start: 0,
+            end: 3,
+            text: 'First Second Third',
+            words: [
+                { word: 'First', start: 0.0, end: 1.0 },
+                { word: 'Second', start: 1.0, end: 2.0 },
+                { word: 'Third', start: 2.0, end: 3.0 },
+            ],
+        };
+        const styleZoom = engine.mergeStyle({
+            mixed_layout: 'none',
+            anim_in_type: 'none',
+            anim_out_type: 'none',
+            highlight_enabled: true,
+            highlight_scale_enabled: true,
+            highlight_scale: 140,
+            hide_until_spoken: true,
+            unread_opacity: 0,
+            use_stroke: false,
+        });
+        drawn = [];
+        renderer.renderSubtitle(styleZoom, segZoom, 1.5, 1080, 1920);
+        assert.deepEqual(drawn.map(d => d.text), ['First', 'Second'], 'hide_until_spoken with unread_opacity=0 must hide future words until spoken');
+        assert.ok(scaleOps.some(o => Math.abs(o.sx - 1.4) < 0.01), 'Active spoken word must be scaled by highlight_scale (140% -> 1.4x)');
+        ctx.scale = origScale;
+    }
+
+    // Verify regular subtitle smart_left_center alignment (narrative line left-aligned, short focal line centered, never right-aligned)
+    {
+        const segAlign = {
+            start: 0,
+            end: 2,
+            text: 'We walk by faith every single day\nAmen!',
+        };
+        const styleLeft = engine.mergeStyle({
+            mixed_layout: 'none',
+            anim_in_type: 'none',
+            anim_out_type: 'none',
+            text_align: 'left',
+            use_stroke: false,
+        });
+        drawn = [];
+        renderer.renderSubtitle(styleLeft, segAlign, 1.0, 1080, 1920);
+        const leftFirstLineX = drawn.find(o => o.text === 'We')?.x;
+        const leftSecondLineX = drawn.find(o => o.text === 'Amen!')?.x;
+        assert.ok(Math.abs(leftFirstLineX - leftSecondLineX) < 1e-3, 'text_align=left must align both lines to the exact same left X');
+
+        drawn = [];
+        const styleSmart = engine.mergeStyle({
+            mixed_layout: 'none',
+            anim_in_type: 'none',
+            anim_out_type: 'none',
+            text_align: 'smart_left_center',
+            use_stroke: false,
+        });
+        renderer.renderSubtitle(styleSmart, segAlign, 1.0, 1080, 1920);
+        const smartFirstLineX = drawn.find(o => o.text === 'We')?.x;
+        const smartSecondLineX = drawn.find(o => o.text === 'Amen!')?.x;
+        assert.ok(Math.abs(smartFirstLineX - leftFirstLineX) < 1e-3, 'smart_left_center must left-align the narrative line');
+        assert.ok(smartSecondLineX > smartFirstLineX + 20, 'smart_left_center must center the short focal impact line');
+    }
+
+    // Verify mixed_layout smart_left_center eliminates right-hand stairs indents and combines left + center
+    {
+        drawn = [];
+        renderer.renderSubtitle(
+            engine.mergeStyle({ mixed_layout: 'stairs', text_align: 'smart_left_center', anim_in_type: 'none', anim_out_type: 'none' }),
+            { start: 0, end: 4, text: 'Stop and pray now' },
+            3.9,
+            1080,
+            1920
+        );
+        assert.equal(drawn[0].x, 0, 'smart_left_center in mixed_layout must left-align primary row at x=0');
+        assert.equal(drawn[1].x, 0, 'smart_left_center in mixed_layout must not right-indent row 2');
+        assert.ok(drawn[3].x > 0, 'smart_left_center in mixed_layout should center the final emphasis word');
+    }
+
+    // 13) Music MV mode & Transcription Model Selector with Pros/Advantages
+    assert.ok(batchTableSrc.includes('id="rbt-align-model"'), 'reels-batch-table.js should include #rbt-align-model selector');
+    assert.ok(batchTableSrc.includes('window.showAlignModelGuideModal'), 'reels-batch-table.js should expose window.showAlignModelGuideModal');
+    assert.ok(indexHtml.includes('id="subtitle-align-model"'), 'index.html should include #subtitle-align-model selector');
+    assert.ok(indexHtml.includes('id="reels-align-model"'), 'index.html should include #reels-align-model selector');
+    assert.ok(apiRouterSrc.includes('buildEffectiveTranscriptionConfig'), 'apiRouter.js should include buildEffectiveTranscriptionConfig');
+    assert.ok(apiRouterSrc.includes('cleanMusicLyricsText'), 'apiRouter.js should include cleanMusicLyricsText');
+    const cloudTransSrc = fs.readFileSync(path.join(ROOT, 'electron/services/cloudTranscription.js'), 'utf8');
+    assert.ok(cloudTransSrc.includes('promptHint ? { prompt: promptHint }'), 'cloudTranscription.js should inject lyrics prompt into Groq Whisper');
+    const gladiaSrc = fs.readFileSync(path.join(ROOT, 'electron/services/gladia.js'), 'utf8');
+    assert.ok(gladiaSrc.includes('highpass=f=160,lowpass=f=4800,dynaudnorm=f=150:g=15'), 'gladia.js should apply vocal frequency isolation filter in musicMode');
+
+    // 14) Queue-wide Background / Content Video / BGM sync & batch apply in #inspector-tab-background
+    const batchReelsSrc = fs.readFileSync(path.join(ROOT, 'src/batch-reels.js'), 'utf8');
+    assert.ok(indexHtml.includes('id="reels-bg-sync-all-queue"'), 'index.html should include #reels-bg-sync-all-queue checkbox');
+    assert.ok(indexHtml.includes('id="reels-bg-queue-scope"'), 'index.html should include #reels-bg-queue-scope selector');
+    assert.ok(indexHtml.includes('id="reels-cv-x-num"') && indexHtml.includes('id="reels-cv-y-num"'), 'index.html should include Content Video X/Y offset inputs');
+    assert.ok(indexHtml.includes('reelsApplyCvConfigToAllTasks'), 'index.html should include reelsApplyCvConfigToAllTasks button');
+    assert.ok(indexHtml.includes('reelsCopyBgToCvAllTasks'), 'index.html should include reelsCopyBgToCvAllTasks button');
+    assert.ok(batchReelsSrc.includes('window.reelsApplyCvConfigToAllTasks = function()'), 'batch-reels.js should define window.reelsApplyCvConfigToAllTasks');
+    assert.ok(batchReelsSrc.includes('window.reelsApplyBgConfigToAllTasks = function()'), 'batch-reels.js should define window.reelsApplyBgConfigToAllTasks');
+    assert.ok(batchReelsSrc.includes('window.reelsApplyBgmConfigToAllTasks = function()'), 'batch-reels.js should define window.reelsApplyBgmConfigToAllTasks');
+    assert.ok(batchReelsSrc.includes('window.reelsCopyBgToCvAllTasks = function()'), 'batch-reels.js should define window.reelsCopyBgToCvAllTasks');
+    assert.ok(batchReelsSrc.includes('window.reelsApplyAllBgCvBgmToQueue = function()'), 'batch-reels.js should define window.reelsApplyAllBgCvBgmToQueue');
+
+    // 15) Progressive per-line background bar wipe ("红底条逐行擦除 (爆款)" / box_wipe)
+    assert.ok(indexHtml.includes('id="reels-box-wipe"'), 'index.html should include #reels-box-wipe checkbox');
+    assert.ok(indexHtml.includes('value="box_wipe"'), 'index.html should include box_wipe option in #reels-anim-in');
+    const redBarPreset = engine.applySubtitlePreset('红底条逐行擦除 (爆款)');
+    assert.ok(presets['红底条逐行擦除 (爆款)'], 'REELS_BUILTIN_PRESETS should include 红底条逐行擦除 (爆款)');
+    assert.ok(redBarPreset, 'BUILTIN_PRESETS should include 红底条逐行擦除 (爆款)');
+    assert.equal(redBarPreset.color_bg, '#991A1C', 'Preset should use deep crimson red #991A1C background bar');
+    assert.equal(redBarPreset.box_wipe_enabled, true, 'Preset should enable box_wipe_enabled');
+    assert.equal(redBarPreset.anim_in_type, 'box_wipe', 'Preset should use anim_in_type=box_wipe');
+    assert.equal(redBarPreset.box_adaptive_width, true, 'Preset should use adaptive per-line width');
+    assert.equal(redBarPreset.box_connected, false, 'Preset should keep per-line bars separated');
+    assert.equal(redBarPreset.bold, true, 'Preset should use bold text');
+    assert.equal(redBarPreset.italic, true, 'Preset should use italic text');
+
+    const animEngine = sandbox.window.ReelsAnimEngine;
+    assert.equal(typeof animEngine.computeBoxWipeLineWidths, 'function', 'ReelsAnimEngine must export computeBoxWipeLineWidths');
+    // Line 1 width = 560, Line 2 width = 388 (total = 948) over 0..2s
+    const wStart = animEngine.computeBoxWipeLineWidths(0.0, 0.0, 2.0, [560, 388]);
+    assert.ok(wStart[0] > 20 && wStart[0] < 60, 'At segment start, Line 1 bar should start with a small visible leading tab');
+    assert.equal(wStart[1], 0, 'At segment start, Line 2 bar must be 0 width');
+
+    const wMidLine1 = animEngine.computeBoxWipeLineWidths(0.5, 0.0, 2.0, [560, 388]);
+    assert.ok(wMidLine1[0] > 240 && wMidLine1[0] < 320, 'Midway through Line 1, Line 1 bar should be partially wiped');
+    assert.equal(wMidLine1[1], 0, 'While Line 1 is still wiping, Line 2 bar must remain 0 width');
+
+    const wMidLine2 = animEngine.computeBoxWipeLineWidths(1.5, 0.0, 2.0, [560, 388]);
+    assert.equal(wMidLine2[0], 560, 'Once sweep passes Line 1 width, Line 1 bar must stay at 100% full width');
+    assert.ok(wMidLine2[1] > 150 && wMidLine2[1] < 260, 'While sweeping Line 2, Line 2 bar should be partially wiped');
+
+    const wEnd = animEngine.computeBoxWipeLineWidths(2.0, 0.0, 2.0, [560, 388]);
+    assert.deepEqual(wEnd, [560, 388], 'At segment end, both Line 1 and Line 2 bars must reach full width');
+
+    // Verify ReelsCanvasRenderer draws all text lines from segment start while progressively wiping the two line bars
+    {
+        const lineToCalls = [];
+        ctx.beginPath = () => {};
+        ctx.moveTo = () => {};
+        ctx.lineTo = (x, y) => lineToCalls.push({ x, y });
+        ctx.quadraticCurveTo = () => {};
+        ctx.closePath = () => {};
+        ctx.fill = () => {};
+        ctx.stroke = () => {};
+        ctx.fillText = () => {};
+        ctx.strokeText = () => {};
+        drawn = [];
+        const segWipe = {
+            start: 0,
+            end: 2,
+            text: "Even if you don't have\nthe strength to pray,",
+        };
+        renderer.renderSubtitle(redBarPreset, segWipe, 0.2, 1080, 1920);
+        const maxRightEarly = Math.max(...lineToCalls.map(p => p.x));
+        assert.ok(drawn.length >= 2, 'All subtitle lines must be visible while the red bar wipes behind them');
+
+        lineToCalls.length = 0;
+        renderer.renderSubtitle(redBarPreset, segWipe, 0.9, 1080, 1920);
+        const maxRightLate = Math.max(...lineToCalls.map(p => p.x));
+        assert.ok(maxRightLate > maxRightEarly + 150, 'Red bar right edge must expand significantly from early frame to late frame');
+    }
+
+    // 16) Coral red slide-up relay preset ("珊瑚红逐词上滑 (爆款)") & trailing punctuation preservation
+    const coralSlidePreset = engine.applySubtitlePreset('珊瑚红逐词上滑 (爆款)');
+    assert.equal(coralSlidePreset.color_high, '#FA4E68', 'Coral preset should use #FA4E68 highlight color');
+    assert.equal(coralSlidePreset.anim_in_type, 'slide_up', 'Coral preset should use slide_up entrance');
+    assert.equal(coralSlidePreset.anim_out_type, 'slide_up', 'Coral preset should use slide_up exit');
+    {
+        const colorDraws = [];
+        renderer._drawWord = (_, text, x, y, color) => colorDraws.push({ text, color });
+        renderer.renderSubtitle(
+            coralSlidePreset,
+            {
+                start: 0,
+                end: 2,
+                text: '14: 6, Jesus',
+                words: [
+                    { word: '14:', start: 0.0, end: 0.6 },
+                    { word: '6,', start: 0.6, end: 1.2 },
+                    { word: 'Jesus', start: 1.2, end: 2.0 },
+                ],
+            },
+            0.8,
+            1080,
+            1920
+        );
+        assert.deepEqual(colorDraws, [
+            { text: '14:', color: '#FFFFFF' },
+            { text: '6', color: '#FA4E68' },
+            { text: ',', color: '#FFFFFF' },
+            { text: 'Jesus', color: '#FFFFFF' },
+        ], 'Active word "6," must highlight "6" in #FA4E68 while keeping trailing comma "," in #FFFFFF');
+    }
+
+    // 17) Continuous forward 3D zoom + rapid char typewriter ("远景打字推进 (爆款)" / zoom_typewriter)
+    assert.ok(indexHtml.includes('value="zoom_typewriter"'), 'index.html should include zoom_typewriter option in #reels-anim-in');
+    const zoomTwPreset = engine.applySubtitlePreset('远景打字推进 (爆款)');
+    assert.equal(zoomTwPreset.anim_in_type, 'zoom_typewriter', 'Zoom typewriter preset should use anim_in_type=zoom_typewriter');
+    assert.equal(zoomTwPreset.text_transform, 'none', 'Zoom typewriter preset should not force uppercase by default');
+    assert.equal(zoomTwPreset.uppercase, false, 'Zoom typewriter preset should have uppercase=false by default');
+    const zStart = animEngine.computeZoomTypewriterState(0.05, 0.0, 1.5, 10);
+    const zMid = animEngine.computeZoomTypewriterState(0.6, 0.0, 1.5, 10);
+    const zEnd = animEngine.computeZoomTypewriterState(1.45, 0.0, 1.5, 10);
+    assert.ok(zStart.blockScale < 0.5 && zStart.revealedChars < 10, 'Early in segment, block scale starts small and characters are typing');
+    assert.equal(zMid.revealedChars, 10, 'By 0.6s, all characters have finished typing');
+    assert.ok(zEnd.blockScale > 1.15 && zEnd.blockScale > zMid.blockScale, 'Block scale continues zooming forward through the end of the segment');
+
+    // 18) Active 2-line focus switching ("双行焦点放大 (爆款)" / line_focus)
+    assert.ok(indexHtml.includes('value="line_focus"'), 'index.html should include line_focus option in #reels-anim-in');
+    const lineFocusPreset = engine.applySubtitlePreset('双行焦点放大 (爆款)');
+    assert.equal(lineFocusPreset.anim_in_type, 'line_focus', 'Line focus preset should use anim_in_type=line_focus');
+    assert.equal(lineFocusPreset.active_line_focus_enabled, true, 'Line focus preset should enable active_line_focus_enabled');
+    assert.equal(lineFocusPreset.inactive_line_scale, 0.62, 'Line focus preset should set inactive_line_scale=0.62');
+    assert.equal(lineFocusPreset.color_high, '#FBFD07', 'Line focus preset should highlight active word in #FBFD07 yellow');
+    assert.equal(lineFocusPreset.italic, true, 'Line focus preset should use bold italic comic typography');
+    assert.equal(lineFocusPreset.text_transform, 'none', 'Line focus preset should not force uppercase by default');
+    assert.equal(lineFocusPreset.uppercase, false, 'Line focus preset should have uppercase=false by default');
+
+    const lfScalesLine1 = animEngine.computeActiveLineFocusScales(
+        [{ startWordIdx: 0, endWordIdx: 3 }, { startWordIdx: 3, endWordIdx: 6 }],
+        1, 1.0, 0.62
+    );
+    assert.equal(lfScalesLine1.activeLineIdx, 0);
+    assert.deepEqual(Array.from(lfScalesLine1.scales), [1.0, 0.62], 'When active word is on Line 1, Line 1 is 1.0x and Line 2 is 0.62x');
+
+    const lfScalesLine2 = animEngine.computeActiveLineFocusScales(
+        [{ startWordIdx: 0, endWordIdx: 3 }, { startWordIdx: 3, endWordIdx: 6 }],
+        4, 1.0, 0.62
+    );
+    assert.equal(lfScalesLine2.activeLineIdx, 1);
+    assert.deepEqual(Array.from(lfScalesLine2.scales), [0.62, 1.0], 'When active word moves to Line 2, Line 1 shrinks to 0.62x and Line 2 expands to 1.0x');
+
+    {
+        const lfDraws = [];
+        let curScale = 1.0;
+        const scaleStack = [];
+        const origSave = ctx.save;
+        const origRestore = ctx.restore;
+        const origScale = ctx.scale;
+        ctx.save = () => { scaleStack.push(curScale); if (origSave) origSave.call(ctx); };
+        ctx.restore = () => { curScale = scaleStack.pop() ?? 1.0; if (origRestore) origRestore.call(ctx); };
+        ctx.scale = (sx, sy) => { curScale *= sx; if (origScale) origScale.call(ctx, sx, sy); };
+        renderer._drawWord = (_, text, x, y, color) => lfDraws.push({ text, x, y, color, scale: Number(curScale.toFixed(2)) });
+
+        const seg6 = {
+            start: 0.0,
+            end: 1.8,
+            text: 'If Jesus means nothing to you',
+            words: [
+                { word: 'If', start: 0.0, end: 0.3 },
+                { word: 'Jesus', start: 0.3, end: 0.6 },
+                { word: 'means', start: 0.6, end: 0.9 },
+                { word: 'nothing', start: 0.9, end: 1.2 },
+                { word: 'to', start: 1.2, end: 1.5 },
+                { word: 'you', start: 1.5, end: 1.8 },
+            ],
+        };
+
+        // At t = 0.45s ("Jesus" on Line 1 is spoken): Line 1 at 1.0x with Jesus in #FBFD07; Line 2 at 0.62x in #FFFFFF (preserving original casing when uppercase is unchecked)
+        lfDraws.length = 0;
+        renderer.renderSubtitle(lineFocusPreset, seg6, 0.45, 1080, 1920);
+        assert.deepEqual(
+            lfDraws.map(d => ({ text: d.text, color: d.color, scale: d.scale })),
+            [
+                { text: 'If', color: '#FFFFFF', scale: 1.0 },
+                { text: 'Jesus', color: '#FBFD07', scale: 1.0 },
+                { text: 'means', color: '#FFFFFF', scale: 1.0 },
+                { text: 'nothing', color: '#FFFFFF', scale: 0.62 },
+                { text: 'to', color: '#FFFFFF', scale: 0.62 },
+                { text: 'you', color: '#FFFFFF', scale: 0.62 },
+            ],
+            'Single 6-word segment splits into 2 balanced lines with Line 1 enlarged (1.0x) and Line 2 shrunk (0.62x)'
+        );
+
+        // At t = 1.05s ("nothing" on Line 2 is spoken): Line 1 shrinks to 0.62x in #FFFFFF; Line 2 expands to 1.0x with nothing in #FBFD07
+        lfDraws.length = 0;
+        renderer.renderSubtitle(lineFocusPreset, seg6, 1.05, 1080, 1920);
+        assert.deepEqual(
+            lfDraws.map(d => ({ text: d.text, color: d.color, scale: d.scale })),
+            [
+                { text: 'If', color: '#FFFFFF', scale: 0.62 },
+                { text: 'Jesus', color: '#FFFFFF', scale: 0.62 },
+                { text: 'means', color: '#FFFFFF', scale: 0.62 },
+                { text: 'nothing', color: '#FBFD07', scale: 1.0 },
+                { text: 'to', color: '#FFFFFF', scale: 1.0 },
+                { text: 'you', color: '#FFFFFF', scale: 1.0 },
+            ],
+            'When speech reaches Line 2, Line 1 shrinks to 0.62x and Line 2 expands to 1.0x with active word highlighted'
+        );
+
+        // Consecutive short 3-word context segments should also auto-pair into a 2-line active-focus block
+        const shortSegs = [
+            { start: 0.0, end: 0.9, text: 'You can keep' },
+            { start: 0.9, end: 1.8, text: 'scrolling down but' },
+        ];
+        renderer.setContextSegments(shortSegs);
+        lfDraws.length = 0;
+        renderer.renderSubtitle(lineFocusPreset, shortSegs[0], 0.45, 1080, 1920);
+        assert.equal(lfDraws.length, 6, 'Consecutive 3-word segments in _contextSegments should auto-pair into 6 words across 2 lines');
+        assert.equal(lfDraws[0].scale, 1.0, 'First paired segment line should be 1.0x while active');
+        assert.equal(lfDraws[3].scale, 0.62, 'Second paired segment line should be 0.62x while inactive');
+        renderer.setContextSegments([]);
+    }
+});
+
+test('kinetic_glow_stack preset, independent outline/glow controls, and fullpage typewriter auto-pagination work', () => {
+    const sandbox = loadBrowserScript('src/reels-style-engine.js', { window: { addEventListener() {} } });
+    loadBrowserScript('src/reels-presets-init.js', sandbox);
+    loadBrowserScript('src/reels-anim-engine.js', sandbox);
+    loadBrowserScript('src/reels-canvas-renderer.js', sandbox);
+
+    const ReelsStyleEngine = sandbox.window.ReelsStyleEngine;
+    const REELS_BUILTIN_PRESETS = sandbox.window.REELS_BUILTIN_PRESETS;
+    const ReelsAnimEngine = sandbox.window.ReelsAnimEngine;
+    const ReelsCanvasRenderer = sandbox.window.ReelsCanvasRenderer;
+
+    // 1. Check presets and animation label
+    const kineticPreset = ReelsStyleEngine.applySubtitlePreset('参考_黄绿辉光逐词叠排');
+    assert.ok(kineticPreset, '参考_黄绿辉光逐词叠排 should exist in BUILTIN_PRESETS');
+    assert.equal(kineticPreset.anim_in_type, 'kinetic_glow_stack');
+    assert.ok(REELS_BUILTIN_PRESETS['参考_黄绿辉光逐词叠排'], '参考_黄绿辉光逐词叠排 should exist in REELS_BUILTIN_PRESETS');
+
+    const redOutlinePreset = ReelsStyleEngine.applySubtitlePreset('参考_红黑描边粗斜体弹入');
+    assert.ok(redOutlinePreset, '参考_红黑描边粗斜体弹入 should exist in BUILTIN_PRESETS');
+    assert.equal(redOutlinePreset.stroke_expand_enabled, true);
+    assert.ok(REELS_BUILTIN_PRESETS['参考_红黑描边粗斜体弹入'], '参考_红黑描边粗斜体弹入 should exist in REELS_BUILTIN_PRESETS');
+
+    const animValues = Array.from(ReelsAnimEngine.ANIM_TYPE_LABELS).map(pair => pair[1]);
+    assert.ok(animValues.includes('kinetic_glow_stack'), 'ANIM_TYPE_LABELS should include kinetic_glow_stack');
+
+    // 2. Check independent outline/glow controls (_resolveStrokeExpandLayerMetrics / _resolveStrokeExpandLayerOpacity)
+    const makeGradient = () => ({ addColorStop() {} });
+    const ctx = {
+        globalAlpha: 1,
+        font: '700 72px sans-serif',
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        fillRect() {},
+        strokeText() {},
+        fillText() {},
+        createLinearGradient: makeGradient,
+        createRadialGradient: makeGradient,
+        measureText(text) {
+            const m = this.font && this.font.match(/([\d.]+)px/);
+            const sz = m ? parseFloat(m[1]) : 72;
+            return { width: String(text).length * sz * 0.6 };
+        },
+    };
+    const renderer = new ReelsCanvasRenderer({ getContext: () => ctx });
+    const m0 = renderer._resolveStrokeExpandLayerMetrics(redOutlinePreset, 0, 3, 5, 8);
+    const m1 = renderer._resolveStrokeExpandLayerMetrics(redOutlinePreset, 1, 3, 5, 8);
+    const m2 = renderer._resolveStrokeExpandLayerMetrics(redOutlinePreset, 2, 3, 5, 8);
+    assert.deepEqual([m0.width, m1.width, m2.width], [11, 25, 42.6]);
+    assert.deepEqual([m0.feather, m1.feather, m2.feather], [2, 30, 27]);
+
+    const customEffectStyle = {
+        ...redOutlinePreset,
+        effect_controls_enabled: true,
+        effect_inner_outline_width: 4,
+        effect_glow_range: 28,
+        effect_glow_blur: 20,
+        effect_glow_opacity: 50,
+    };
+    const cm0 = renderer._resolveStrokeExpandLayerMetrics(customEffectStyle, 0, 3, 5, 8);
+    const cm1 = renderer._resolveStrokeExpandLayerMetrics(customEffectStyle, 1, 3, 5, 8);
+    const cm2 = renderer._resolveStrokeExpandLayerMetrics(customEffectStyle, 2, 3, 5, 8);
+    assert.equal(cm0.width, 4);
+    assert.equal(cm1.width, 28);
+    assert.ok(cm2.width > 28);
+    assert.equal(cm1.feather, 20);
+    assert.equal(renderer._resolveStrokeExpandLayerOpacity(customEffectStyle, 0), 1);
+    assert.equal(renderer._resolveStrokeExpandLayerOpacity(customEffectStyle, 2), 0.5);
+
+    // 3. Render kinetic_glow_stack without throwing and verify words are drawn
+    const segment = {
+        start: 0.0,
+        end: 1.5,
+        text: 'Shine bright today',
+        words: [
+            { word: 'Shine', start: 0.0, end: 0.5 },
+            { word: 'bright', start: 0.5, end: 1.0 },
+            { word: 'today', start: 1.0, end: 1.5 },
+        ],
+    };
+    let backdropCalls = 0;
+    const origBackdrop = renderer.renderKineticGlowBackdrop.bind(renderer);
+    renderer.renderKineticGlowBackdrop = (st, w, h) => {
+        backdropCalls += 1;
+        return origBackdrop(st, w, h);
+    };
+    renderer.renderSubtitle(kineticPreset, segment, 1.2, 1080, 1920, false, false);
+    assert.equal(backdropCalls, 1, 'renderSubtitle should draw kinetic backdrop when _skipKineticBackdrop is false');
+    renderer.renderSubtitle(kineticPreset, segment, 1.2, 1080, 1920, false, true);
+    assert.equal(backdropCalls, 1, 'renderSubtitle should skip kinetic backdrop when _skipKineticBackdrop is true');
+});
+
+test('bold toggle and font_weight sync across style engine, font manager, and canvas renderer', () => {
+    const sandbox = loadBrowserScript('src/reels-style-engine.js', { window: { addEventListener() {} } });
+    loadBrowserScript('src/reels-anim-engine.js', sandbox);
+    loadBrowserScript('src/reels-canvas-renderer.js', sandbox);
+    loadBrowserScript('src/reels-font-manager.js', sandbox);
+
+    const ReelsStyleEngine = sandbox.window.ReelsStyleEngine;
+    const ReelsCanvasRenderer = sandbox.window.ReelsCanvasRenderer;
+    const ReelsFontManager = sandbox.window.ReelsFontManager;
+
+    const mergedUnbold = ReelsStyleEngine.mergeStyle({ bold: false });
+    assert.equal(mergedUnbold.bold, false);
+    assert.equal(mergedUnbold.font_weight, 400);
+
+    const mergedBold = ReelsStyleEngine.mergeStyle({ font_weight: 400, bold: true });
+    assert.equal(mergedBold.bold, true);
+
+    const fm = new ReelsFontManager();
+    fm._registerLocalFont('CustomSingleFileFont', 'C:/fonts/CustomSingleFileFont.ttf');
+    const entries = fm.getFontWeightEntries('CustomSingleFileFont', 'normal').map(e => e.value);
+    assert.ok(entries.includes('400'), 'Single-file font should expose Regular (400) weight entry');
+    assert.ok(entries.includes('700'), 'Single-file font should expose Bold (700) weight entry');
+
+    const seenFonts = [];
+    const ctx = {
+        globalAlpha: 1,
+        font: '700 72px sans-serif',
+        direction: 'ltr',
+        textAlign: 'left',
+        textBaseline: 'top',
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        fillRect() {},
+        strokeText() {},
+        fillText() { seenFonts.push(this.font); },
+        measureText(text) { return { width: String(text).length * 24 }; },
+    };
+    const renderer = new ReelsCanvasRenderer({ getContext: () => ctx });
+    const segment = {
+        start: 0,
+        end: 2,
+        text: 'Hello world',
+        words: [{ word: 'Hello', start: 0, end: 1 }, { word: 'world', start: 1, end: 2 }],
+    };
+    renderer.renderSubtitle({ font_family: 'Arial', fontsize: 72, font_weight: 700, bold: false }, segment, 0.5, 1080, 1920);
+    assert.ok(seenFonts.some(f => /^400\s+72px/.test(f)), 'Canvas renderer should use weight 400 when bold is explicitly false');
+
+    seenFonts.length = 0;
+    renderer.renderSubtitle({ font_family: 'Arial', fontsize: 72, font_weight: 400, bold: true }, segment, 0.5, 1080, 1920);
+    assert.ok(seenFonts.some(f => /^700\s+72px/.test(f)), 'Canvas renderer should use weight 700 when bold is explicitly true');
+});
+
+test('export HDR / wide-gamut color conversion filter normalizes input to SDR BT.709', () => {
+    const rawvideo = require('../electron/services/ffmpeg-rawvideo');
+    const buildFilter = rawvideo._test.buildInputBt709ConvertFilter;
+    assert.equal(typeof buildFilter, 'function');
+
+    const sdrFilter = buildFilter({
+        needsConversion: false,
+        isHdr: false,
+        colorTransfer: 'bt709',
+        colorPrimaries: 'bt709',
+        colorSpace: 'bt709',
+        pixFmt: 'yuv420p',
+    }, 'nonexistent_ffmpeg');
+    assert.ok(sdrFilter.includes('out_color_matrix=bt709:out_range=tv'), 'SDR input filter should enforce BT.709 color matrix and TV range');
+    assert.ok(sdrFilter.includes('setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv'), 'SDR input filter should enforce bt709 stream params');
+
+    const hdrFilter = buildFilter({
+        needsConversion: true,
+        isHdr: true,
+        isWideGamut: true,
+        hasIncompleteMetadata: false,
+        colorTransfer: 'arib-std-b67',
+        colorPrimaries: 'bt2020',
+        colorSpace: 'bt2020nc',
+        pixFmt: 'yuv420p10le',
+    }, 'nonexistent_ffmpeg');
+    assert.ok(hdrFilter.includes('tonemap=tonemap=hable') || hdrFilter.includes('tonemapping=bt.2390'), 'HDR input filter should tone-map HDR to SDR');
+    assert.ok(hdrFilter.includes('setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv'), 'HDR input filter should enforce bt709 stream params');
+
+    const bgChain = rawvideo._test.normalizedDirectBackgroundFilter(
+        0,
+        'scale=1080:1920,setsar=1',
+        'setpts=PTS-STARTPTS',
+        30,
+        'bg',
+        0,
+        {
+            needsConversion: true,
+            isHdr: true,
+            isWideGamut: true,
+            hasIncompleteMetadata: false,
+            colorTransfer: 'smpte2084',
+            colorPrimaries: 'bt2020',
+            colorSpace: 'bt2020nc',
+            pixFmt: 'yuv420p10le',
+        }
+    );
+    assert.ok(bgChain.startsWith('[0:v]'), 'Direct background filter should start with [0:v]');
+    assert.ok(bgChain.includes('setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv'), 'Direct background filter should include BT.709 setparams');
+    assert.ok(bgChain.endsWith('[bg]'), 'Direct background filter should end with [bg]');
+});
+
+test('merged 4.4.47 customized features: font preferences, font metadata, export CPU budget, and custom download range UI', () => {
+    const tmpProfile = fs.mkdtempSync(path.join(require('os').tmpdir(), 'vk-font-prefs-'));
+    try {
+        const { createFontPreferences } = require('../electron/services/fontPreferences');
+        const prefs = createFontPreferences(tmpProfile);
+        assert.deepEqual(prefs.read(['Inter', 'Anton']), ['Inter', 'Anton']);
+        const afterToggle = prefs.toggle('Inter');
+        assert.deepEqual(afterToggle, ['Anton']);
+        const afterAdd = prefs.toggle('Montserrat');
+        assert.deepEqual(afterAdd, ['Anton', 'Montserrat']);
+    } finally {
+        fs.rmSync(tmpProfile, { recursive: true, force: true });
+    }
+
+    const fontMeta = require('../electron/services/fontMetadata');
+    assert.equal(typeof fontMeta.readFontMetadata, 'function');
+
+    const cpuBudget = require('../resources/export-cpu-budget');
+    assert.equal(typeof cpuBudget.assign, 'function');
+    assert.equal(typeof cpuBudget.createBudgetManager, 'function');
+
+    const indexHtml = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+    assert.ok(indexHtml.includes('id="reels-download-mode"'), 'index.html should include #reels-download-mode');
+    assert.ok(indexHtml.includes('id="reels-download-range"'), 'index.html should include #reels-download-range');
+});
+
+test('Synthetic bold on single-weight fonts and default off state for scroll typewriter effect', () => {
+    // 1. Test Canvas 2D synthetic bold engine on a mock CanvasRenderingContext2D
+    const fillCalls = [];
+    const strokeCalls = [];
+    function MockCtx() {
+        this.font = '400 40px "SingleWeightFont", sans-serif';
+        this.shadowColor = 'rgba(0,0,0,0.8)';
+        this.shadowBlur = 6;
+        this.shadowOffsetX = 2;
+        this.shadowOffsetY = 2;
+        this.lineWidth = 4;
+    }
+    MockCtx.prototype.save = function () {};
+    MockCtx.prototype.restore = function () {};
+    MockCtx.prototype.fillText = function (text, x, y) {
+        if (this._isProbe) return;
+        fillCalls.push({ text, x, y, font: this.font, shadowBlur: this.shadowBlur });
+    };
+    MockCtx.prototype.strokeText = function (text, x, y) {
+        if (this._isProbe) return;
+        strokeCalls.push({ text, x, y, font: this.font, lineWidth: this.lineWidth, shadowBlur: this.shadowBlur });
+    };
+
+    // Probe canvas returns identical pixels for 400 and 700 (simulating a single-weight font like Anton/Impact/single-file TTF)
+    const identicalPixels = new Uint8ClampedArray(160 * 48 * 4);
+    identicalPixels[3] = 255;
+    identicalPixels[7] = 200;
+    const probeCtx = {
+        _isProbe: true,
+        font: '',
+        fillStyle: '#fff',
+        textBaseline: 'top',
+        clearRect() {},
+        fillText() {},
+        measureText: () => ({ width: 80 }),
+        getImageData: () => ({ data: identicalPixels }),
+    };
+
+    const rendererSandbox = loadBrowserScript('src/reels-canvas-renderer.js', {
+        CanvasRenderingContext2D: MockCtx,
+        document: {
+            createElement: () => ({
+                width: 160,
+                height: 48,
+                getContext: () => probeCtx,
+            }),
+        },
+    });
+
+    assert.equal(typeof rendererSandbox.window.installCanvasSyntheticBoldSupport, 'function');
+    const c = new MockCtx();
+
+    // Weight 400 -> single pass
+    fillCalls.length = 0;
+    c.font = '400 48px "SingleWeightFont", sans-serif';
+    c.fillText('Hello', 100, 200);
+    assert.equal(fillCalls.length, 1, 'Weight 400 must render in a single fillText pass');
+
+    // Weight 700 (B checked) on single-weight font -> synthetic faux-bold multi-pass with shadow only on first pass
+    fillCalls.length = 0;
+    c.font = '700 48px "SingleWeightFont", sans-serif';
+    c.fillText('Hello', 100, 200);
+    assert.ok(fillCalls.length > 1, 'Weight 700 on single-weight font must synthesize faux-bold passes');
+    assert.equal(fillCalls[0].shadowBlur, 6, 'First pass preserves text shadow');
+    assert.ok(fillCalls.slice(1).every(call => call.shadowBlur === 0), 'Offset faux-bold passes suppress duplicate shadow');
+
+    // StrokeText with weight 700 -> multi-pass offset stroke to match synthetic bold glyph contour
+    strokeCalls.length = 0;
+    c.lineWidth = 4;
+    c.strokeText('Hello', 100, 200);
+    assert.equal(strokeCalls.length, 4, 'Synthetic bold strokeText performs 4 micro-offset passes matching emboldened glyph');
+    assert.equal(strokeCalls[0].shadowBlur, 6, 'First stroke pass preserves shadow');
+    assert.ok(strokeCalls.slice(1).every(call => call.shadowBlur === 0), 'Offset stroke passes suppress duplicate shadow');
+
+    // 2. Test overlay bold & scroll default typewriter off state
+    const drawnFonts = [];
+    const ovCtx = {
+        canvas: { width: 1080, height: 1920 },
+        font: '',
+        direction: 'ltr',
+        globalAlpha: 1,
+        globalCompositeOperation: 'source-over',
+        fillStyle: '#fff',
+        strokeStyle: '#000',
+        lineWidth: 1,
+        lineJoin: 'round',
+        miterLimit: 2,
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        beginPath() {},
+        closePath() {},
+        rect() {},
+        fillRect() {},
+        clearRect() {},
+        drawImage() {},
+        clip() {},
+        moveTo() {},
+        lineTo() {},
+        arcTo() {},
+        quadraticCurveTo() {},
+        fill() {},
+        stroke() {},
+        strokeRect() {},
+        setLineDash() {},
+        createLinearGradient: () => ({ addColorStop() {} }),
+        measureText: (txt) => ({ width: String(txt || '').length * 18 }),
+        fillText() { drawnFonts.push(this.font); },
+        strokeText() {},
+    };
+    const ovSandbox = loadBrowserScript('src/reels-overlay.js', {
+        document: {
+            createElement: () => ({
+                width: 1080,
+                height: 1920,
+                style: {},
+                dataset: {},
+                classList: { add() {}, remove() {}, contains: () => false },
+                appendChild() {},
+                getContext: () => ovCtx,
+            }),
+        },
+    });
+    const ReelsOverlay = ovSandbox.window.ReelsOverlay;
+
+    // Text overlay with bold=true even if font_weight=400 must render with 700
+    const textOv = ReelsOverlay.createTextOverlay({ content: 'Bold Test', bold: true, font_weight: 400, _exporting: true });
+    drawnFonts.length = 0;
+    ReelsOverlay.drawOverlay(ovCtx, textOv, 1.0, 1080, 1920);
+    assert.ok(drawnFonts.some(f => /\b700\b/.test(f)), 'bold=true must force weight >= 600 even if font_weight was 400');
+
+    // Default scroll overlay must have scroll_typewriter_enabled === false
+    const scrollOv = ReelsOverlay.createScrollOverlay({ content: 'Line 1\nLine 2' });
+    assert.equal(scrollOv.scroll_typewriter_enabled, false, 'Default scroll overlay must not enable typewriter effect');
+
+    // Verify #rop-scroll-tw-details is hidden by default in reels-overlay-panel.js
+    const panelSrc = fs.readFileSync(path.join(ROOT, 'src/reels-overlay-panel.js'), 'utf8');
+    assert.ok(
+        panelSrc.includes('id="rop-scroll-tw-details" class="rop-grid" style="grid-column:span 2;display:none;"'),
+        '#rop-scroll-tw-details must be hidden by default when #rop-scroll-tw-enabled is off'
+    );
+
+    // Verify uppercase toggle is authoritative and presets do not force uppercase when unchecked
+    const applyTransform = rendererSandbox.window.ReelsCanvasRenderer.prototype._applyTextTransform;
+    assert.equal(
+        applyTransform('God leads me.', { uppercase: false, text_transform: 'uppercase' }),
+        'God leads me.',
+        'Unchecked uppercase (false) must override residual text_transform="uppercase"'
+    );
+    assert.equal(
+        applyTransform('God leads me.', { uppercase: true, text_transform: 'none' }),
+        'GOD LEADS ME.',
+        'Checked uppercase (true) must uppercase text'
+    );
+    const styleSandbox = loadBrowserScript('src/reels-style-engine.js', { window: { addEventListener() {} } });
+    loadBrowserScript('src/reels-presets-init.js', styleSandbox);
+    const engine = styleSandbox.window.ReelsStyleEngine;
+    const lineFocusStyle = engine.applySubtitlePreset('双行焦点放大 (爆款)');
+    assert.equal(lineFocusStyle.uppercase, false, '双行焦点放大 (爆款) should not force uppercase by default');
+    assert.equal(lineFocusStyle.text_transform, 'none', '双行焦点放大 (爆款) should have text_transform="none" by default');
+    const mergedUnchecked = engine.mergeStyle({ text_transform: 'uppercase', uppercase: false });
+    assert.equal(mergedUnchecked.uppercase, false);
+    assert.equal(mergedUnchecked.text_transform, 'none');
+
+    // 3. Test scroll typewriter active-word highlight in 'char' reveal mode, title digit/word ASR mismatch, and pause bridging
+    const fillRecords = [];
+    ovCtx.fillText = function (txt, x, y) {
+        drawnFonts.push(this.font);
+        fillRecords.push({ text: String(txt), fillStyle: String(this.fillStyle), x, y });
+    };
+    const twScrollOv = ReelsOverlay.createScrollOverlay({
+        scroll_title: 'JESUS IS COMING – THESE 4 DOORS ARE CLOSING NUMBER 4 COULD CLOSE TONIGHT.',
+        scroll_title_fixed: true,
+        scroll_title_uppercase: true,
+        content: 'Many people think they still\nhave time. Pray tomorrow.',
+        scroll_uppercase: false,
+        color: '#FFFFFF',
+        scroll_typewriter_enabled: true,
+        scroll_tw_speech_sync: true,
+        scroll_tw_reveal_type: 'char',
+        scroll_tw_hide_unread: false,
+        scroll_tw_unrevealed_opacity: 100,
+        scroll_tw_active_highlight: true,
+        scroll_tw_active_color: '#ffd700',
+        feather_top: 0,
+        feather_bottom: 0,
+        start: 0,
+        end: 10,
+        _taskSegments: [
+            {
+                start: 0.0,
+                end: 3.0,
+                text: 'Jesus is coming these four doors are closing number four could close tonight',
+            },
+            {
+                start: 3.2,
+                end: 8.0,
+                text: 'Many people think they still have time. Pray tomorrow.',
+                words: [
+                    { word: 'Many', start: 3.2, end: 3.6 },
+                    { word: 'people', start: 3.6, end: 4.1 },
+                    { word: 'think', start: 4.1, end: 4.5 },
+                    { word: 'they', start: 4.5, end: 4.9 },
+                    { word: 'still', start: 4.9, end: 5.3 },
+                    { word: 'have', start: 5.5, end: 5.9 },
+                    { word: 'time.', start: 5.9, end: 6.4 },
+                    { word: 'Pray', start: 6.7, end: 7.2 },
+                    { word: 'tomorrow.', start: 7.2, end: 8.0 },
+                ],
+            },
+        ],
+    });
+
+    // At t = 0.0s (paused at start before body speech begins at 3.2s): first word "Many" must be highlighted in #ffd700
+    fillRecords.length = 0;
+    ReelsOverlay.drawOverlay(ovCtx, twScrollOv, 0.0, 1080, 1920);
+    assert.ok(
+        fillRecords.some(r => r.text.includes('Many') && r.fillStyle.toLowerCase() === '#ffd700'),
+        'At t=0.0s in char mode with hide_unread=false, full first word "Many" must be highlighted in #ffd700'
+    );
+
+    // At t = 6.55s (inside pause between "time." end=6.4s and "Pray" start=6.7s): "time." stays highlighted in #ffd700
+    fillRecords.length = 0;
+    ReelsOverlay.drawOverlay(ovCtx, twScrollOv, 6.55, 1080, 1920);
+    assert.ok(
+        fillRecords.some(r => r.text.includes('time') && r.fillStyle.toLowerCase() === '#ffd700'),
+        'During inter-word pause (6.55s), active word highlight must bridge gap instead of dropping out'
+    );
+
+    // At t = 6.9s (middle of "Pray" [6.7..7.2]): the entire word "Pray" is highlighted in #ffd700 even in char reveal mode
+    fillRecords.length = 0;
+    ReelsOverlay.drawOverlay(ovCtx, twScrollOv, 6.9, 1080, 1920);
+    assert.ok(
+        fillRecords.some(r => r.text === 'Pray' && r.fillStyle.toLowerCase() === '#ffd700'),
+        'At t=6.9s in char reveal mode, the entire active word "Pray" must be highlighted as one run in #ffd700'
+    );
+    assert.ok(
+        fillRecords.some(r => r.text.includes('have time.') && r.fillStyle.toLowerCase() === '#ffffff'),
+        'Already spoken words on the same line must render in base #FFFFFF color'
+    );
+});
+
+test('Chengpin 04 style preset: natural 5-word auto-pagination, top-heavy balanced 2-line wrap, two-pass sticker outline, and push-apart active word scale', () => {
+    const sandbox = loadBrowserScript('src/reels-style-engine.js', { window: { addEventListener() {} } });
+    loadBrowserScript('src/reels-presets-init.js', sandbox);
+    loadBrowserScript('src/reels-canvas-renderer.js', sandbox);
+    const engine = sandbox.window.ReelsStyleEngine;
+    const presetName = '🟢 绿字放大推开_双行爆款 (成品04同款)';
+    const style = engine.applySubtitlePreset(presetName);
+
+    assert.equal(style.highlight_scale_enabled, true);
+    assert.equal(style.highlight_push_apart, true);
+    assert.equal(style.max_words_per_segment, 5);
+    assert.equal(style.max_words_per_line, 4);
+    assert.equal(style.balanced_two_line_wrap, true);
+    assert.equal(style.uppercase, true);
+
+    const callOrder = [];
+    const ctx = {
+        globalAlpha: 1,
+        font: '900 82px Montserrat',
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        strokeText(txt) { callOrder.push({ kind: 'stroke', text: String(txt), strokeStyle: String(this.strokeStyle) }); },
+        fillText(txt) { callOrder.push({ kind: 'fill', text: String(txt), fillStyle: String(this.fillStyle) }); },
+        measureText(text) {
+            const pxMatch = String(this.font || '').match(/([\d.]+)px/);
+            const px = pxMatch ? parseFloat(pxMatch[1]) : 82;
+            return { width: String(text).length * px * 0.58 };
+        }
+    };
+    const renderer = new sandbox.window.ReelsCanvasRenderer({ getContext: () => ctx });
+
+    const rawWords = ['3', 'signs', 'God', 'is', 'protecting', 'you', 'from', 'harm.'];
+    const seg = {
+        start: 0,
+        end: 4.0,
+        text: rawWords.join(' '),
+        words: rawWords.map((w, i) => ({ word: w, start: i * 0.5, end: (i + 1) * 0.5 }))
+    };
+
+    const drawnWords = [];
+    const origDrawWord = renderer._drawWord.bind(renderer);
+    renderer._drawWord = function (c, text, x, y, color, st, isHighlight, wordScale, useStroke) {
+        drawnWords.push({ text, x, y, color, isHighlight, wordScale });
+        return origDrawWord(c, text, x, y, color, st, isHighlight, wordScale, useStroke);
+    };
+
+    // Page 1 at t = 0.7s ("signs" is active on line 1 of ["3 SIGNS GOD IS", "PROTECTING"])
+    drawnWords.length = 0;
+    callOrder.length = 0;
+    renderer.renderSubtitle(style, seg, 0.7, 1080, 1920);
+    assert.deepEqual(
+        drawnWords.map(w => w.text),
+        ['3', 'SIGNS', 'GOD', 'IS', 'PROTECTING'],
+        'First sub-page should auto-paginate to 5 words'
+    );
+    // Verify 2-line balanced wrap: first 4 words on line 1 (same y), 5th word on line 2 (larger y)
+    assert.equal(drawnWords[0].y, drawnWords[1].y);
+    assert.equal(drawnWords[1].y, drawnWords[2].y);
+    assert.equal(drawnWords[2].y, drawnWords[3].y);
+    assert.ok(drawnWords[4].y > drawnWords[0].y, '5th word "PROTECTING" wraps onto line 2');
+
+    // Verify two-pass unified sticker outline: all strokeText calls happen before any non-shadow word fillText call
+    const firstTextFillIdx = callOrder.findIndex(c => c.kind === 'fill' && c.fillStyle.toUpperCase() !== '#000000');
+    const lastStrokeIdx = callOrder.map(c => c.kind).lastIndexOf('stroke');
+    assert.ok(firstTextFillIdx > lastStrokeIdx && lastStrokeIdx >= 0, 'All outer strokes must be drawn before any word fill');
+
+    // Verify push-apart active word scale: compare gap around "SIGNS" when active (t=0.7s) vs inactive (t=2.2s when "PROTECTING" is active)
+    const signsActiveLeftGap = drawnWords[1].x - drawnWords[0].x;
+    const signsActiveRightGap = drawnWords[2].x - drawnWords[1].x;
+
+    drawnWords.length = 0;
+    renderer.renderSubtitle(style, seg, 2.2, 1080, 1920);
+    const signsInactiveLeftGap = drawnWords[1].x - drawnWords[0].x;
+    const signsInactiveRightGap = drawnWords[2].x - drawnWords[1].x;
+
+    assert.ok(
+        signsActiveLeftGap > signsInactiveLeftGap && signsActiveRightGap > signsInactiveRightGap,
+        'When "SIGNS" scales up to 138%, highlight_push_apart must push "3" left and "GOD" right so words never overlap'
+    );
+
+    // Page 2 at t = 2.7s ("YOU FROM HARM.")
+    drawnWords.length = 0;
+    renderer.renderSubtitle(style, seg, 2.7, 1080, 1920);
+    assert.deepEqual(
+        drawnWords.map(w => w.text),
+        ['YOU', 'FROM', 'HARM.'],
+        'Second sub-page should show remaining 3 words'
+    );
+    assert.equal(drawnWords[0].y, drawnWords[1].y, '"YOU FROM" on line 1');
+    assert.ok(drawnWords[2].y > drawnWords[0].y, '"HARM." on line 2');
+});
+
+test('Task deletion in left list and batch table prevents drag hijack and never resurrects deleted tasks on close', () => {
+    const batchReelsSrc = fs.readFileSync(path.join(ROOT, 'src/batch-reels.js'), 'utf8');
+    const batchTableSrc = fs.readFileSync(path.join(ROOT, 'src/reels-batch-table.js'), 'utf8');
+    const indexHtmlSrc = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+
+    assert.ok(
+        batchReelsSrc.includes(".reels-task-delete-btn, .reels-task-duplicate-btn"),
+        'reelsTaskDragStart must ignore pointer/drag events originating on delete/duplicate buttons'
+    );
+    assert.ok(
+        batchReelsSrc.includes('window.reelsRemoveSelectedTasks = reelsRemoveSelectedTasks;') &&
+        batchReelsSrc.includes('window.reelsRemoveBatchGroup = reelsRemoveBatchGroup;') &&
+        batchReelsSrc.includes('window.reelsRemoveIncompleteTasksInGroup = reelsRemoveIncompleteTasksInGroup;'),
+        'batch-reels.js must expose batch delete, group delete, and incomplete task cleanup helpers'
+    );
+    assert.ok(
+        batchTableSrc.includes('window.reelsSyncActiveBatchTabFromId = reelsSyncActiveBatchTabFromId;'),
+        'reels-batch-table.js must expose reelsSyncActiveBatchTabFromId so selecting a task syncs the active batch tab'
+    );
+    assert.ok(
+        batchTableSrc.includes('if (_batchTableState.editSessionSnapshot)') &&
+        batchTableSrc.includes('if (_batchTableState.openedGroupedProjection && Array.isArray(_batchTableState.openedGroupedProjection.tasks))'),
+        'reelsSyncTaskRemovalToBatchTabs must also purge deleted tasks from editSessionSnapshot and openedGroupedProjection'
+    );
+    assert.ok(
+        batchTableSrc.includes('id="rbt-top-apply-btn"'),
+        'Batch table top toolbar must include #rbt-top-apply-btn (保存并关闭)'
+    );
+    assert.ok(
+        indexHtmlSrc.includes('id="reels-batch-delete-btn"'),
+        'index.html must include #reels-batch-delete-btn (删除已选) in the task list header'
+    );
+});
+
+test('Christmas writing pens, subtitle ribbon bands, ornaments, and presets are registered and render cleanly', () => {
+    const sandbox = loadBrowserScript('src/reels-style-engine.js', { window: { addEventListener() {} } });
+    loadBrowserScript('src/reels-presets-init.js', sandbox);
+    loadBrowserScript('src/reels-overlay.js', sandbox);
+    loadBrowserScript('src/reels-canvas-renderer.js', sandbox);
+
+    const isTip = sandbox.window.isImageOrVectorWritingTip;
+    for (const kind of ['candy_cane', 'christmas_tree', 'holly_berry', 'snowflake_wand', 'santa_feather', 'jingle_bell']) {
+        assert.equal(isTip(kind), true, `Christmas writing tip "${kind}" must be registered in BUILTIN_WRITING_TIP_KINDS`);
+    }
+
+    const brushEngine = sandbox.window.ReelsBrushEngine;
+    for (const bandStyle of ['xmas_candy_ribbon', 'xmas_velvet_gold', 'xmas_pine_snow', 'xmas_gingerbread_tag', 'xmas_frost_ice']) {
+        assert.equal(brushEngine.isTextBackingStyle(bandStyle), true, `Christmas backing style "${bandStyle}" must be registered in ReelsBrushEngine.TEXT_BACKING_STYLES`);
+    }
+    for (const cardStyle of [
+        'newspaper_page',
+        'newspaper_sepia_page',
+        'torn_parchment_board',
+        'kraft_clipboard',
+        'grid_notebook_page',
+        'dark_film_board',
+        'xmas_candy_frame',
+        'xmas_velvet_gold_board',
+        'xmas_pine_snow_board',
+        'xmas_gingerbread_card',
+        'xmas_starry_snow_night',
+        'xmas_cream_holly_letter',
+    ]) {
+        assert.equal(brushEngine.isCardBackgroundStyle(cardStyle), true, `Card background style "${cardStyle}" must be registered in ReelsBrushEngine.CARD_BACKGROUND_STYLES`);
+        let saveCount = 0;
+        let restoreCount = 0;
+        const mockGrad = { addColorStop() {} };
+        const mockCtx = {
+            globalAlpha: 1,
+            save() { saveCount++; },
+            restore() { restoreCount++; },
+            beginPath() {},
+            closePath() {},
+            moveTo() {},
+            lineTo() {},
+            quadraticCurveTo() {},
+            bezierCurveTo() {},
+            arc() {},
+            arcTo() {},
+            rect() {},
+            clip() {},
+            fill() {},
+            stroke() {},
+            fillRect() {},
+            strokeRect() {},
+            clearRect() {},
+            translate() {},
+            rotate() {},
+            scale() {},
+            setLineDash() {},
+            createPattern() { return {}; },
+            createLinearGradient() { return mockGrad; },
+            createRadialGradient() { return mockGrad; },
+        };
+        const translations = [];
+        mockCtx.translate = (tx, ty) => { translations.push([tx, ty]); };
+        brushEngine.drawThemedCardBackground(mockCtx, 40, 420, 1000, 1130, 16, {
+            style: cardStyle,
+            opacity: 0.96,
+            scrollOffsetY: -245,
+        });
+        assert.equal(saveCount, restoreCount, `drawThemedCardBackground("${cardStyle}") must balance ctx.save() and ctx.restore() so canvas clip state never leaks`);
+        assert.ok(translations.length > 0, `drawThemedCardBackground("${cardStyle}") with scrollOffsetY must translate interior texture/elements in a loop`);
+    }
+
+    // Verify createScrollOverlay supports custom card/border dimensions & upward scroll follow
+    const scrollOv = sandbox.window.ReelsOverlay.createScrollOverlay({
+        bg_enabled: true,
+        bg_style: 'newspaper_page',
+        bg_width: 860,
+        bg_height: 980,
+        bg_offset_x: 10,
+        bg_offset_y: -15,
+        bg_body_only: true,
+    });
+    assert.equal(scrollOv.bg_width, 860);
+    assert.equal(scrollOv.bg_height, 980);
+    assert.equal(scrollOv.bg_offset_x, 10);
+    assert.equal(scrollOv.bg_offset_y, -15);
+    assert.equal(scrollOv.bg_body_only, true);
+    assert.equal(scrollOv.bg_scroll_follow, true, 'bg_scroll_follow should default to true so newspaper/card backgrounds scroll upward with subtitles');
+
+    // Verify bg_body_only with Auto height (bg_height=0) hugs bottom body text and never covers top title or middle video
+    const mockGradForScroll = { addColorStop() {} };
+    const makeScrollMockCtx = () => ({
+        globalAlpha: 1,
+        font: '48px sans-serif',
+        save() {}, restore() {}, beginPath() {}, closePath() {}, moveTo() {}, lineTo() {},
+        quadraticCurveTo() {}, bezierCurveTo() {}, arc() {}, arcTo() {}, ellipse() {},
+        rect() {}, clip() {}, fill() {}, stroke() {}, fillRect() {}, strokeRect() {},
+        clearRect() {}, drawImage() {}, translate() {}, rotate() {}, scale() {},
+        setLineDash() {}, fillText() {}, strokeText() {},
+        measureText(str) { return { width: String(str || '').length * 22 }; },
+        createPattern() { return {}; },
+        createLinearGradient() { return mockGradForScroll; },
+        createRadialGradient() { return mockGradForScroll; },
+    });
+    const bodyOnlyAutoOv = sandbox.window.ReelsOverlay.createScrollOverlay({
+        x: 70, y: 400, w: 940, h: 1120,
+        scroll_title: 'JESUS IS COMING BACK - ONLY 3\nSIGNS REMAIN',
+        scroll_title_enabled: true,
+        scroll_title_fixed: true,
+        scroll_title_independent: false,
+        scroll_from_y: 1450,
+        scroll_speed: 120,
+        content: 'You may have\nscrolled past many\nvideos about the end\ntimes without stopping',
+        bg_enabled: true,
+        bg_style: 'newspaper_page',
+        bg_padding_top: 55,
+        bg_padding_bottom: 50,
+        bg_body_only: true,
+        bg_height: 0,
+    });
+    sandbox.window.ReelsOverlay.drawOverlay(makeScrollMockCtx(), bodyOnlyAutoOv, 2.5, 1080, 1920);
+    assert.ok(bodyOnlyAutoOv._renderedY > 600, `Expected bg_body_only Auto card Y (${bodyOnlyAutoOv._renderedY}) to stay strictly below fixed title (y=400..596)`);
+    assert.ok(bodyOnlyAutoOv._renderedY > 1000, `Expected bg_body_only Auto card Y (${bodyOnlyAutoOv._renderedY}) at t=2.5s to hug bottom scrolling body text instead of covering middle video`);
+
+    // Verify bg_body_only with explicit bg_height anchors to bottom of body area
+    const bodyOnlyFixedHOv = sandbox.window.ReelsOverlay.createScrollOverlay({
+        x: 70, y: 400, w: 940, h: 1120,
+        scroll_title: 'JESUS IS COMING BACK - ONLY 3\nSIGNS REMAIN',
+        scroll_title_enabled: true,
+        scroll_title_fixed: true,
+        scroll_title_independent: false,
+        scroll_from_y: 1450,
+        scroll_speed: 120,
+        content: 'You may have\nscrolled past many\nvideos about the end',
+        bg_enabled: true,
+        bg_style: 'newspaper_page',
+        bg_padding_top: 55,
+        bg_padding_bottom: 50,
+        bg_body_only: true,
+        bg_height: 420,
+        bg_width: 820,
+    });
+    sandbox.window.ReelsOverlay.drawOverlay(makeScrollMockCtx(), bodyOnlyFixedHOv, 2.5, 1080, 1920);
+    assert.equal(bodyOnlyFixedHOv._renderedW, 820, 'Explicit bg_width=820 must set rendered card width to 820');
+    assert.equal(bodyOnlyFixedHOv._renderedH, 420, 'Explicit bg_height=420 must set rendered card height to 420');
+    assert.equal(bodyOnlyFixedHOv._renderedY, 1100, 'Explicit bg_height=420 with bg_body_only=true must anchor to bottom (1520 - 420 = 1100)');
+
+    const panelSrc = fs.readFileSync(path.join(ROOT, 'src/reels-overlay-panel.js'), 'utf8');
+    assert.ok(panelSrc.includes('id="rop-scroll-bg-style"'), 'Scroll overlay panel must include #rop-scroll-bg-style dropdown');
+    assert.ok(panelSrc.includes('id="rop-scroll-title-bg-style"'), 'Scroll overlay panel must include #rop-scroll-title-bg-style dropdown');
+    assert.ok(panelSrc.includes('rop-scroll-card-bg-preset'), 'Scroll overlay panel must include one-click .rop-scroll-card-bg-preset buttons');
+    assert.ok(panelSrc.includes('rop-scroll-body-bg-preset'), 'Scroll overlay panel must include one-click .rop-scroll-body-bg-preset buttons');
+    assert.ok(panelSrc.includes('id="rop-scroll-bg-width"'), 'Scroll overlay panel must include #rop-scroll-bg-width control');
+    assert.ok(panelSrc.includes('id="rop-scroll-bg-height"'), 'Scroll overlay panel must include #rop-scroll-bg-height control');
+    assert.ok(panelSrc.includes('id="rop-scroll-bg-scroll-follow"'), 'Scroll overlay panel must include #rop-scroll-bg-scroll-follow checkbox');
+    assert.ok(panelSrc.includes('id="rop-scroll-bg-width-quick"'), 'Scroll overlay panel must include top quick width slider');
+    assert.ok(panelSrc.includes('id="rop-scroll-body-bg-pad-h-quick"'), 'Scroll overlay panel must include top quick per-line length slider');
+
+    const previewV2Src = fs.readFileSync(path.join(ROOT, 'src/reels-preview-v2.js'), 'utf8');
+    assert.ok(previewV2Src.includes('hitTestOverlayHandle'), 'Preview V2 must support interactive 8-handle overlay resizing on canvas');
+
+    // Verify Decor Overlay (30款点缀图层: 黑色氛围模板 / 飘浮粒子 / 电影颗粒 / 回忆颗粒感 / 发光星星 / 圣诞装饰 / 复古角框)
+    assert.equal(typeof sandbox.window.ReelsOverlay.createDecorOverlay, 'function', 'ReelsOverlay.createDecorOverlay must exist');
+    assert.equal(typeof sandbox.window.ReelsOverlay.applyDecorStylePreset, 'function', 'ReelsOverlay.applyDecorStylePreset must exist');
+    const decorStyles = sandbox.window.ReelsOverlay.DECOR_OVERLAY_STYLES;
+    assert.equal(Object.keys(decorStyles).length, 30, 'DECOR_OVERLAY_STYLES must provide 30 built-in embellishment & grain styles');
+    for (const styleKey of Object.keys(decorStyles)) {
+        const decorOv = sandbox.window.ReelsOverlay.createDecorOverlay({
+            decor_style: styleKey,
+            decor_snowflakes: true,
+        });
+        let saves = 0;
+        let restores = 0;
+        const mockGrad = { addColorStop() {} };
+        const mockCtx = {
+            globalAlpha: 1,
+            save() { saves++; },
+            restore() { restores++; },
+            beginPath() {},
+            closePath() {},
+            moveTo() {},
+            lineTo() {},
+            quadraticCurveTo() {},
+            bezierCurveTo() {},
+            arc() {},
+            arcTo() {},
+            ellipse() {},
+            rect() {},
+            clip() {},
+            fill() {},
+            stroke() {},
+            fillRect() {},
+            strokeRect() {},
+            clearRect() {},
+            drawImage() {},
+            translate() {},
+            rotate() {},
+            scale() {},
+            setLineDash() {},
+            createPattern() { return {}; },
+            createLinearGradient() { return mockGrad; },
+            createRadialGradient() { return mockGrad; },
+        };
+        sandbox.window.ReelsOverlay.drawOverlay(mockCtx, decorOv, 1.5, 1080, 1920);
+        assert.equal(saves, restores, `drawOverlay for decor_style="${styleKey}" must balance ctx.save() and ctx.restore()`);
+    }
+    assert.ok(panelSrc.includes('id="rop-add-decor"'), 'Overlay panel must include + ✨ 点缀图层 button');
+    assert.ok(panelSrc.includes('id="rop-decor-props"'), 'Overlay panel must include #rop-decor-props section');
+    assert.ok(panelSrc.includes('class ReelsDecorPanel'), 'Overlay panel module must define standalone ReelsDecorPanel for the dedicated tab');
+    assert.ok(panelSrc.includes('id="rdp-master-enable"'), 'ReelsDecorPanel must include master enable checkbox #rdp-master-enable');
+    assert.ok(panelSrc.includes('id="rdp-dark-enabled"'), 'ReelsDecorPanel must include dark template enable checkbox #rdp-dark-enabled');
+    assert.ok(panelSrc.includes('id="rdp-grain-enabled"'), 'ReelsDecorPanel must include film grain enable checkbox #rdp-grain-enabled');
+
+    // Verify decor_dark_enabled and decor_grain_enabled switches gate rendering independently
+    const toggleTestOv = sandbox.window.ReelsOverlay.createDecorOverlay({
+        decor_style: 'dark_floating_dust',
+        decor_dark_vignette: 85,
+        decor_dark_enabled: false,
+        decor_grain_intensity: 60,
+        decor_grain_warmth: 40,
+        decor_grain_enabled: false,
+        decor_floating_particles: false,
+        decor_glow_stars: false,
+        decor_snowflakes: false,
+        decor_corner_ornaments: false,
+        decor_edge_garland: false,
+        decor_film_scratches: false,
+        decor_light_leak: false,
+    });
+    let fillRectCalls = 0;
+    const silentGrad = { addColorStop() {} };
+    const toggleCtx = {
+        globalAlpha: 1,
+        save() {}, restore() {}, beginPath() {}, closePath() {}, moveTo() {}, lineTo() {},
+        quadraticCurveTo() {}, bezierCurveTo() {}, arc() {}, arcTo() {}, ellipse() {}, rect() {}, clip() {},
+        fill() {}, stroke() {}, strokeRect() {}, clearRect() {}, drawImage() {}, translate() {}, rotate() {}, scale() {}, setLineDash() {},
+        fillRect() { fillRectCalls++; },
+        createPattern() { return {}; },
+        createLinearGradient() { return silentGrad; },
+        createRadialGradient() { return silentGrad; },
+    };
+    sandbox.window.ReelsOverlay.drawOverlay(toggleCtx, toggleTestOv, 1.0, 1080, 1920);
+    assert.equal(fillRectCalls, 0, 'When all sub-effects (including decor_dark_enabled and decor_grain_enabled) are unchecked, drawOverlay must draw 0 fillRect calls');
+
+    toggleTestOv.decor_dark_enabled = true;
+    sandbox.window.ReelsOverlay.drawOverlay(toggleCtx, toggleTestOv, 1.0, 1080, 1920);
+    assert.ok(fillRectCalls > 0, 'When decor_dark_enabled is checked, dark template vignette must render');
+
+    // Verify independent preview/export toggle and middle-layer z-order across all pipelines
+    const indexHtmlSrc = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+    assert.ok(indexHtmlSrc.includes('data-tab="decor"'), 'Inspector tab bar must include standalone ✨ 点缀与颗粒 tab button');
+    assert.ok(indexHtmlSrc.includes('id="inspector-tab-decor"'), 'Inspector must include #inspector-tab-decor container');
+    assert.ok(indexHtmlSrc.includes('id="reels-decor-panel-root"'), 'Inspector must include #reels-decor-panel-root mount node');
+    assert.ok(indexHtmlSrc.includes('id="reels-decor-toggle"'), 'Preview bar must include dedicated #reels-decor-toggle checkbox');
+    assert.ok(previewV2Src.includes('data-role="decor"'), 'Preview V2 bar must include dedicated [data-role="decor"] checkbox');
+    assert.ok(previewV2Src.includes("drawOverlays(ctx, task, overlayTime, w, h, phase, 'middle')"), 'Preview V2 must render middle decor/insert layer before subtitles and regular overlays');
+
+    const batchReelsSrc = fs.readFileSync(path.join(ROOT, 'src/batch-reels.js'), 'utf8');
+    assert.ok(batchReelsSrc.includes('function _isReelsDecorToggleEnabled()'), 'batch-reels.js must define _isReelsDecorToggleEnabled()');
+    assert.ok(batchReelsSrc.includes('function reelsOnDecorToggleChange(checkbox)'), 'batch-reels.js must define reelsOnDecorToggleChange(checkbox)');
+    assert.ok(batchReelsSrc.includes("renderOverlays('middle')"), 'V1 preview must render middle decor/insert layer before subtitles and regular overlays');
+    assert.ok(batchReelsSrc.includes('_reelsState.decorPanel.refresh()'), 'reelsSelectTask must refresh ReelsDecorPanel when switching tasks');
+    assert.ok(panelSrc.includes('_syncDecorStackToScopeTasks()'), 'ReelsDecorPanel must synchronize the full decor layer stack across scoped tasks');
+
+    const wysiwygSrc = fs.readFileSync(path.join(ROOT, 'src/reels-wysiwyg-export.js'), 'utf8');
+    assert.ok(wysiwygSrc.includes('drawOverlayGroup(middleOvs)'), 'WYSIWYG export must render middle decor/insert layer before subtitles and regular overlays');
+
+    // Verify ReelsRenderPlan orders decor between insert clips and regular overlays
+    loadBrowserScript('src/reels-render-plan.js', sandbox);
+    const mockTask = {
+        overlays: [
+            { id: 'ov_card', type: 'textcard', title_text: 'Top Card' },
+            { id: 'ov_decor', type: 'decor', decor_style: 'dark_floating_dust' },
+            { id: 'ov_scroll', type: 'scroll', content: 'Scrolling text' },
+        ],
+        visualOverlayOrder: ['overlay:ov_card', 'overlay:ov_decor', 'overlay:ov_scroll'],
+    };
+    const composited = sandbox.window.ReelsRenderPlan.getCompositedOverlays(mockTask, { forExport: true });
+    assert.equal(composited[0].id, 'ov_decor', 'getCompositedOverlays must always place decor middle-layer before textcard/scroll overlays');
+    assert.ok(composited[0].z_index < composited[1].z_index && composited[0].z_index < composited[2].z_index, 'Decor overlay must have lower z_index than regular overlays');
+
+    const presets = sandbox.window.REELS_BUILTIN_PRESETS;
+    for (const presetName of [
+        '🎄 圣诞红绿金_双行推开爆款',
+        '🍬 圣诞拐杖糖斜纹带_手写笔出字',
+        '🎅 圣诞红丝绒烫金_冬青装饰带',
+        '❄️ 圣诞松林覆雪带_暖金发光字',
+        '🍪 圣诞姜饼糖霜签_复古剪报字',
+    ]) {
+        assert.ok(presets[presetName], `Built-in Christmas preset "${presetName}" must exist`);
+    }
+});
+
+
+
+
+
+
+

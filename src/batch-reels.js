@@ -10055,6 +10055,12 @@ function reelsSelectTask(idx, options = {}) {
         } else {
             prevTask.overlays = [...(_reelsState.overlayProxy.overlayMgr.overlays || [])];
         }
+        // 若点缀面板勾选了“同步”且上一任务已有 decor 图层，切换任务前自动确保作用范围内任务均已同步
+        if (!_reelsState._coverEditMode && (prevTask.overlays || []).some(o => o && o.type === 'decor')) {
+            if (_reelsState.decorPanel && typeof _reelsState.decorPanel._syncDecorStackToScopeTasks === 'function') {
+                _reelsState.decorPanel._syncDecorStackToScopeTasks();
+            }
+        }
     }
 
     _reelsState.selectedIdx = idx;
@@ -10091,10 +10097,13 @@ function reelsSelectTask(idx, options = {}) {
         } else {
             mgr.overlays = task.overlays ? [...task.overlays] : [];
         }
-        // 刷新覆层面板
+        // 刷新覆层面板与独立点缀面板
         if (_reelsState.overlayPanel) {
             _reelsState.overlayPanel.deselectOverlay();
             _reelsState.overlayPanel._refreshList();
+        }
+        if (_reelsState.decorPanel && typeof _reelsState.decorPanel.refresh === 'function') {
+            _reelsState.decorPanel.refresh();
         }
     }
 
@@ -10403,6 +10412,7 @@ function reelsSelectTask(idx, options = {}) {
     _reelsState.mockPlaying = false;
     _reelsState.mockPausedTime = 0;
     _updatePreviewTimeUI(0, _getPreviewDuration());
+    reelsUpdatePreview();
     // V2 预览有独立时钟；播放中切换任务时也必须清掉旧任务进度。
     window.ReelsPreviewV2?.resetForTaskSwitch?.({ autoplay: options.autoplay === true });
     if (playBtn) playBtn.textContent = '▶️';
