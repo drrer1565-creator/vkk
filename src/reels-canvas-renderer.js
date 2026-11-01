@@ -839,6 +839,22 @@ class ReelsCanvasRenderer {
         // For non-scrolling lines, we only render if active
         if (!_isSubCall && (currentTime < segStart || currentTime > segEnd)) return;
 
+        // 自动迁移已保存的圣诞徽章/挂旗带旧配置，使其居中显示整句短语并按 5 词双行自然切分
+        if (['xmas_gingerbread_tag', 'xmas_velvet_gold', 'xmas_pine_snow'].includes(s.box_brush_style)
+            && s.anim_in_type === 'typewriter' && s.hide_until_spoken === true) {
+            s.hide_until_spoken = false;
+            s.unread_opacity = 100;
+            s.anim_in_type = 'pop';
+            s.anim_in_duration = 0.16;
+            if (!s.max_words_per_segment) {
+                s.max_words_per_segment = 5;
+                s.max_words_per_line = 3;
+                s.balanced_two_line_wrap = true;
+                s.wrap_width_percent = 66;
+                s.wrap_lines = 2;
+            }
+        }
+
         // ── 按每屏词数上限 (max_words_per_segment) 与句尾标点自动切分自然短句屏 ──
         const maxWordsPerSeg = Math.max(0, parseInt(s.max_words_per_segment, 10) || 0);
         if (!_isSubCall && maxWordsPerSeg > 0 && (!segment.styled_ranges || segment.styled_ranges.length === 0)) {
@@ -1656,9 +1672,14 @@ class ReelsCanvasRenderer {
                     const lineHScaled = lineH * lineScale;
                     const scaledLineW = lineW * lineScale;
                     const hasCustomLineScale = Math.abs(lineScale - 1.0) > 0.001;
-                    const anchorLineW = (finalLineWidths[i] != null && (hasCustomLineScale || finalLineWidths[i] > lineW))
-                        ? finalLineWidths[i] : scaledLineW;
-                    const effectiveLineW = (actualLineWidths[i] != null && (hasCustomLineScale || actualLineWidths[i] > lineW))
+                    const lineRange = lineWordRanges[i];
+                    const lineHasActiveZoom = pushApartEnabled && activeSpokenIdx >= 0 && lineRange
+                        && activeSpokenIdx >= lineRange.startWordIdx && activeSpokenIdx < lineRange.endWordIdx;
+                    const anchorLineW = lineHasActiveZoom
+                        ? (actualLineWidths[i] ?? scaledLineW)
+                        : ((finalLineWidths[i] != null && (hasCustomLineScale || finalLineWidths[i] > lineW))
+                            ? finalLineWidths[i] : scaledLineW);
+                    const effectiveLineW = (actualLineWidths[i] != null && (hasCustomLineScale || actualLineWidths[i] > lineW || lineHasActiveZoom))
                         ? actualLineWidths[i] : scaledLineW;
                     const lineAlignMode = resolveLineAlignMode(i);
                     const xStart = computeAlignedLineX(i, lineAlignMode === 'right' ? effectiveLineW : anchorLineW);
@@ -1685,7 +1706,6 @@ class ReelsCanvasRenderer {
                     const visWords = [];
                     let minWX = Infinity;
                     let maxWX = -Infinity;
-                    const baseSpaceW = ctx.measureText(' ').width + wordSpacing;
 
                     for (const wordStr of lineWords) {
                         const wordW = this._measureTextWithSpacing(ctx, wordStr, letterSpacing);
@@ -1696,7 +1716,35 @@ class ReelsCanvasRenderer {
                         };
                         const wordStart = wt.start;
                         const wordEnd = wt.end;
-                        const slotW = wordW * lineScale;
+                        let isWordActiveSpoken = false;
+                        if (activeSpokenIdx >= 0) {
+                            if (wordPopGroups) {
+                                const activeTiming = resolvedWordTimings[activeSpokenIdx];
+                                isWordActiveSpoken = activeTiming != null
+                                    && Math.abs(wordStart - activeTiming.start) < 1e-6
+                                    && Math.abs(wordEnd - activeTiming.end) < 1e-6;
+                            } else {
+                                isWordActiveSpoken = wordIdx === activeSpokenIdx;
+                            }
+                        }
+                        const isHighlightZoom = highlightScaleEnabled && isWordActiveSpoken;
+                        let allocScale = 1.0;
+                        if (isWordPopRandom) {
+                            allocScale = this._computeWordRandomFinalScale(
+                                wordIdx, segStart, wordStart,
+                                Number(s.word_pop_random_min_scale ?? 0.7),
+                                Number(s.word_pop_random_max_scale ?? 1.34)
+                            );
+                        } else if (isWordPopRandomPulse) {
+                            const pMax = Number(s.word_pop_random_pulse_max_scale ?? 1.40);
+                            allocScale = Math.max(1.0, pMax * 0.85);
+                        } else if (isLetterJump) {
+                            const ljScale = Number(s.letter_jump_scale ?? 1.5);
+                            if (ljScale > 1.0) allocScale = ljScale;
+                        }
+                        const slotW = (pushApartEnabled && isHighlightZoom)
+                            ? (wordW * Math.max(allocScale, highlightScaleFactor) + pushApartExtraPad * 2) * lineScale
+                            : (wordW * lineScale * allocScale);
                         const slotX = textDirection === 'rtl' ? currX - slotW : currX;
                         const wordDrawX = s.only_show_active_word ? (cx - wordW / 2) : slotX;
 
@@ -1726,7 +1774,8 @@ class ReelsCanvasRenderer {
                             if (wordDrawX < minWX) minWX = wordDrawX;
                             if (wordDrawX + visW > maxWX) maxWX = wordDrawX + visW;
                         }
-                        currX += textDirection === 'rtl' ? -(slotW + baseSpaceW * lineScale) : (slotW + baseSpaceW * lineScale);
+                        const gapW = (safeBaseSpaceW_ + this._computeRandomWordSpacing(s, wordIdx, segStart, wordStart)) * lineScale;
+                        currX += textDirection === 'rtl' ? -(slotW + gapW) : (slotW + gapW);
                     }
 
                     if (visWords.length > 0) {

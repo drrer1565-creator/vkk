@@ -8572,21 +8572,12 @@ const ReelsBrushEngine = {
         }
         ctx.restore();
 
-        // Step 2 on offscreen: Fill the unified silhouette mask with our procedural texture pattern anchored to scrolling text coordinates
+        // Step 2 on offscreen: Fill the unified silhouette mask with our procedural texture pattern anchored to scrolling text coordinates.
+        // IMPORTANT: Never use 'multiply' on octx because 'multiply' uses source-over where destination alpha is 0,
+        // which would paint an opaque rectangular bounding box over transparent pixels outside the silhouette!
         octx.globalCompositeOperation = 'source-in';
-        const pat = octx.createPattern(tileCanvas, 'repeat');
-        if (opts.colormode === 'tint' && opts.color && opts.color !== '#000000' && opts.color !== cfg.baseColor) {
-            octx.fillStyle = opts.color;
-            octx.fillRect(boxX, boxY, boxW, boxH);
-            if (pat) {
-                octx.globalCompositeOperation = 'multiply';
-                octx.save();
-                octx.translate(anchorX, anchorY);
-                octx.fillStyle = pat;
-                octx.fillRect(boxX - anchorX, boxY - anchorY, boxW, boxH);
-                octx.restore();
-            }
-        } else if (pat) {
+        const pat = tileCanvas ? octx.createPattern(tileCanvas, 'repeat') : null;
+        if (pat) {
             octx.save();
             octx.translate(anchorX, anchorY);
             octx.fillStyle = pat;
@@ -8596,6 +8587,21 @@ const ReelsBrushEngine = {
             octx.fillStyle = cfg.baseColor;
             octx.fillRect(boxX, boxY, boxW, boxH);
         }
+        const normOptColor = String(opts.color || '').trim().toLowerCase();
+        const normBaseColor = String(cfg.baseColor || '').trim().toLowerCase();
+        const defaultCutoutPalette = new Set([
+            '', '#000000', '#7c3f1c', '#7a3e1d', '#f3efe6', '#eae2d3',
+            '#f5ead4', '#f4e9d2', '#9e1b20', '#a61c1e', '#1e1c1a', '#191a20',
+            '#d6b588', '#d8ba8c', '#f6f2e9', '#fbfbf7', '#f8fafc'
+        ]);
+        if (opts.colormode === 'tint' && normOptColor && normOptColor !== normBaseColor && !defaultCutoutPalette.has(normOptColor)) {
+            octx.save();
+            octx.globalCompositeOperation = 'source-atop';
+            octx.globalAlpha = 0.48;
+            octx.fillStyle = opts.color;
+            octx.fillRect(boxX, boxY, boxW, boxH);
+            octx.restore();
+        }
         octx.restore();
 
         // Step 3: Composite the textured cutout silhouette onto main ctx
@@ -8603,9 +8609,9 @@ const ReelsBrushEngine = {
         if (styleId === 'xmas_gingerbread_tag' && lineCores.length > 0) {
             const firstCore = lineCores[0];
             const lastCore = lineCores[lineCores.length - 1];
-            const ornScale = Math.max(0.75, Math.min(1.3, maxFs / 58));
-            this._drawHollyOrnament(ctx, firstCore.left + 8, firstCore.top + 8, ornScale, false);
-            this._drawHollyOrnament(ctx, lastCore.right - 8, lastCore.bottom - 8, ornScale, true);
+            const ornScale = Math.max(0.75, Math.min(1.25, maxFs / 60));
+            this._drawHollyOrnament(ctx, firstCore.left - firstCore.cutoutR * 0.32, firstCore.top + 4, ornScale, false);
+            this._drawHollyOrnament(ctx, lastCore.right + lastCore.cutoutR * 0.32, lastCore.bottom - 4, ornScale, true);
         }
         ctx.restore();
     },
