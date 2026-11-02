@@ -142,24 +142,32 @@ jobs:
           Write-Host "📄 python311._pth 内容:"
           Get-Content $pthFile
           
-          # 下载 get-pip.py
+          # 下载 get-pip.py 并直接解压内置 pip 到 site-packages（规避 pip 26.3 在 Windows 下 get-pip.py 自修改拦截报错）
           Write-Host "📥 下载 get-pip.py"
           Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile "vendor/windows/python/get-pip.py"
           
           # 创建 site-packages 目录
           New-Item -ItemType Directory -Force -Path "vendor/windows/python/Lib/site-packages"
           
-          # 安装 pip
-          Write-Host "🔧 安装 pip"
-          & "vendor/windows/python/python.exe" "vendor/windows/python/get-pip.py" --no-warn-script-location
+          # 解压 get-pip.py 内置的 pip 到 Lib/site-packages
+          Write-Host "🔧 安装 pip 到 Lib/site-packages"
+          $gpContent = Get-Content "vendor/windows/python/get-pip.py" -Raw
+          $gpContent = $gpContent.Replace("pip_zip.extractall(tmpdir)", "pip_zip.extractall('vendor/windows/python/Lib/site-packages')")
+          $gpContent = $gpContent.Replace("bootstrap(tmpdir=tmpdir)", "print('pip extracted to site-packages OK')")
+          Set-Content "vendor/windows/python/get-pip.py" -Value $gpContent -Encoding UTF8
+          & "vendor/windows/python/python.exe" "vendor/windows/python/get-pip.py"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item "vendor/windows/python/get-pip.py" -Force -ErrorAction SilentlyContinue
           
           # 安装依赖到 site-packages
           Write-Host "🔧 安装 Python 依赖"
           & "vendor/windows/python/python.exe" -m pip install flask flask-cors pydub requests pysrt diff-match-patch --target "vendor/windows/python/Lib/site-packages" --no-warn-script-location
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           
           # 验证依赖安装
           Write-Host "🔍 验证 Flask 和 flask-cors 安装:"
           & "vendor/windows/python/python.exe" -c "import flask; from flask_cors import CORS; print('Flask version:', flask.__version__)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           
           Write-Host "✅ Python Embedded 安装完成"
           dir "vendor/windows/python"
