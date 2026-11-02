@@ -2384,6 +2384,25 @@ test('All built-in subtitle presets (including fullpage_typewriter newspaper cut
             `"${twPresetName}" must paginate long multi-segment scripts so all visible lines stay on-screen (0..1920), got Y=${drawnWords.map(w => Math.round(w.y)).join(',')}`
         );
     }
+
+    // Verify quick-cut / talking-head export protections against "视频编码收尾超时"
+    const rawvideoSrc = fs.readFileSync(path.join(ROOT, 'electron/services/ffmpeg-rawvideo.js'), 'utf8');
+    assert.ok(
+        rawvideoSrc.includes('const needAlphaStreamLoop = !isAlphaBgImage && !useDirectLoopFade') &&
+        rawvideoSrc.includes("args.push('-fflags', '+genpts', '-i', opts.alphaOverlayBgPath);"),
+        'startSession must avoid infinite -stream_loop -1 on single-pass/talking-head clips so tpad=stop_mode=clone works cleanly at EOF'
+    );
+    assert.ok(
+        rawvideoSrc.includes('tpad=stop_mode=clone:stop_duration=5') &&
+        rawvideoSrc.includes('setpts=PTS-STARTPTS'),
+        'ffmpeg-rawvideo.js must pad non-looped extractSimpleLoop with tpad and normalize start_pts'
+    );
+    const wysiwygExportSrc = fs.readFileSync(path.join(ROOT, 'src/reels-wysiwyg-export.js'), 'utf8');
+    assert.ok(
+        wysiwygExportSrc.includes('_alphaFallbackRetried: true') &&
+        wysiwygExportSrc.includes('!params._alphaFallbackRetried'),
+        'reelsWysiwygExport must automatically fall back from alphaOverlayBgPath to standard frame-extraction mode if fast alpha overlay fails or times out'
+    );
 });
 
 

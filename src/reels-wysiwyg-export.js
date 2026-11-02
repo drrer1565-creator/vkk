@@ -721,8 +721,8 @@ async function reelsWysiwygExport(params) {
             log(`🎯 [智能提速] 合成时长(${duration.toFixed(2)}s)无需底板(${_probedBg.toFixed(2)}s)循环！强制关闭渐变，唤醒极速贴合 ⚡️！`);
             loopFade = false; 
             // 只要不是多视频，就可以霸王硬上弓恢复极速直通路径！
-            // ⚠️ 但如果有覆层使用了 blend mode，则不能走 alpha overlay（FFmpeg overlay 不支持 CSS 混合模式）
-            if (params.alphaOverlayBgPath === null && !_hasBlendOverlay
+            // ⚠️ 但如果有覆层使用了 blend mode，或已经是 Alpha 失败后的自动降级重试，则不能走 alpha overlay
+            if (params.alphaOverlayBgPath === null && !params._alphaFallbackRetried && !_hasBlendOverlay
                 && !contentVideoDirectBg && !contentVideoBlurBg) {
                 const uiFastAlpha = (document.getElementById('reels-fast-alpha-mode') || {}).checked !== false;
                 if (uiFastAlpha) params.alphaOverlayBgPath = backgroundPath; 
@@ -1371,6 +1371,17 @@ async function reelsWysiwygExport(params) {
         if (e && e.message === '__CANCELLED__') {
             log('导出已取消，资源已清理');
             return { cancelled: true };
+        }
+        // ── 自动容错降级：若 Fast Alpha Overlay 直通模式因快剪口播素材的 VFR/时间戳/elst 异常导致编码或收尾失败，
+        //    自动回退到标准固定帧率背景抽帧 + 单路 rawvideo 管道合成模式重试一次，确保成片稳定导出 ──
+        if (params.alphaOverlayBgPath && !params._alphaFallbackRetried && !(isCancelled && isCancelled())) {
+            const errText = (e && e.message) ? e.message : String(e);
+            log(`⚠️ Fast Alpha 直通合成遇到源视频时间戳/编码兼容问题 (${errText})，正在自动切换为「标准固定帧率抽帧合成模式」重试...`);
+            return await reelsWysiwygExport({
+                ...params,
+                alphaOverlayBgPath: null,
+                _alphaFallbackRetried: true,
+            });
         }
         throw e;
     }

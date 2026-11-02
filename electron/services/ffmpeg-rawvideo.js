@@ -1079,12 +1079,23 @@ async function extractSimpleLoopWithTrim(ffmpeg, backgroundPath, framesDir, scal
 }
 
 async function extractSimpleLoop(ffmpeg, backgroundPath, framesDir, scaleCropFilter, fps, duration, ptsFactor = 1.0, shouldLoop = false) {
-    const colorPrefix = isImageMedia(backgroundPath) ? '' : `${buildInputBt709ConvertFilter(backgroundPath, ffmpeg)},`;
+    const isImg = isImageMedia(backgroundPath);
+    const colorPrefix = isImg ? '' : `${buildInputBt709ConvertFilter(backgroundPath, ffmpeg)},`;
     let vf = `${colorPrefix}${scaleCropFilter}`;
-    if (Math.abs(ptsFactor - 1.0) > 0.01) {
-        vf = `${vf},setpts=PTS*${ptsFactor.toFixed(3)}`;
+    if (!isImg) {
+        if (Math.abs(ptsFactor - 1.0) > 0.01) {
+            vf = `${vf},setpts=(PTS-STARTPTS)*${ptsFactor.toFixed(3)}`;
+        } else {
+            vf = `${vf},setpts=PTS-STARTPTS`;
+        }
+        if (!shouldLoop) {
+            vf = `${vf},tpad=stop_mode=clone:stop_duration=5`;
+        }
     }
     const args = ['-y'];
+    if (!isImg) {
+        args.push('-fflags', '+genpts');
+    }
     if (shouldLoop) {
         args.push('-stream_loop', '-1');
     }
@@ -1610,15 +1621,27 @@ async function startSession(opts) {
         const step = Math.max(0.1, scaledBgDuration - fadeDur - (2 / safeFps));
         const useDirectLoopFade = !isAlphaBgImage && opts.loopFade && scaledBgDuration > fadeDur + 0.05
             && targetDuration > scaledBgDuration + 0.01;
+        // 仅当目标合成时长明确超过背景视频时长（例如短背景循环配长语音，且未启用 xfade）时才开启 -stream_loop -1。
+        // 单段口播/快剪素材（targetDuration <= scaledBgDuration + 0.5）不挂无限 -stream_loop -1：
+        // 1) 挂了 -stream_loop -1 后输入 0 永远不会触发 EOF，导致下方 tpad=stop_mode=clone 完全失效；
+        // 2) 快速剪辑/无损切割 (-c copy) 口播素材常带有 edit-list (elst)、非零 start_pts、VFR 或音轨长于视频轨，
+        //    一旦在结尾处触发 demuxer 循环回跳第 0 帧，不仅结尾画面会闪回开头，且循环边界的 DTS/PTS 跳变会导致
+        //    FFmpeg overlay 滤镜在 stdin 结束后卡死，最终报「视频编码收尾超时」。
+        const needAlphaStreamLoop = !isAlphaBgImage && !useDirectLoopFade
+            && (!(scaledBgDuration > 0) || targetDuration > scaledBgDuration + 0.5);
+        const ptsFactorForInput = Math.max(0.01, (bgDurScale || 100) / 100);
+        const maxBgReadDuration = Math.max(10, Math.ceil((Number(targetDuration) || 60) / ptsFactorForInput) + 5);
         let bgInputCount = 1;
         if (useDirectLoopFade) {
             bgInputCount = Math.max(2, Math.ceil((targetDuration - scaledBgDuration) / step) + 2);
-            for (let i = 0; i < bgInputCount; i++) args.push('-i', opts.alphaOverlayBgPath);
+            for (let i = 0; i < bgInputCount; i++) args.push('-fflags', '+genpts', '-i', opts.alphaOverlayBgPath);
             console.log(`[WYSIWYG] 背景直通 xfade 循环: ${bgInputCount} 段, rawVideoDur=${rawBgDuration.toFixed(3)}s, step=${step.toFixed(3)}s, fade=${fadeDur.toFixed(3)}s`);
         } else if (isAlphaBgImage) {
-            args.push('-loop', '1', '-i', opts.alphaOverlayBgPath);
+            args.push('-loop', '1', '-t', String(maxBgReadDuration), '-i', opts.alphaOverlayBgPath);
+        } else if (needAlphaStreamLoop) {
+            args.push('-fflags', '+genpts', '-stream_loop', '-1', '-t', String(maxBgReadDuration), '-i', opts.alphaOverlayBgPath);
         } else {
-            args.push('-stream_loop', '-1', '-i', opts.alphaOverlayBgPath);
+            args.push('-fflags', '+genpts', '-i', opts.alphaOverlayBgPath);
         }
         
         args.push(
@@ -1986,7 +2009,7 @@ async function finishSession(sessionId) {
                 resolve();
             };
             const onClose = () => finishWait(false);
-            const timer = setTimeout(() => finishWait(true), 120000);
+            const timer = setTimeout(() => finishWait(true), 45000);
             session.proc.once('close', onClose);
             try { session.proc.stdin.end(); } catch (_) { }
             if (session.encoderExited) finishWait(false);
@@ -2720,8 +2743,8 @@ async function parallelExport(opts, mainWindow) {
         textDirection: path.join(scriptBase, 'reels-text-direction.js'),
         animEngine: path.join(scriptBase, 'reels-anim-engine.js'),
         richText: path.join(scriptBase, 'reels-rich-text.js'),
-        canvasRenderer: path.join(scriptBase, 'reels-canvas-renderer.js'),
         overlay: path.join(scriptBase, 'reels-overlay.js'),
+        canvasRenderer: path.join(scriptBase, 'reels-canvas-renderer.js'),
         fontMetadata: path.join(scriptBase, 'fonts-metadata.js'),
         fontManager: path.join(scriptBase, 'reels-font-manager.js'),
     };
