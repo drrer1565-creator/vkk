@@ -1772,12 +1772,33 @@
             if (hasKineticBackdrop) {
                 state.renderer.renderKineticGlowBackdrop(style, w, h);
             }
-            const segment = findActiveSegment(task, time, style);
+            const segs = Array.isArray(task.segments) ? task.segments : [];
+            let segment = findActiveSegment(task, time, style);
+            if (!segment && !state.isPlaying && segs.length > 0 && time <= numberOr(segs[0].start, 0) + 0.05) {
+                segment = segs[0];
+            }
             if (!segment) return;
+            let renderTime = time;
+            if (!state.isPlaying) {
+                const segStart = numberOr(segment.start, 0);
+                const segEnd = Math.max(segStart + 0.05, numberOr(segment.end, segStart + 1));
+                const segDur = segEnd - segStart;
+                const inDur = (style.anim_in_type && style.anim_in_type !== 'none')
+                    ? Math.max(0.15, numberOr(style.anim_in_duration, 0.3))
+                    : 0.15;
+                if (style.fullpage_typewriter && time <= segStart + 0.05) {
+                    const lastSegEnd = segs.length > 0
+                        ? Math.max(segEnd, numberOr(segs[Math.min(segs.length - 1, 2)].end, segEnd))
+                        : segEnd;
+                    renderTime = Math.max(segEnd * 0.85, Math.min(lastSegEnd, segStart + 2.4));
+                } else if (time <= segStart + inDur) {
+                    renderTime = Math.min(segEnd - 0.01, Math.max(time, segStart + Math.min(segDur * 0.55, Math.max(inDur + 0.08, 0.45))));
+                }
+            }
             if (typeof state.renderer.setContextSegments === 'function') {
                 state.renderer.setContextSegments(task.segments || [segment], task.ttsText || task.aiScript || '');
             }
-            state.renderer.renderSubtitle(style, segment, time, w, h, false, hasKineticBackdrop);
+            state.renderer.renderSubtitle(style, segment, renderTime, w, h, false, hasKineticBackdrop);
         } catch (err) {
             console.warn('[PreviewV2] subtitle render failed', err);
         }
@@ -2151,7 +2172,7 @@
         if (!(style && (style.scrolling_mode || style.fullpage_typewriter))) return null;
 
         // 滚动/打字机模式在句间空隙保留最近一个已开始的片段。
-        let nearest = null;
+        let nearest = segs[0];
         for (const seg of segs) {
             if (numberOr(seg.start, 0) <= time) nearest = seg;
             else break;

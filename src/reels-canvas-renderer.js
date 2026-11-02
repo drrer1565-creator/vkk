@@ -154,8 +154,9 @@ function drawSpeechWritingTip(ctx, kind, x, y, size, angle) {
     ctx.translate(x, y);ctx.rotate(angle * Math.PI / 180);ctx.scale(size, size);
     ctx.lineCap = 'round';ctx.lineJoin = 'round';
     const shape = (data, fill, stroke, width = .025) => {
-        const p = new Path2D(data);if (fill) { ctx.fillStyle = fill;ctx.fill(p); }
-        if (stroke) { ctx.strokeStyle = stroke;ctx.lineWidth = width;ctx.stroke(p); }
+        const p = typeof Path2D !== 'undefined' ? new Path2D(data) : null;
+        if (fill) { ctx.fillStyle = fill; p ? ctx.fill(p) : ctx.fill(); }
+        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; p ? ctx.stroke(p) : ctx.stroke(); }
     };
     if (kind === 'rose') {
         shape('M0 0 Q.21-.22 .48-.73', null, '#26743c', .045);
@@ -1110,7 +1111,7 @@ class ReelsCanvasRenderer {
         const hideUntilSpoken = Boolean(s.hide_until_spoken);
         const unreadOpacityFactor = Math.max(0, Math.min(1, Number(s.unread_opacity ?? 0) / 100));
         let activeSpokenIdx = -1;
-        if ((highlightEnabled || highlightScaleEnabled || hideUntilSpoken || s.dynamic_box || isLineFocus) &&
+        if ((highlightEnabled || highlightScaleEnabled || hideUntilSpoken || s.only_show_active_word || s.dynamic_box || isLineFocus || _isWPR_ || _isWPRP_) &&
             currentTime != null && currentTime >= segStart - 1e-6 && currentTime <= segEnd + 1e-6) {
             activeSpokenIdx = resolvedWordTimings.findIndex((wt, idx) =>
                 currentTime >= wt.start && (idx === totalWordCount - 1 ? currentTime <= wt.end : currentTime < wt.end)
@@ -1490,6 +1491,9 @@ class ReelsCanvasRenderer {
             twRevealedCount = anim.computeTypewriterProgress(
                 currentTime, segStart, segEnd, totalUnits
             );
+            if (typewriterRevealType !== 'char' && activeSpokenIdx >= 0) {
+                twRevealedCount = Math.max(twRevealedCount, activeSpokenIdx + 1);
+            }
         }
 
         // ── Character bounce & Extended Per-Char Animations ──
@@ -1646,7 +1650,8 @@ class ReelsCanvasRenderer {
                 }
             };
 
-            const brushEngine = (typeof window !== 'undefined' && (window.ReelsBrushEngine || window.ReelsOverlay?.ReelsBrushEngine));
+            const brushEngine = (typeof window !== 'undefined' && (window.ReelsBrushEngine || window.ReelsOverlay?.ReelsBrushEngine))
+                || (typeof globalThis !== 'undefined' && (globalThis.ReelsBrushEngine || globalThis.ReelsOverlay?.ReelsBrushEngine));
             const bStyle = s.box_brush_style;
             const isTextBacking = Boolean(brushEngine && typeof brushEngine.isTextBackingStyle === 'function' && brushEngine.isTextBackingStyle(bStyle));
             const isBrush = brushEngine && bStyle && bStyle !== 'rect' && bStyle !== 'none';
@@ -2162,7 +2167,7 @@ class ReelsCanvasRenderer {
                     : (wordW * lineScale * allocScale);
                 const slotX = textDirection === 'rtl' ? currX - slotW : currX;
 
-                const isWordActive = !s.only_show_active_word || (currentTime == null || (currentTime >= wordStart && (wordIdx === totalWordCount - 1 ? currentTime <= wordEnd : currentTime < wordEnd)));
+                const isWordActive = !s.only_show_active_word || (currentTime == null || isActiveSpoken || (activeSpokenIdx < 0 && currentTime >= wordStart && (wordIdx === totalWordCount - 1 ? currentTime <= wordEnd : currentTime < wordEnd)));
                 const wordCenterX = s.only_show_active_word ? cx : (slotX + slotW / 2);
                 const drawX = wordCenterX - (wordW * lineScale) / 2;
                 const textDrawX = wordCenterX - wordW / 2;
@@ -2257,7 +2262,7 @@ class ReelsCanvasRenderer {
                 }
 
                 let wordOpacity = lineAlpha;
-                if (s.only_show_active_word && currentTime != null && (currentTime < wordStart || currentTime > wordEnd)) {
+                if (s.only_show_active_word && currentTime != null && !isWordActive) {
                     wordOpacity = 0.0;
                 } else if ((s.ambient_glow_enabled || style?._ambient_text_final_pass)
                     && currentTime != null && currentTime < wordStart) {
@@ -2323,13 +2328,13 @@ class ReelsCanvasRenderer {
                 if (anim && (isWordPopRandom || isWordPopRandomPulse)) {
                     const unreadOpacity = Math.max(0, Math.min(1, Number(s.word_pop_random_unread_opacity ?? 0.0)));
                     const readOpacity = Math.max(0, Math.min(1, Number(s.word_pop_random_read_opacity ?? 1.0)));
-                    if (currentTime < wordStart) {
+                    if (currentTime < wordStart && !isActiveSpoken) {
                         wordOpacity *= unreadOpacity;
-                    } else {
+                    } else if (!s.only_show_active_word && !(isActiveSpoken && readOpacity <= 0.01)) {
                         wordOpacity *= readOpacity;
                     }
 
-                    if (currentTime >= wordStart) {
+                    if (currentTime >= wordStart || isActiveSpoken) {
                         randomPopScale = dynamicWordScale;
                     }
                 }
@@ -4241,6 +4246,14 @@ class ReelsCanvasRenderer {
 
         if (allTokens.length === 0) return;
 
+        const firstVisibleTok = allTokens.find(tok => tok && tok.text && tok.text.trim().length > 0);
+        const firstTokStart = (firstVisibleTok && Number.isFinite(Number(firstVisibleTok.start)))
+            ? Number(firstVisibleTok.start)
+            : 0;
+        const effectiveTime = (!s._writingPart && currentTime < firstTokStart)
+            ? firstTokStart
+            : currentTime;
+
         // 2. Set font properties
         const fontFamily = s.font_family || 'Arial';
         const fallbackFamily = _resolveGenericFallback(fontFamily);
@@ -4253,19 +4266,25 @@ class ReelsCanvasRenderer {
         ctx.font = fontStr;
         ctx.textBaseline = 'top';
 
-        const getLineFontStr = (li) => {
+        const getLineFontSize = (li) => {
             let fSize = fontSize;
-            let fWeight = fontWeight;
-            let fFamily = fontFamily;
-            let fItalic = italic;
-            
             if (li === 0) {
                 if (s.fullpage_typewriter_first_line_scale) {
                     fSize = fontSize * parseFloat(s.fullpage_typewriter_first_line_scale);
                 } else if (firstSegStyle.fontsize) {
                     fSize = firstSegStyle.fontsize;
                 }
-                
+            }
+            return fSize;
+        };
+
+        const getLineFontStr = (li) => {
+            const fSize = getLineFontSize(li);
+            let fWeight = fontWeight;
+            let fFamily = fontFamily;
+            let fItalic = italic;
+            
+            if (li === 0) {
                 if (s.fullpage_typewriter_first_line_bold !== undefined) {
                     fWeight = s.fullpage_typewriter_first_line_bold ? 900 : fontWeight;
                 } else if (firstSegStyle.bold !== undefined) {
@@ -4284,17 +4303,7 @@ class ReelsCanvasRenderer {
             return `${fItalic ? 'italic ' : ''}${fWeight} ${fSize}px "${fFamily}", ${fallbackFam}`;
         };
 
-        const getLineHeight = (li) => {
-            let fSize = fontSize;
-            if (li === 0) {
-                if (s.fullpage_typewriter_first_line_scale) {
-                    fSize = fontSize * parseFloat(s.fullpage_typewriter_first_line_scale);
-                } else if (firstSegStyle.fontsize) {
-                    fSize = firstSegStyle.fontsize;
-                }
-            }
-            return fSize * 1.2;
-        };
+        const getLineHeight = (li) => getLineFontSize(li) * 1.2;
 
         // 3. Line wrapping
         const advEnabled = !!s.advanced_textbox_enabled;
@@ -4353,9 +4362,11 @@ class ReelsCanvasRenderer {
             wrappingTokens.push(currentWrapTok);
         }
 
+        const maxWordsPerLine = Math.max(0, parseInt(s.max_words_per_line, 10) || 0);
         const wrapLines = [];
         let currentWrapLine = [];
         let currentWrapLineW = 0;
+        let currentWrapLineWords = 0;
 
         for (const wrapTok of wrappingTokens) {
             if (wrapTok.text.includes('\n')) {
@@ -4365,6 +4376,7 @@ class ReelsCanvasRenderer {
                         wrapLines.push(currentWrapLine);
                         currentWrapLine = [];
                         currentWrapLineW = 0;
+                        currentWrapLineWords = 0;
                     }
                     const partText = parts[p];
                     if (partText) {
@@ -4376,6 +4388,7 @@ class ReelsCanvasRenderer {
                             tokens: partTokens
                         });
                         currentWrapLineW += partW;
+                        if (wrapTok.isWord) currentWrapLineWords += 1;
                     }
                 }
                 continue;
@@ -4383,14 +4396,17 @@ class ReelsCanvasRenderer {
 
             const wrapTokW = this._measureTextWithSpacing(ctx, wrapTok.text, letterSpacing);
             const isWhitespace = /^\s+$/.test(wrapTok.text);
+            const hitWordLimit = maxWordsPerLine > 0 && wrapTok.isWord && currentWrapLineWords >= maxWordsPerLine;
 
-            if (autoWrap && currentWrapLineW + wrapTokW > maxWidth && currentWrapLine.length > 0 && !isWhitespace) {
+            if (((autoWrap && currentWrapLineW + wrapTokW > maxWidth) || hitWordLimit) && currentWrapLine.length > 0 && !isWhitespace) {
                 wrapLines.push(currentWrapLine);
                 currentWrapLine = [wrapTok];
                 currentWrapLineW = wrapTokW;
+                currentWrapLineWords = wrapTok.isWord ? 1 : 0;
             } else {
                 currentWrapLine.push(wrapTok);
                 currentWrapLineW += wrapTokW;
+                if (wrapTok.isWord) currentWrapLineWords += 1;
             }
         }
         if (currentWrapLine.length > 0) {
@@ -4419,23 +4435,28 @@ class ReelsCanvasRenderer {
         const padTop = parsePadding(s.box_padding_top, parsePadding(s.box_padding_y, 20));
         const padBottom = parsePadding(s.box_padding_bottom, parsePadding(s.box_padding_y, 20));
 
-        // Limit lines if advanced textbox. When auto-page is enabled, split all
-        // wrapped lines into height-safe pages and select the page whose first
-        // visible token has started. This lets a writing tip keep writing through
-        // a long script without silently dropping the overflow lines.
+        // Paginate wrapped lines into height- and line-count-safe pages so long
+        // multi-segment scripts never stack off-screen above/below the canvas.
         let visibleLines = lines;
         let visibleLineIndices = lines.map((_, index) => index);
-        if (advEnabled) {
-            const lineSpacing = s.line_spacing || 8;
-            const availablePageH = Math.max(1, advH - padTop - padBottom);
+        let pageStartIdx = 0;
+        {
+            const lineSpacingForPage = s.line_spacing || 8;
+            const availablePageH = advEnabled
+                ? Math.max(1, advH - padTop - padBottom)
+                : Math.max(120, Math.floor(videoH * 0.78) - padTop - padBottom);
+            const maxLinesPerPage = advEnabled
+                ? Infinity
+                : Math.max(1, parseInt(s.fullpage_typewriter_max_lines || s.wrap_lines, 10) || 6);
             const pages = [];
             let pageStart = 0;
             let pageHeight = 0;
 
             for (let li = 0; li < lines.length; li++) {
                 const lineH = getLineHeight(li);
-                const nextHeight = pageHeight + (li > pageStart ? lineSpacing : 0) + lineH;
-                if (li > pageStart && nextHeight > availablePageH) {
+                const nextHeight = pageHeight + (li > pageStart ? lineSpacingForPage : 0) + lineH;
+                const exceedsLines = !advEnabled && (li - pageStart) >= maxLinesPerPage;
+                if (li > pageStart && (nextHeight > availablePageH || exceedsLines)) {
                     pages.push({ start: pageStart, end: li });
                     pageStart = li;
                     pageHeight = lineH;
@@ -4456,11 +4477,12 @@ class ReelsCanvasRenderer {
                 };
 
                 for (let pi = 1; pi < pages.length; pi++) {
-                    if (currentTime >= getPageStartTime(pages[pi])) activePage = pages[pi];
+                    if (effectiveTime >= getPageStartTime(pages[pi])) activePage = pages[pi];
                     else break;
                 }
             }
 
+            pageStartIdx = activePage.start;
             visibleLineIndices = [];
             for (let li = activePage.start; li < activePage.end; li++) visibleLineIndices.push(li);
             visibleLines = visibleLineIndices.map(li => lines[li]);
@@ -4556,7 +4578,7 @@ class ReelsCanvasRenderer {
                     for (const tok of lineTokens) {
                         const tokW = this._measureTextWithSpacing(ctx, tok.text, letterSpacing);
                         const tokenX = textDirection === 'rtl' ? currX - tokW : currX;
-                        const isVisibleTok = !hideUnrevealedBacking || (currentTime >= tok.start);
+                        const isVisibleTok = !hideUnrevealedBacking || (effectiveTime >= tok.start);
                         if (isVisibleTok) {
                             revealedText += tok.text;
                             if (tok.text.trim()) {
@@ -4691,10 +4713,10 @@ class ReelsCanvasRenderer {
 
                 let color, opacity;
                 let isHighlight = false;
-                if (currentTime >= tok.end) {
+                if (effectiveTime >= tok.end) {
                     color = (globalLi === 0) ? (s.fullpage_typewriter_first_line_color || firstSegStyle.color_text || s.color_text || '#FFFFFF') : (s.color_text || '#FFFFFF');
                     opacity = 1.0;
-                } else if (currentTime >= tok.start && currentTime < tok.end) {
+                } else if (effectiveTime >= tok.start && effectiveTime < tok.end) {
                     color = imageTip ? ((globalLi === 0 ? s.fullpage_typewriter_first_line_color : '') || s.color_text || '#FFFFFF') : (s.color_high || '#FFD700');
                     opacity = 1.0;
                     isHighlight = true;
@@ -4703,9 +4725,9 @@ class ReelsCanvasRenderer {
                     opacity = s.fullpage_typewriter_unrevealed_opacity ?? s.tw_unrevealed_opacity ?? 0.0;
                 }
 
-                if (currentTime >= tok.start && !/^\s+$/.test(tok.text)) {
+                if (effectiveTime >= tok.start && !/^\s+$/.test(tok.text)) {
                     const p = imageTip && !tok._sentenceToken && tok.end > tok.start
-                        ? Math.max(0, Math.min(1, (currentTime - tok.start) / (tok.end - tok.start))) : 1;
+                        ? Math.max(0, Math.min(1, (effectiveTime - tok.start) / (tok.end - tok.start))) : 1;
                     cursorX = textDirection === 'rtl' ? tokenX + tokW * (1-p) : tokenX + tokW * p;
                     cursorY = y;
                     cursorLineIdx = globalLi;
@@ -4803,7 +4825,9 @@ class ReelsCanvasRenderer {
 
             if (groupWords.length === 0) break;
 
-            const gStart = groupWords[0].start;
+            const gStart = groupIdx === 0
+                ? Math.min(Number(segment.start) || 0, groupWords[0].start)
+                : groupWords[0].start;
             const gEnd = groupWords[groupWords.length - 1].end;
 
             const accumSeed = (groupIdx + 1) * 93.71 + (segment.start || 0) * 153.29 + seedVal * 23.41;
@@ -6222,7 +6246,7 @@ class ReelsCanvasRenderer {
             if (currentTime >= words[i].start) activeIdx = i;
             else break;
         }
-        if (activeIdx < 0) return;
+        if (activeIdx < 0) activeIdx = 0;
 
         const ctx = this.ctx;
         const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -6348,12 +6372,23 @@ class ReelsCanvasRenderer {
     }
 
     _renderWordRandomPosition(s, segment, currentTime, videoW, videoH) {
+        const segStart = Number(segment.start) || 0;
+        const segEnd = Number(segment.end) || segStart;
+        if (currentTime < segStart || currentTime > segEnd) return;
         const ctx = this.ctx;
         const words = this._getTimedWords(segment);
         if (!words.length) return;
 
-        const activeIdx = words.findIndex(w => currentTime >= w.start && currentTime <= w.end);
-        if (activeIdx < 0) return;
+        let activeIdx = words.findIndex(w => currentTime >= w.start && currentTime <= w.end);
+        if (activeIdx < 0) {
+            for (let k = words.length - 1; k >= 0; k--) {
+                if (currentTime >= words[k].start - 1e-6) {
+                    activeIdx = k;
+                    break;
+                }
+            }
+            if (activeIdx < 0) activeIdx = 0;
+        }
 
         const wordInfo = words[activeIdx];
         const wordStr = wordInfo.word;

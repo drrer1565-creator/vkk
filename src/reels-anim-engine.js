@@ -216,12 +216,12 @@ function computeAnimProgress(currentTime, segStart, segEnd,
  * Return the number of revealed characters (int) for a typewriter effect.
  */
 function computeTypewriterProgress(currentTime, segStart, segEnd, totalChars, twSpeed = 1.0) {
-    if (totalChars <= 0) return 0;
+    if (totalChars <= 0 || currentTime < segStart) return 0;
     const segDur = Math.max(0.001, segEnd - segStart);
     const elapsed = Math.max(0.0, currentTime - segStart);
     const revealDur = segDur / Math.max(0.1, twSpeed);
     const frac = Math.min(1.0, elapsed / revealDur);
-    return Math.floor(frac * totalChars);
+    return Math.min(totalChars, Math.floor(frac * totalChars) + 1);
 }
 
 /**

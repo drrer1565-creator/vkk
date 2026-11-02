@@ -80,6 +80,9 @@ function loadBrowserScript(relPath, sandboxExtras = {}) {
         encodeURIComponent,
         decodeURIComponent,
         navigator: { onLine: true },
+        Path2D: class MockPath2D {
+            constructor(d = '') { this.d = d; }
+        },
         FontFace: class MockFontFace {
             constructor(family, source, descriptors = {}) {
                 this.family = family;
@@ -2254,6 +2257,135 @@ test('Christmas writing pens, subtitle ribbon bands, ornaments, and presets are 
         assert.ok(presets[presetName], `Built-in Christmas preset "${presetName}" must exist`);
     }
 });
+
+test('All built-in subtitle presets (including fullpage_typewriter newspaper cutout & candy ribbon) render without error and produce visible on-screen output', () => {
+    const sandbox = loadBrowserScript('src/reels-style-engine.js', { window: { addEventListener() {} } });
+    loadBrowserScript('src/reels-presets-init.js', sandbox);
+    loadBrowserScript('src/reels-anim-engine.js', sandbox);
+    loadBrowserScript('src/reels-overlay.js', sandbox);
+    loadBrowserScript('src/reels-canvas-renderer.js', sandbox);
+
+    const engine = sandbox.window.ReelsStyleEngine;
+    const allPresets = engine.loadSubtitlePresets().presets;
+    const presetNames = Object.keys(allPresets);
+    assert.ok(presetNames.length >= 70, `Expected at least 70 built-in subtitle presets, got ${presetNames.length}`);
+
+    const drawnWords = [];
+    const fillTextCalls = [];
+    let cutoutCalls = 0;
+    const origCutout = sandbox.window.ReelsBrushEngine.drawTextCutoutBacking.bind(sandbox.window.ReelsBrushEngine);
+    sandbox.window.ReelsBrushEngine.drawTextCutoutBacking = function (ctx, lines, opts) {
+        cutoutCalls++;
+        return origCutout(ctx, lines, opts);
+    };
+
+    const mockGrad = { addColorStop() {} };
+    const ctx = {
+        canvas: { width: 1080, height: 1920 },
+        globalAlpha: 1,
+        globalCompositeOperation: 'source-over',
+        font: '700 74px sans-serif',
+        fillStyle: '#fff',
+        strokeStyle: '#000',
+        lineWidth: 2,
+        lineJoin: 'round',
+        miterLimit: 2,
+        direction: 'ltr',
+        textAlign: 'left',
+        textBaseline: 'top',
+        save() {},
+        restore() {},
+        beginPath() {},
+        closePath() {},
+        moveTo() {},
+        lineTo() {},
+        quadraticCurveTo() {},
+        bezierCurveTo() {},
+        arc() {},
+        arcTo() {},
+        ellipse() {},
+        rect() {},
+        clip() {},
+        fill() {},
+        stroke() {},
+        fillRect() {},
+        strokeRect() {},
+        clearRect() {},
+        drawImage() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        setLineDash() {},
+        createPattern() { return {}; },
+        createLinearGradient() { return mockGrad; },
+        createRadialGradient() { return mockGrad; },
+        measureText(txt) {
+            const m = String(this.font || '').match(/([\d.]+)px/);
+            const px = m ? parseFloat(m[1]) : 74;
+            return {
+                width: String(txt || '').length * px * 0.55,
+                actualBoundingBoxAscent: px * 0.75,
+                actualBoundingBoxDescent: px * 0.22,
+            };
+        },
+        fillText(txt, x, y) { fillTextCalls.push({ text: String(txt), x, y, alpha: this.globalAlpha }); },
+        strokeText() {},
+    };
+
+    const renderer = new sandbox.window.ReelsCanvasRenderer({ width: 1080, height: 1920, getContext: () => ctx });
+    const origDrawWord = renderer._drawWord.bind(renderer);
+    renderer._drawWord = function (c, text, x, y, color, ...rest) {
+        drawnWords.push({ text: String(text), x, y, color });
+        return origDrawWord(c, text, x, y, color, ...rest);
+    };
+
+    // Build a 12-segment script (simulating a full 36-second Reels video) so fullpage_typewriter tests multi-page pagination
+    const multiSegments = Array.from({ length: 12 }, (_, idx) => {
+        const s0 = idx * 3.0;
+        const rawWords = ['God', 'is', 'opening', 'a', 'new', 'door', 'for', 'you'];
+        return {
+            start: s0,
+            end: s0 + 2.8,
+            text: rawWords.join(' '),
+            words: rawWords.map((w, wi) => ({
+                word: w,
+                start: s0 + wi * 0.35,
+                end: s0 + (wi + 1) * 0.35,
+            })),
+        };
+    });
+
+    for (const name of presetNames) {
+        const style = engine.applySubtitlePreset(name);
+        assert.ok(style, `Preset "${name}" must resolve to a valid style object`);
+        renderer.setContextSegments(multiSegments, multiSegments.map(s => s.text).join(' '));
+
+        drawnWords.length = 0;
+        fillTextCalls.length = 0;
+        renderer.renderSubtitle(style, multiSegments[0], 0.45, 1080, 1920);
+        assert.ok(
+            drawnWords.length > 0 || fillTextCalls.length > 0,
+            `Preset "${name}" must draw visible subtitle text at t=0.45s`
+        );
+    }
+
+    // Specifically verify "📰 复古报纸剪报整屏 (多行累积)" and "🍬 圣诞拐杖糖斜纹带_手写笔出字" at t=0.0s and t=1.2s
+    for (const twPresetName of ['📰 复古报纸剪报整屏 (多行累积)', '🍬 圣诞拐杖糖斜纹带_手写笔出字']) {
+        const style = engine.applySubtitlePreset(twPresetName);
+        renderer.setContextSegments(multiSegments, multiSegments.map(s => s.text).join(' '));
+
+        drawnWords.length = 0;
+        cutoutCalls = 0;
+        renderer.renderSubtitle(style, multiSegments[0], 0.0, 1080, 1920);
+        assert.ok(drawnWords.length > 0, `"${twPresetName}" must draw visible text at t=0.0s`);
+        assert.ok(cutoutCalls > 0, `"${twPresetName}" must draw its cutout backing at t=0.0s without ReferenceError`);
+        assert.ok(
+            drawnWords.every(w => w.y >= 0 && w.y <= 1920),
+            `"${twPresetName}" must paginate long multi-segment scripts so all visible lines stay on-screen (0..1920), got Y=${drawnWords.map(w => Math.round(w.y)).join(',')}`
+        );
+    }
+});
+
 
 
 

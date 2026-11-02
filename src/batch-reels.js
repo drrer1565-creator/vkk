@@ -4276,6 +4276,8 @@ function _reelsUpdatePreviewInternal() {
                 else break;
             }
             activeSegment = best;
+        } else if (!isMediaPlaying && segs.length > 0 && audioCycleTime <= (Number(segs[0].start) || 0) + 0.05) {
+            activeSegment = segs[0];
         } else {
             // Not speaking, don't show test text
             activeSegment = null;
@@ -4375,12 +4377,32 @@ function _reelsUpdatePreviewInternal() {
     }
 
     if (activeSegment && showSubtitle) {
+        const segsForCtx = (typeof _selectedTask !== 'undefined' && _selectedTask && _selectedTask.segments)
+            ? _selectedTask.segments
+            : [activeSegment];
         if (typeof _selectedTask !== 'undefined' && _selectedTask && _selectedTask.segments) {
             renderer.setContextSegments(_selectedTask.segments, _selectedTask.ttsText || _selectedTask.aiScript || '');
         } else {
             renderer.setContextSegments([activeSegment]);
         }
-        renderer.renderSubtitle(style, activeSegment, audioCycleTime, w, h, false, hasKineticBackdrop);
+        let subRenderTime = audioCycleTime;
+        if (!isMediaPlaying) {
+            const segStart = Number(activeSegment.start) || 0;
+            const segEnd = Math.max(segStart + 0.05, Number(activeSegment.end) || (segStart + 1));
+            const segDur = segEnd - segStart;
+            const inDur = (style.anim_in_type && style.anim_in_type !== 'none')
+                ? Math.max(0.15, Number(style.anim_in_duration) || 0.3)
+                : 0.15;
+            if (style.fullpage_typewriter && audioCycleTime <= segStart + 0.05) {
+                const lastSegEnd = segsForCtx.length > 0
+                    ? Math.max(segEnd, Number(segsForCtx[Math.min(segsForCtx.length - 1, 2)].end) || segEnd)
+                    : segEnd;
+                subRenderTime = Math.max(segEnd * 0.85, Math.min(lastSegEnd, segStart + 2.4));
+            } else if (audioCycleTime <= segStart + inDur) {
+                subRenderTime = Math.min(segEnd - 0.01, Math.max(audioCycleTime, segStart + Math.min(segDur * 0.55, Math.max(inDur + 0.08, 0.45))));
+            }
+        }
+        renderer.renderSubtitle(style, activeSegment, subRenderTime, w, h, false, hasKineticBackdrop);
     }
 
     if (overlayAboveSubtitle) renderOverlays('overlay');
