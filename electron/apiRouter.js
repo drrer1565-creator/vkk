@@ -913,6 +913,228 @@ async function routeAPI(endpoint, data, progressSender = null, sender = null) {
             return await geminiService.testKeys(data.keys, data.model || null);
         }
 
+        case 'ai/smart-export-names': {
+            const rawItems = Array.isArray(data.items) ? data.items : [];
+            const now = new Date();
+            const defaultDateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+            const dateStr = String(data.dateStr || defaultDateStr).replace(/[^0-9]/g, '').slice(0, 8) || defaultDateStr;
+
+            const extractFirstSentence = (rawText) => {
+                let cleaned = String(rawText || '')
+                    .replace(/[\r\n]+/g, ' ')
+                    .replace(/^\s*(?:\(?\s*(?:part|pt\.?|section|episode|ep\.?)\s*\d+(?:\s*of\s*\d+)?\s*\)?|\[?\d+\s*\/\s*\d+\]?|[（(]?[上下中]篇?[)）]?)\s*[:：.\-—]*\s*/i, '')
+                    .replace(/^\s*\d+\s*[.、)\-]\s*/, '')
+                    .replace(/^["'“”‘’«»「」『』\s]+/, '')
+                    .trim();
+                if (!cleaned) return '';
+                const m = cleaned.match(/^(.{4,90}?)(?:[.!?。！？；;]+(?=\s|$|["'”’])|\n|$)/);
+                let first = (m ? m[1] : cleaned).trim();
+                const words = first.split(/\s+/);
+                if (words.length > 16) {
+                    first = words.slice(0, 14).join(' ');
+                }
+                if (first.length > 80) {
+                    first = first.slice(0, 80).trim();
+                }
+                return first.replace(/["'“”‘’]+$/g, '').trim();
+            };
+
+            const sanitizeCnTitle = (str) => {
+                let s = String(str || '').trim();
+                s = s
+                    .replace(/[\r\n\t]+/g, '')
+                    .replace(/[<>:"/\\|?*]+/g, '')
+                    .replace(/^[，。！？、；：“”‘’"',.!?;:\-_\s]+/, '')
+                    .replace(/[，。！？、；：“”‘’"',.!?;:\-_\s]+$/, '');
+                const clauseParts = s.split(/[。！？!?；;]/).map(p => p.trim()).filter(Boolean);
+                if (clauseParts.length > 0) s = clauseParts[0];
+                s = s.replace(/[，、：,:]+/g, '').replace(/\s+/g, ' ').trim();
+                if (s.length > 22) s = s.slice(0, 22).trim();
+                return s || '未命名文案';
+            };
+
+            const detectExplicitPart = (rawText) => {
+                const t = String(rawText || '').trim();
+                if (!t) return '';
+                if (/(?:^\s*|\b)(?:part\s*1\b|pt\.?\s*1\b|\[?1\s*\/\s*2\]?|\(1\s*\/\s*2\)|上篇|（上）|\(上\))/i.test(t)) return '（上篇）';
+                if (/(?:^\s*|\b)(?:part\s*2\b|pt\.?\s*2\b|\[?2\s*\/\s*2\]?|\(2\s*\/\s*2\)|下篇|（下）|\(下\))/i.test(t)) return '（下篇）';
+                return '';
+            };
+
+            const isLikelyContinuationPair = (prevText, currText) => {
+                const a = String(prevText || '').trim();
+                const b = String(currText || '').trim();
+                if (!a || !b || a === b) return false;
+                if (a.length < 25 || b.length < 20) return false;
+                const aEndsOpen = /[,;:\-—…]$|\.\.\.$|[a-zA-Z0-9\u4e00-\u9fa5]$/.test(a) && !/[.!?。！？]["'”’)]*$/.test(a);
+                const bStartsLowerOrConn = /^[a-z]/.test(b)
+                    || /^(?:and|but|so|yet|for|nor|because|then|however|therefore|moreover|furthermore|still|meanwhile|instead|otherwise|thus|hence|he|she|they|it|this|that|these|those|his|her|their|但是|然而|而且|接着|随后|因此|所以|于是|他|她|它|这|那)\b/i.test(b.replace(/^["'“”‘’\s]+/, ''));
+                if (aEndsOpen || bStartsLowerOrConn) return true;
+                const stopWords = new Set(['the', 'and', 'for', 'that', 'this', 'with', 'you', 'not', 'are', 'from', 'your', 'have', 'will', 'all', 'who', 'was', 'his', 'her', 'they', 'but', 'what', 'when', 'where', 'into', 'unto', 'shall', 'lord', 'god', 'jesus']);
+                const extractTokens = (txt) => new Set(
+                    (txt.toLowerCase().match(/[a-z]{4,}/g) || []).filter(w => !stopWords.has(w))
+                );
+                const setA = extractTokens(a);
+                const setB = extractTokens(b);
+                if (setA.size >= 4 && setB.size >= 4) {
+                    let overlap = 0;
+                    for (const w of setA) {
+                        if (setB.has(w)) overlap++;
+                    }
+                    const ratio = overlap / Math.min(setA.size, setB.size);
+                    if (overlap >= 3 && ratio >= 0.42 && a.length >= 90 && b.length >= 70) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            const partLabels = new Array(rawItems.length).fill('');
+            for (let i = 0; i < rawItems.length; i++) {
+                const exp = detectExplicitPart(rawItems[i]?.text);
+                if (exp) partLabels[i] = exp;
+            }
+            for (let i = 0; i < rawItems.length - 1; i++) {
+                if (partLabels[i] || partLabels[i + 1]) continue;
+                const tA = String(rawItems[i]?.text || '').trim();
+                const tB = String(rawItems[i + 1]?.text || '').trim();
+                if (isLikelyContinuationPair(tA, tB)) {
+                    partLabels[i] = '（上篇）';
+                    partLabels[i + 1] = '（下篇）';
+                    i++; // 成对跳过，避免三连覆盖
+                }
+            }
+
+            // 如果同一个上下篇对出现多次（比如 24 条文案循环铺满 120 条），保持相同的上下篇标记
+            const firstSentences = rawItems.map(it => extractFirstSentence(it?.firstSentence || it?.text || ''));
+            const uniqueSentences = [];
+            const sentenceToIndex = new Map();
+            for (const s of firstSentences) {
+                if (s && !sentenceToIndex.has(s)) {
+                    sentenceToIndex.set(s, uniqueSentences.length);
+                    uniqueSentences.push(s);
+                }
+            }
+
+            const translatedMap = new Map();
+            const isMostlyChinese = (s) => {
+                const cnChars = (String(s || '').match(/[\u4e00-\u9fa5]/g) || []).length;
+                const enWords = (String(s || '').match(/[a-zA-Z]+/g) || []).length;
+                return cnChars >= 2 && cnChars >= enWords;
+            };
+
+            // 优先尝试配置的 Gemini API 批量翻译首句 + 识别上下文上下篇
+            const keysData = settingsService.loadGeminiKeys() || {};
+            const geminiKeys = (keysData.keys || []).map(k => String(k || '').trim()).filter(Boolean);
+            const geminiModel = keysData.model || 'gemini-2.0-flash';
+            if (geminiKeys.length > 0 && uniqueSentences.length > 0) {
+                try {
+                    const https = require('https');
+                    const apiKey = geminiKeys[0];
+                    const promptLines = uniqueSentences.map((s, idx) => `${idx + 1}. ${s}`).join('\n');
+                    const prompt = `你是一个短视频文件命名助手。请将以下每条文案的第一句话翻译成简短、自然、通顺的中文短语（每条控制在6到16个汉字以内，不要标点符号，适合直接作为文件名）。如果原句已经是中文，请提炼成简短中文短语。严格按 JSON 数组格式返回，例如 ["我是道路真理和生命", "不要害怕因为我与你同在"]，数组长度必须为 ${uniqueSentences.length}。\n\n待翻译首句列表：\n${promptLines}`;
+                    const bodyStr = JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.2 }
+                    });
+                    const geminiRes = await new Promise((resolve, reject) => {
+                        const req = https.request({
+                            hostname: 'generativelanguage.googleapis.com',
+                            path: `/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Content-Length': Buffer.byteLength(bodyStr)
+                            },
+                            timeout: 12000
+                        }, (res) => {
+                            let chunks = '';
+                            res.on('data', d => { chunks += d; });
+                            res.on('end', () => resolve({ status: res.statusCode, body: chunks }));
+                        });
+                        req.on('error', reject);
+                        req.on('timeout', () => { req.destroy(new Error('timeout')); });
+                        req.write(bodyStr);
+                        req.end();
+                    });
+                    if (geminiRes && geminiRes.status === 200) {
+                        const parsed = JSON.parse(geminiRes.body);
+                        const rawReply = parsed?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                        const jsonMatch = rawReply.match(/\[[\s\S]*\]/);
+                        if (jsonMatch) {
+                            const arr = JSON.parse(jsonMatch[0]);
+                            if (Array.isArray(arr)) {
+                                uniqueSentences.forEach((orig, idx) => {
+                                    if (arr[idx]) {
+                                        translatedMap.set(orig, sanitizeCnTitle(arr[idx]));
+                                    }
+                                });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[ai/smart-export-names] Gemini 翻译回退至免费翻译通道:', e.message);
+                }
+            }
+
+            // 对未翻译的句子使用免 Key 翻译通道兜底（确保无 API Key 时也 100% 可用）
+            const translateOneKeyless = async (sentence) => {
+                if (!sentence) return '未命名文案';
+                if (isMostlyChinese(sentence)) return sanitizeCnTitle(sentence);
+                try {
+                    const https = require('https');
+                    const urlPath = `/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=${encodeURIComponent(sentence)}`;
+                    const resBody = await new Promise((resolve, reject) => {
+                        const req = https.get({
+                            hostname: 'translate.googleapis.com',
+                            path: urlPath,
+                            headers: { 'User-Agent': 'Mozilla/5.0' },
+                            timeout: 6000
+                        }, (res) => {
+                            let dataStr = '';
+                            res.on('data', chunk => { dataStr += chunk; });
+                            res.on('end', () => resolve(dataStr));
+                        });
+                        req.on('error', reject);
+                        req.on('timeout', () => { req.destroy(new Error('timeout')); });
+                    });
+                    const parsed = JSON.parse(resBody);
+                    if (Array.isArray(parsed) && Array.isArray(parsed[0])) {
+                        const joined = parsed[0].map(seg => (Array.isArray(seg) ? seg[0] : '')).join('');
+                        if (joined && joined.trim()) {
+                            return sanitizeCnTitle(joined);
+                        }
+                    }
+                } catch (_) { }
+                return sanitizeCnTitle(sentence);
+            };
+
+            const missingSentences = uniqueSentences.filter(s => !translatedMap.has(s));
+            const CONCURRENCY = 6;
+            for (let i = 0; i < missingSentences.length; i += CONCURRENCY) {
+                const batch = missingSentences.slice(i, i + CONCURRENCY);
+                const results = await Promise.all(batch.map(s => translateOneKeyless(s)));
+                batch.forEach((s, idx) => translatedMap.set(s, results[idx]));
+            }
+
+            const results = rawItems.map((it, idx) => {
+                const origFirst = firstSentences[idx] || '';
+                const cnTitle = origFirst ? (translatedMap.get(origFirst) || sanitizeCnTitle(origFirst)) : '未命名文案';
+                const partTag = partLabels[idx] || '';
+                const fullName = `${dateStr}-${cnTitle}${partTag}`;
+                return {
+                    index: it?.index ?? idx,
+                    firstSentence: origFirst,
+                    cnFirstSentence: cnTitle,
+                    partTag,
+                    dateStr,
+                    fullName
+                };
+            });
+
+            return { status: 'success', dateStr, results };
+        }
+
         // ==================== 媒体操作 ====================
         case 'media/info': {
             if (!data.file_path) throw new Error('缺少文件路径');

@@ -2405,6 +2405,35 @@ test('All built-in subtitle presets (including fullpage_typewriter newspaper cut
     );
 });
 
+test('scroll card quick opacity slider, repeat maker modal, and ai-cn-date smart naming are wired', () => {
+    const panelSrc = fs.readFileSync(path.join(ROOT, 'src/reels-overlay-panel.js'), 'utf8');
+    const overlaySrc = fs.readFileSync(path.join(ROOT, 'src/reels-overlay.js'), 'utf8');
+    const batchTableSrc = fs.readFileSync(path.join(ROOT, 'src/reels-batch-table.js'), 'utf8');
+    const batchReelsSrc = fs.readFileSync(path.join(ROOT, 'src/batch-reels.js'), 'utf8');
+    const apiRouterSrc = fs.readFileSync(path.join(ROOT, 'electron/apiRouter.js'), 'utf8');
+    const indexHtmlSrc = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+
+    // 1. Scroll background quick opacity sliders & feather-inset card height
+    assert.ok(panelSrc.includes('id="rop-scroll-bg-opacity-quick"') && panelSrc.includes('id="rop-scroll-bg-opacity-quick-num"'));
+    assert.ok(panelSrc.includes('id="rop-scroll-body-bg-opacity-quick"') && panelSrc.includes('id="rop-scroll-body-bg-opacity-quick-num"'));
+    assert.ok(overlaySrc.includes('const _fTopInset = Math.max(0, parseFloat(ov.feather_top_offset ?? 0))'));
+    assert.ok(overlaySrc.includes('const effClipY = ov.bg_body_only ? bodyClipTopBase : clipY;'));
+
+    // 2. Repeat Maker (🔁 重复制作) buttons, modal, and alignment reuse
+    assert.ok(batchTableSrc.includes('id="rbt-repeat-maker-bar-btn"'));
+    assert.ok(batchTableSrc.includes('id="rbt-th-repeat-maker-btn"'));
+    assert.ok(batchTableSrc.includes('id="rbt-repeat-maker-btn"'));
+    assert.ok(batchTableSrc.includes('function _showRepeatMakerModal()'));
+    assert.ok(batchTableSrc.includes('reused_same_audio_text'));
+
+    // 3. AI Chinese first-sentence + context upper/lower part naming (20261102-文案第一句)
+    assert.ok(apiRouterSrc.includes("case 'ai/smart-export-names':"));
+    assert.ok(indexHtmlSrc.includes('<option value="ai-cn-date">'));
+    assert.ok(batchTableSrc.includes('<option value="ai-cn-date"'));
+    assert.ok(batchReelsSrc.includes('async function _ensureReelsAiChineseExportNames('));
+});
+
+
 
 
 

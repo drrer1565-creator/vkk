@@ -1463,7 +1463,8 @@ function _renderBatchTable() {
                         <button class="rbt-btn" id="rbt-cycle-fill-btn" style="background:rgba(255,255,255,0.05); color:#ccc; border:1px solid rgba(255,255,255,0.1); padding:2px 8px; font-size:11px;" title="打开素材循环填充面板">素材使用设置</button>
                         <span style="color:rgba(255,255,255,0.2);margin:0 2px;">|</span>
                         <span style="font-size:11px;color:#888;">导出命名规则</span>
-                        <select id="reels-naming-mode" class="rbt-select" style="width:150px;height:24px;font-size:11px;padding:0 4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#ccc;" title="自定义命名使用每行“导出命名”列；该列为空时会继续按默认回退规则生成">
+                        <select id="reels-naming-mode" class="rbt-select" style="width:165px;height:24px;font-size:11px;padding:0 4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#ccc;" title="选择导出命名规则；支持『日期-首句中文(上下篇)』导出时自动翻译文案首句并识别上下篇">
+                            <option value="ai-cn-date" ${exportNamingMode === 'ai-cn-date' ? 'selected' : ''}>🤖 日期-首句中文(上下篇)</option>
                             <option value="custom" ${exportNamingMode === 'custom' ? 'selected' : ''}>自定义命名</option>
                             <option value="text" ${exportNamingMode === 'text' ? 'selected' : ''}>默认文案</option>
                             <option value="background" ${exportNamingMode === 'background' ? 'selected' : ''}>背景素材名</option>
@@ -1473,6 +1474,7 @@ function _renderBatchTable() {
                             <option value="date-auto" ${exportNamingMode === 'date-auto' ? 'selected' : ''}>按日期自动排序</option>
                         </select>
                         <button id="reels-naming-config-btn" style="display:${(exportNamingMode === 'index' || exportNamingMode === 'date-auto') ? 'inline-block' : 'none'};background:none;border:none;color:#aaa;cursor:pointer;font-size:11px;padding:0;margin-left:2px;" title="配置命名规则">⚙️</button>
+                        <button class="rbt-btn" id="rbt-ai-cn-name-btn" style="padding:2px 8px;font-size:11px;background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.4);color:#6ee7b7;font-weight:600;" title="一键提取每行文案第一句翻译为中文，并识别长文案上下文标好（上篇）/（下篇），生成如 20261102-文案第一句">🤖 AI首句中文命名</button>
                         <span style="color:rgba(255,255,255,0.2);margin:0 2px;">|</span>
                         <button class="rbt-btn" id="rbt-paste-txtcontent" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;" title="从剪贴板粘贴到人声-断行文案列">粘贴人声-断行文案</button>
                         ${textcards.length > 0 ? textcards.map((ov, oIdx) => `
@@ -1486,6 +1488,7 @@ function _renderBatchTable() {
                             <button class="rbt-btn rbt-paste-scroll-btn-tiled" data-scroll-id="" data-scroll-idx="0" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;" title="从 Google 表格粘贴滚动字幕并自动创建滚动层">粘贴滚动字幕</button>
                         `}
                         <button class="rbt-btn" id="rbt-paste-clip-ab" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;" title="A/B双版文案">粘贴剪辑文案 (A/B版)</button>
+                        <button class="rbt-btn" id="rbt-repeat-maker-btn" style="padding:2px 9px;font-size:11px;background:linear-gradient(135deg,rgba(245,158,11,0.25),rgba(234,88,12,0.25));border:1px solid rgba(251,191,36,0.55);color:#fde68a;font-weight:700;" title="多文件夹分组循环添加背景素材（如5个文件夹各24个=120个）+ 人声/文案 1~24 循环铺满">🔁 重复制作</button>
                         <button class="rbt-btn" id="rbt-bulk-create-btn" style="padding:2px 8px;font-size:11px;background:rgba(124,92,255,0.15);border:1px solid rgba(124,92,255,0.3);color:#b8a0ff;font-weight:600;" title="类似Canva大量制作：表格数据 × 覆层模板 = 批量任务">🧩 大量制作</button>
                         <button class="rbt-btn" id="rbt-import-material-groups-btn" style="padding:2px 8px;font-size:11px;background:rgba(76,158,255,0.12);border:1px solid rgba(76,158,255,0.3);color:#8fc7ff;" title="选择总文件夹；一级子文件夹各生成一行：音频 + 多视频拼接循环">📦 导入素材组</button>
                         <button class="rbt-btn" id="rbt-insert-folder-btn" style="padding:2px 8px;font-size:11px;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.35);color:#86efac;" title="给勾选任务设置同一个插入素材文件夹">📁 插入素材文件夹</button>
@@ -1713,6 +1716,7 @@ function _renderBatchTable() {
                         <button class="rbt-btn" id="rbt-apply-batch-card" style="padding:2px 8px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;">应用</button>
                         <button class="rbt-btn" id="rbt-gallery-batch-btn" style="padding:2px 8px;font-size:11px;background:rgba(123,139,239,0.2);border:1px solid rgba(123,139,239,0.4);color:#7b8bef;" title="打开预设可视化图库">图库...</button>
                         <button class="rbt-btn" id="rbt-import-card-preset-btn" style="padding:2px 6px;font-size:10px;background:rgba(100,100,255,0.1);border:1px solid rgba(100,100,255,0.2);color:#8b8bfa;" title="导入覆层预设 JSON 文件">📥</button>
+                        <button class="rbt-btn" id="rbt-repeat-maker-bar-btn" style="padding:2px 10px;font-size:11px;background:linear-gradient(135deg,#f59e0b,#ea580c);border:1px solid #fbbf24;color:#fff;font-weight:700;border-radius:4px;box-shadow:0 2px 6px rgba(245,158,11,0.35);cursor:pointer;" title="多文件夹分组循环添加背景素材（如5个文件夹各24个=120个）+ 人声/文案 1~24 循环铺满">🔁 重复制作</button>
                         <span id="rbt-selected-count" style="margin-left:auto;font-size:11px;color:#aaa;"></span>
                     </div>
 
@@ -1750,7 +1754,7 @@ function _renderBatchTable() {
 
                             <!-- 🟦 画面基础层 (Blue) -->
                             <th class="rbt-col-hook rbt-grp-video"><div class="rbt-th-wrap"><span>前置Hook</span><button class="rbt-th-clear" data-clear-col="hook" title="清空该列">清</button></div></th>
-                            <th class="rbt-col-bg rbt-grp-video"><div class="rbt-th-wrap"><span>背景素材</span><button class="rbt-th-folder" data-folder-col="bg" title="选择文件夹批量分配">📁</button><button class="rbt-th-clear" data-clear-col="bg" title="清空该列">清</button></div></th>
+                            <th class="rbt-col-bg rbt-grp-video"><div class="rbt-th-wrap"><span>背景素材</span><button type="button" class="rbt-th-repeat" id="rbt-th-repeat-maker-btn" title="重复制作：选5个文件夹按每个文件夹24个循环添加，并支持人声/文案循环铺满" style="background:rgba(245,158,11,0.22);border:1px solid rgba(251,191,36,0.55);color:#fde68a;border-radius:3px;padding:0 4px;font-size:10px;font-weight:700;cursor:pointer;line-height:16px;">🔁重复</button><button class="rbt-th-folder" data-folder-col="bg" title="选择文件夹批量分配">📁</button><button class="rbt-th-clear" data-clear-col="bg" title="清空该列">清</button></div></th>
                             <th class="rbt-col-clippool rbt-grp-video"><div class="rbt-th-wrap"><span>背景片段池</span><button class="rbt-th-clear" data-clear-col="clipPool" title="清空该列">清</button></div></th>
                             <th class="rbt-col-bgclipsettings rbt-grp-video"><div class="rbt-th-wrap"><span>背景池剪辑</span><button class="rbt-th-paste" data-paste-col="bgClipSettings" title="从剪贴板粘贴到该列">📋</button><button class="rbt-th-clear" data-clear-col="bgClipSettings" title="清空该列">清</button></div></th>
                             <th class="rbt-col-bgscale rbt-grp-video"><div class="rbt-th-wrap"><span>背景缩放</span><button class="rbt-th-clear" data-clear-col="bgScale" title="清空该列">清</button></div></th>
@@ -4689,6 +4693,54 @@ function _bindBatchTableEvents() {
     // 🧩 大量制作
     container.querySelector('#rbt-bulk-create-btn')?.addEventListener('click', () => {
         _showBulkCreateModal();
+    });
+
+    // 🔁 重复制作（多文件夹各N个循环添加 + 人声/文案 1~N 循环铺满）
+    const openRepeatMaker = (e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        _showRepeatMakerModal();
+    };
+    container.querySelector('#rbt-repeat-maker-btn')?.addEventListener('click', openRepeatMaker);
+    container.querySelector('#rbt-repeat-maker-bar-btn')?.addEventListener('click', openRepeatMaker);
+    container.querySelector('#rbt-th-repeat-maker-btn')?.addEventListener('click', openRepeatMaker);
+
+    // 🤖 AI 首句中文命名 (20261102-文案第一句 + 上下篇识别)
+    container.querySelector('#rbt-ai-cn-name-btn')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const btn = e.currentTarget;
+        const tasks = window._reelsState?.tasks || [];
+        if (!tasks.length) {
+            alert('当前表格没有任务行，请先添加任务或文案');
+            return;
+        }
+        _applyBatchTableChanges();
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '⏳ AI翻译命名中...';
+        try {
+            const modeSel = container.querySelector('#reels-naming-mode');
+            if (modeSel) {
+                modeSel.value = 'ai-cn-date';
+                localStorage.setItem('reels_naming_mode', 'ai-cn-date');
+            }
+            const outerSel = document.getElementById('reels-export-naming-mode-outer');
+            if (outerSel) outerSel.value = 'ai-cn-date';
+            if (typeof window._ensureReelsAiChineseExportNames === 'function') {
+                await window._ensureReelsAiChineseExportNames(tasks, { overwriteManual: true });
+            }
+            _skipNextApply = true;
+            _renderBatchTable();
+            if (typeof _syncTasksToActiveTab === 'function') _syncTasksToActiveTab();
+            if (typeof _batchAutoSave === 'function') _batchAutoSave();
+            if (typeof showToast === 'function') {
+                showToast(`✅ 已为 ${tasks.length} 个任务生成「日期-首句中文(含上下篇)」导出命名`, 'success');
+            }
+        } catch (err) {
+            alert('生成 AI 中文命名失败: ' + (err.message || err));
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+        }
     });
 
     // 内容视频缩放: input + slider
@@ -13494,6 +13546,745 @@ async function _selectAndImportMaterialGroupFolders(options = {}) {
 }
 
 // ═══════════════════════════════════════════════════════
+// 9a-2. 🔁 重复制作 (多文件夹各N个循环添加 + 人声/文案 1~N 循环铺满)
+// ═══════════════════════════════════════════════════════
+
+function _getRepeatMakerFsAdapter() {
+    let fs = null;
+    let pathMod = null;
+    try {
+        if (window.require) {
+            fs = window.require('fs');
+            pathMod = window.require('path');
+        }
+    } catch (_) { }
+    if (!fs && window.electronAPI && window.electronAPI.fsReaddir) {
+        fs = {
+            readdirSync: (p, options) => {
+                const entries = window.electronAPI.fsReaddir(p) || [];
+                if (options && options.withFileTypes) {
+                    return entries.map(e => ({
+                        name: e.name,
+                        isDirectory: () => Boolean(e.isDirectory),
+                        isFile: () => Boolean(e.isFile)
+                    }));
+                }
+                return entries.map(e => e.name);
+            }
+        };
+        pathMod = {
+            join: (...args) => window.electronAPI.pathJoin(...args),
+            basename: (p) => window.electronAPI.pathBasename(p)
+        };
+    }
+    return { fs, pathMod };
+}
+
+function _scanRepeatMakerDirFiles(dirPath, kind = 'bg') {
+    const { fs, pathMod } = _getRepeatMakerFsAdapter();
+    if (!fs || !pathMod || !dirPath) return [];
+    const bgExts = new Set(['mp4', 'mov', 'mkv', 'avi', 'wmv', 'flv', 'webm', 'jpg', 'jpeg', 'png', 'webp']);
+    const audioExts = new Set(['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'wma']);
+    const targetExts = kind === 'audio' ? audioExts : bgExts;
+    try {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        const files = entries
+            .filter(e => e.isFile() && !String(e.name || '').startsWith('.'))
+            .map(e => pathMod.join(dirPath, e.name))
+            .filter(fp => {
+                const ext = _getPathBaseName(fp).split('.').pop().toLowerCase();
+                return targetExts.has(ext);
+            });
+        files.sort((a, b) => _naturalSortByName(_getPathBaseName(a), _getPathBaseName(b)));
+        return files;
+    } catch (e) {
+        console.warn('[RepeatMaker] 读取文件夹失败:', dirPath, e);
+        return [];
+    }
+}
+
+function _scanRepeatMakerSubdirs(rootDir, kind = 'bg') {
+    const { fs, pathMod } = _getRepeatMakerFsAdapter();
+    if (!fs || !pathMod || !rootDir) return [];
+    try {
+        const entries = fs.readdirSync(rootDir, { withFileTypes: true });
+        const subDirs = entries
+            .filter(e => e.isDirectory() && !String(e.name || '').startsWith('.'))
+            .map(e => pathMod.join(rootDir, e.name))
+            .sort((a, b) => _naturalSortByName(_getPathBaseName(a), _getPathBaseName(b)));
+        return subDirs.filter(d => _scanRepeatMakerDirFiles(d, kind).length > 0);
+    } catch (_) {
+        return [];
+    }
+}
+
+function _parseRepeatMakerScripts(rawText) {
+    const raw = String(rawText || '');
+    if (!raw.trim()) return [];
+    if (raw.includes('\t') || raw.includes('"')) {
+        try {
+            const rows = _parseBatchTSV(raw, true);
+            const extracted = rows
+                .map(r => (Array.isArray(r) ? r.map(c => String(c || '').trim()).filter(Boolean).join('\n') : String(r || '').trim()))
+                .filter(Boolean);
+            if (extracted.length > 0) return extracted;
+        } catch (_) { }
+    }
+    return raw
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+}
+
+function _showRepeatMakerModal() {
+    _applyBatchTableChanges();
+    const existing = document.getElementById('rbt-repeat-maker-modal');
+    if (existing) existing.remove();
+
+    const state = window._reelsState;
+    const currentTaskCount = Array.isArray(state?.tasks) ? state.tasks.length : 0;
+    const savedPerFolder = Math.max(1, parseInt(localStorage.getItem('rbt_repeat_per_folder') || '24', 10) || 24);
+    const savedTotalRows = Math.max(1, parseInt(localStorage.getItem('rbt_repeat_total_rows') || String(currentTaskCount || 120), 10) || 120);
+
+    // State inside modal
+    const bgFolders = []; // [{ dirPath, name, files: [] }]
+    let audioFiles = [];  // [filePath, ...]
+    let audioSourceLabel = '';
+    let manualTotalRows = savedTotalRows;
+
+    const modal = document.createElement('div');
+    modal.id = 'rbt-repeat-maker-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:18px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
+
+    modal.innerHTML = `
+        <div style="width:min(940px,96vw);max-height:92vh;background:#161824;color:#f1f5f9;border:1px solid rgba(251,191,36,0.45);border-radius:14px;box-shadow:0 24px 80px rgba(0,0,0,0.75);display:flex;flex-direction:column;overflow:hidden;">
+            <!-- Header -->
+            <div style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,rgba(245,158,11,0.2),rgba(124,92,255,0.12));">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:22px;">🔁</span>
+                    <div>
+                        <div style="font-size:15px;font-weight:800;color:#fde68a;">重复制作工作台（多文件夹分段循环 + 人声/文案 1~N 循环铺满）</div>
+                        <div style="font-size:11px;color:#cbd5e1;margin-top:2px;">例如：放 5 个背景文件夹 × 每个 24 条 = 120 条（各文件夹内部独立循环不串素材），同时把 24 个人声和 24 条文案从 1~24 循环铺满 120 条！</div>
+                    </div>
+                </div>
+                <button type="button" id="rbt-rm-close-btn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#e2e8f0;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px;">✖ 关闭</button>
+            </div>
+
+            <!-- Top Global Bar -->
+            <div style="padding:10px 20px;background:rgba(0,0,0,0.28);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:12px;">
+                <label style="display:flex;align-items:center;gap:6px;color:#fde68a;font-weight:700;">
+                    <span>① 每个背景文件夹生成视频数:</span>
+                    <input type="number" id="rbt-rm-per-folder" min="1" max="2000" value="${savedPerFolder}" style="width:68px;padding:3px 6px;border-radius:5px;border:1px solid #f59e0b;background:#0f172a;color:#fef08a;font-weight:800;font-size:13px;text-align:center;">
+                    <span style="color:#94a3b8;font-weight:400;">个/文件夹</span>
+                </label>
+                <span style="color:rgba(255,255,255,0.2);">|</span>
+                <label style="display:flex;align-items:center;gap:6px;color:#93c5fd;font-weight:700;">
+                    <span>🎯 总铺满目标视频行数:</span>
+                    <input type="number" id="rbt-rm-total-rows" min="1" max="5000" value="${savedTotalRows}" style="width:76px;padding:3px 6px;border-radius:5px;border:1px solid #38bdf8;background:#0f172a;color:#e0f2fe;font-weight:800;font-size:13px;text-align:center;" title="当添加了背景文件夹时，自动等于 文件夹数 × 每个文件夹视频数；也可手动输入（如 120）">
+                    <span id="rbt-rm-total-formula" style="color:#cbd5e1;font-size:11px;font-weight:400;"></span>
+                </label>
+                <span style="color:rgba(255,255,255,0.2);">|</span>
+                <label style="display:flex;align-items:center;gap:6px;color:#cbd5e1;">
+                    <span>写入方式:</span>
+                    <select id="rbt-rm-write-mode" style="padding:3px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);background:#0f172a;color:#f1f5f9;font-size:11px;">
+                        <option value="overwrite">⚡ 从第 1 行开始覆盖/自动补齐行数 (推荐)</option>
+                        <option value="append">➕ 在现有表格末尾追加新行</option>
+                        <option value="replace">🧹 清空当前表格并重新生成</option>
+                    </select>
+                </label>
+            </div>
+
+            <!-- Main Scrollable Body -->
+            <div style="padding:14px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;flex:1;">
+                <!-- Section 1: Background Folders -->
+                <div id="rbt-rm-bg-dropzone" style="padding:12px 14px;border-radius:10px;background:rgba(30,41,59,0.55);border:1px dashed rgba(251,191,36,0.45);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                        <div>
+                            <div style="font-size:13px;font-weight:700;color:#fde68a;">🎬 模块一：背景素材多文件夹分段循环（可放多个文件夹，支持直接拖入文件夹）</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">第 1 个文件夹填满前 N 行（不够自动从该文件夹第 1 个素材循环），第 2 个文件夹填满接下来 N 行……严格保证每个区段只用对应文件夹的素材！</div>
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                            <select id="rbt-rm-bg-loop-order" style="padding:3px 6px;border-radius:5px;border:1px solid rgba(255,255,255,0.18);background:#0f172a;color:#e2e8f0;font-size:11px;" title="单个文件夹内部素材不足 N 个时的循环顺序">
+                                <option value="sequence">🔁 文件夹内按文件名 1→N 顺序循环</option>
+                                <option value="shuffle">🎲 文件夹内随机打乱循环</option>
+                            </select>
+                            <button type="button" id="rbt-rm-add-bg-dirs-btn" style="padding:4px 10px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;border-radius:5px;cursor:pointer;">➕ 添加背景文件夹(可多选)</button>
+                            <button type="button" id="rbt-rm-add-bg-parent-btn" style="padding:4px 10px;font-size:11px;background:rgba(251,191,36,0.15);color:#fde68a;border:1px solid rgba(251,191,36,0.4);border-radius:5px;cursor:pointer;" title="选择一个大文件夹，自动把里面的所有子文件夹按顺序加入列表">📂 选总文件夹(自动拆子文件夹)</button>
+                            <button type="button" id="rbt-rm-clear-bg-btn" style="padding:4px 8px;font-size:11px;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);border-radius:5px;cursor:pointer;">清空</button>
+                        </div>
+                    </div>
+                    <div id="rbt-rm-bg-folder-list" style="max-height:165px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding:6px;border-radius:6px;background:rgba(15,23,42,0.65);font-size:11px;">
+                    </div>
+                </div>
+
+                <!-- Section 2: Voice / Audio 1..N Cycle -->
+                <div id="rbt-rm-audio-dropzone" style="padding:12px 14px;border-radius:10px;background:rgba(30,41,59,0.55);border:1px dashed rgba(56,189,248,0.45);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                        <div>
+                            <div style="font-size:13px;font-weight:700;color:#7dd3fc;">🎙️ 模块二：人声文件 1~N 循环铺满（如 1 个文件夹 24 个音频 → 循环铺满 120 行）</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">选择一个含 24 个人声的文件夹（或直接多选音频文件），自动按 1~24 顺序一轮接一轮循环填满上方设定的总目标行数（如 120 行）。</div>
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                            <button type="button" id="rbt-rm-pick-audio-dir-btn" style="padding:4px 10px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;border:none;border-radius:5px;cursor:pointer;">📁 选择人声文件夹</button>
+                            <button type="button" id="rbt-rm-pick-audio-files-btn" style="padding:4px 10px;font-size:11px;background:rgba(56,189,248,0.15);color:#bae6fd;border:1px solid rgba(56,189,248,0.4);border-radius:5px;cursor:pointer;">🎵 选择多个人声文件</button>
+                            <button type="button" id="rbt-rm-clear-audio-btn" style="padding:4px 8px;font-size:11px;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);border-radius:5px;cursor:pointer;">清空</button>
+                        </div>
+                    </div>
+                    <div id="rbt-rm-audio-summary" style="padding:7px 10px;border-radius:6px;background:rgba(15,23,42,0.65);font-size:11px;color:#94a3b8;">
+                        尚未选择人声文件（留空则不修改现有任务的人声列；您也可以将人声文件夹或音频拖入此处）
+                    </div>
+                </div>
+
+                <!-- Section 3: Scripts 1..N Cycle -->
+                <div style="padding:12px 14px;border-radius:10px;background:rgba(30,41,59,0.55);border:1px dashed rgba(167,139,250,0.45);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                        <div>
+                            <div style="font-size:13px;font-weight:700;color:#c4b5fd;">📝 模块三：批量文案 1~N 循环铺满（如复制 24 条文案 → 自动循环铺满 120 行）</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">支持直接从 Google 表格 / Excel 复制 24 个单元格粘贴进来，自动按 1~24 循环铺满全部目标行（如 120 行）。</div>
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                            <button type="button" id="rbt-rm-paste-clipboard-btn" style="padding:4px 10px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;border:none;border-radius:5px;cursor:pointer;">📋 从剪贴板一键粘贴</button>
+                            <button type="button" id="rbt-rm-clear-scripts-btn" style="padding:4px 8px;font-size:11px;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);border-radius:5px;cursor:pointer;">清空</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:#e2e8f0;">
+                        <span style="color:#a78bfa;font-weight:600;">填入目标列:</span>
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input type="checkbox" id="rbt-rm-col-txtcontent" checked>
+                            <span>人声-断行文案 (用于字幕对齐)</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input type="checkbox" id="rbt-rm-col-scroll" checked>
+                            <span>滚动字幕正文 (若模版含滚动层则同步填入)</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input type="checkbox" id="rbt-rm-col-card">
+                            <span>覆层卡片正文 (overlay_body)</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input type="checkbox" id="rbt-rm-col-tts">
+                            <span>AI生音频文案 (ttsText)</span>
+                        </label>
+                    </div>
+                    <textarea id="rbt-rm-scripts-input" rows="4" placeholder="在此粘贴 24 条文案（每行一条，或直接从 Google 表格/Excel 复制 24 行单元格粘贴）……留空则不修改文案列" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:#0f172a;color:#f8fafc;font-size:12px;line-height:1.45;resize:vertical;"></textarea>
+                    <div id="rbt-rm-scripts-summary" style="margin-top:4px;font-size:11px;color:#cbd5e1;">已输入 0 条文案</div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div id="rbt-rm-footer-preview" style="font-size:12px;color:#fde68a;font-weight:600;">
+                    💡 请添加背景文件夹、人声或文案（三项可同时使用，也可只填其中一项单独循环铺满）
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <button type="button" id="rbt-rm-cancel-btn" style="padding:7px 16px;font-size:12px;background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;">取消</button>
+                    <button type="button" id="rbt-rm-apply-btn" style="padding:7px 20px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;border:1px solid #fbbf24;border-radius:6px;cursor:pointer;box-shadow:0 4px 14px rgba(245,158,11,0.4);">🚀 一键循环铺满表格</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const perFolderInput = modal.querySelector('#rbt-rm-per-folder');
+    const totalRowsInput = modal.querySelector('#rbt-rm-total-rows');
+    const totalFormulaEl = modal.querySelector('#rbt-rm-total-formula');
+    const bgListEl = modal.querySelector('#rbt-rm-bg-folder-list');
+    const audioSummaryEl = modal.querySelector('#rbt-rm-audio-summary');
+    const scriptsInput = modal.querySelector('#rbt-rm-scripts-input');
+    const scriptsSummaryEl = modal.querySelector('#rbt-rm-scripts-summary');
+    const footerPreviewEl = modal.querySelector('#rbt-rm-footer-preview');
+
+    const getPerFolderCount = () => Math.max(1, parseInt(perFolderInput.value, 10) || 24);
+    const getTotalTargetRows = () => {
+        if (bgFolders.length > 0) {
+            return bgFolders.length * getPerFolderCount();
+        }
+        return Math.max(1, parseInt(totalRowsInput.value, 10) || manualTotalRows || 120);
+    };
+
+    const refreshModalSummary = () => {
+        const perFolder = getPerFolderCount();
+        if (bgFolders.length > 0) {
+            const computedTotal = bgFolders.length * perFolder;
+            totalRowsInput.value = String(computedTotal);
+            totalFormulaEl.textContent = `(${bgFolders.length} 个文件夹 × 每个 ${perFolder} 条 = ${computedTotal} 行)`;
+        } else {
+            totalFormulaEl.textContent = `(未选背景文件夹，按手动输入总行数 ${getTotalTargetRows()} 行循环铺满)`;
+        }
+        const totalRows = getTotalTargetRows();
+
+        // Render BG folder list
+        if (bgFolders.length === 0) {
+            bgListEl.innerHTML = `<div style="color:#64748b;padding:8px 4px;text-align:center;">尚未添加背景文件夹。点击上方「➕ 添加背景文件夹(可多选)」或直接把 5 个文件夹拖进此框内（若只铺满人声/文案可留空）。</div>`;
+        } else {
+            bgListEl.innerHTML = bgFolders.map((f, idx) => {
+                const startRow = idx * perFolder + 1;
+                const endRow = (idx + 1) * perFolder;
+                const cycleNote = f.files.length >= perFolder
+                    ? `取前 ${perFolder} 个`
+                    : `从第 1 个循环补齐 ${perFolder} 个 (循环 ${Math.ceil(perFolder / Math.max(1, f.files.length))} 轮)`;
+                return `
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:5px;background:rgba(30,41,59,0.85);border:1px solid rgba(255,255,255,0.07);">
+                        <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+                            <span style="background:#f59e0b;color:#0f172a;font-weight:800;padding:1px 6px;border-radius:4px;font-size:10px;white-space:nowrap;">文件夹 #${idx + 1}</span>
+                            <span style="color:#fef08a;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_escHtml(f.dirPath)}">${_escHtml(f.name)}</span>
+                            <span style="color:#94a3b8;white-space:nowrap;">(${f.files.length} 个素材 · ${cycleNote})</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                            <span style="color:#6ee7b7;font-weight:700;background:rgba(16,185,129,0.15);padding:1px 6px;border-radius:4px;">➔ 第 ${startRow} ~ ${endRow} 行</span>
+                            <button type="button" data-move-up="${idx}" style="background:rgba(255,255,255,0.08);border:none;color:#cbd5e1;border-radius:3px;padding:1px 5px;cursor:pointer;" ${idx === 0 ? 'disabled' : ''} title="上移">↑</button>
+                            <button type="button" data-move-down="${idx}" style="background:rgba(255,255,255,0.08);border:none;color:#cbd5e1;border-radius:3px;padding:1px 5px;cursor:pointer;" ${idx === bgFolders.length - 1 ? 'disabled' : ''} title="下移">↓</button>
+                            <button type="button" data-remove-bg="${idx}" style="background:rgba(239,68,68,0.2);border:none;color:#fca5a5;border-radius:3px;padding:1px 6px;cursor:pointer;" title="移除此文件夹">✕</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render Audio summary
+        if (audioFiles.length === 0) {
+            audioSummaryEl.innerHTML = `<span style="color:#64748b;">尚未选择人声文件（留空则不修改现有任务的人声列；您也可以将人声文件夹或音频拖入此处）</span>`;
+        } else {
+            const firstFew = audioFiles.slice(0, 4).map(p => _getPathBaseName(p)).join('、') + (audioFiles.length > 4 ? ' ...' : '');
+            const rounds = (totalRows / audioFiles.length).toFixed(1).replace(/\.0$/, '');
+            audioSummaryEl.innerHTML = `
+                <div style="color:#7dd3fc;font-weight:700;">✅ 已加载 ${audioFiles.length} 个人声文件 ${audioSourceLabel ? `（来源：${_escHtml(audioSourceLabel)}）` : ''} ➔ 将按 1~${audioFiles.length} 顺序循环铺满第 1 ~ ${totalRows} 行（共循环 ${rounds} 轮）</div>
+                <div style="color:#94a3b8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">示例顺序：${_escHtml(firstFew)}</div>
+            `;
+        }
+
+        // Render Scripts summary
+        const parsedScripts = _parseRepeatMakerScripts(scriptsInput.value);
+        if (parsedScripts.length === 0) {
+            scriptsSummaryEl.innerHTML = `<span style="color:#64748b;">已输入 0 条文案（留空则不修改文案列）</span>`;
+        } else {
+            const rounds = (totalRows / parsedScripts.length).toFixed(1).replace(/\.0$/, '');
+            const previewFirst = parsedScripts[0].slice(0, 45) + (parsedScripts[0].length > 45 ? '...' : '');
+            scriptsSummaryEl.innerHTML = `<span style="color:#c4b5fd;font-weight:700;">✅ 已识别 ${parsedScripts.length} 条文案 ➔ 将按 1~${parsedScripts.length} 顺序循环铺满第 1 ~ ${totalRows} 行（共循环 ${rounds} 轮）</span> <span style="color:#94a3b8;">| 首条预览: "${_escHtml(previewFirst)}"</span>`;
+        }
+
+        // Footer preview
+        const activeParts = [];
+        if (bgFolders.length > 0) activeParts.push(`背景文件夹 ${bgFolders.length} 个 × ${perFolder} = ${bgFolders.length * perFolder} 行`);
+        if (audioFiles.length > 0) activeParts.push(`人声 ${audioFiles.length} 个循环铺满 ${totalRows} 行`);
+        if (parsedScripts.length > 0) activeParts.push(`文案 ${parsedScripts.length} 条循环铺满 ${totalRows} 行`);
+        footerPreviewEl.textContent = activeParts.length > 0
+            ? `🚀 即将执行：${activeParts.join(' ＋ ')}（共生成/更新 ${totalRows} 个视频任务）`
+            : `💡 请添加背景文件夹、人声或文案（三项可同时使用，也可只填其中一项单独循环铺满）`;
+    };
+
+    const addBgDirectories = (dirs) => {
+        let added = 0;
+        for (const rawDir of (dirs || [])) {
+            const dirPath = String(rawDir || '').trim();
+            if (!dirPath) continue;
+            const directFiles = _scanRepeatMakerDirFiles(dirPath, 'bg');
+            if (directFiles.length > 0) {
+                bgFolders.push({
+                    dirPath,
+                    name: _getPathBaseName(dirPath),
+                    files: directFiles
+                });
+                added++;
+            } else {
+                // 如果选中的是包含多个子文件夹的总目录，自动把里面有素材的子文件夹拆开加入
+                const subDirs = _scanRepeatMakerSubdirs(dirPath, 'bg');
+                for (const sub of subDirs) {
+                    const subFiles = _scanRepeatMakerDirFiles(sub, 'bg');
+                    if (subFiles.length > 0) {
+                        bgFolders.push({
+                            dirPath: sub,
+                            name: _getPathBaseName(sub),
+                            files: subFiles
+                        });
+                        added++;
+                    }
+                }
+            }
+        }
+        if (added === 0 && dirs && dirs.length > 0) {
+            alert('所选文件夹中没有找到支持的视频或图片素材 (.mp4, .mov, .mkv, .webm, .jpg, .png, .webp)');
+        }
+        refreshModalSummary();
+    };
+
+    perFolderInput.addEventListener('input', () => {
+        localStorage.setItem('rbt_repeat_per_folder', String(getPerFolderCount()));
+        refreshModalSummary();
+    });
+    totalRowsInput.addEventListener('input', () => {
+        manualTotalRows = Math.max(1, parseInt(totalRowsInput.value, 10) || 120);
+        localStorage.setItem('rbt_repeat_total_rows', String(manualTotalRows));
+        refreshModalSummary();
+    });
+    scriptsInput.addEventListener('input', refreshModalSummary);
+
+    bgListEl.addEventListener('click', (e) => {
+        const upBtn = e.target.closest('[data-move-up]');
+        if (upBtn) {
+            const idx = parseInt(upBtn.dataset.moveUp, 10);
+            if (idx > 0) {
+                const tmp = bgFolders[idx - 1];
+                bgFolders[idx - 1] = bgFolders[idx];
+                bgFolders[idx] = tmp;
+                refreshModalSummary();
+            }
+            return;
+        }
+        const downBtn = e.target.closest('[data-move-down]');
+        if (downBtn) {
+            const idx = parseInt(downBtn.dataset.moveDown, 10);
+            if (idx >= 0 && idx < bgFolders.length - 1) {
+                const tmp = bgFolders[idx + 1];
+                bgFolders[idx + 1] = bgFolders[idx];
+                bgFolders[idx] = tmp;
+                refreshModalSummary();
+            }
+            return;
+        }
+        const rmBtn = e.target.closest('[data-remove-bg]');
+        if (rmBtn) {
+            const idx = parseInt(rmBtn.dataset.removeBg, 10);
+            if (idx >= 0 && idx < bgFolders.length) {
+                bgFolders.splice(idx, 1);
+                refreshModalSummary();
+            }
+        }
+    });
+
+    modal.querySelector('#rbt-rm-add-bg-dirs-btn')?.addEventListener('click', async () => {
+        try {
+            if (window.electronAPI && window.electronAPI.selectDirectories) {
+                const dirs = await window.electronAPI.selectDirectories();
+                if (Array.isArray(dirs) && dirs.length > 0) addBgDirectories(dirs);
+            } else if (window.electronAPI && window.electronAPI.selectDirectory) {
+                const dir = await window.electronAPI.selectDirectory();
+                if (dir) addBgDirectories([dir]);
+            }
+        } catch (err) {
+            alert('选择文件夹失败: ' + (err.message || err));
+        }
+    });
+
+    modal.querySelector('#rbt-rm-add-bg-parent-btn')?.addEventListener('click', async () => {
+        try {
+            const parentDir = await window.electronAPI?.selectDirectory?.();
+            if (!parentDir) return;
+            const subDirs = _scanRepeatMakerSubdirs(parentDir, 'bg');
+            if (subDirs.length > 0) {
+                addBgDirectories(subDirs);
+            } else {
+                addBgDirectories([parentDir]);
+            }
+        } catch (err) {
+            alert('读取总文件夹失败: ' + (err.message || err));
+        }
+    });
+
+    modal.querySelector('#rbt-rm-clear-bg-btn')?.addEventListener('click', () => {
+        bgFolders.length = 0;
+        refreshModalSummary();
+    });
+
+    // Drag & Drop on BG box
+    const bgDropzone = modal.querySelector('#rbt-rm-bg-dropzone');
+    bgDropzone?.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); bgDropzone.style.borderColor = '#fbbf24'; });
+    bgDropzone?.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); bgDropzone.style.borderColor = 'rgba(251,191,36,0.45)'; });
+    bgDropzone?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        bgDropzone.style.borderColor = 'rgba(251,191,36,0.45)';
+        const droppedFiles = Array.from(e.dataTransfer?.files || []);
+        const paths = droppedFiles.map(f => _rbtGetNativeFilePath(f)).filter(Boolean);
+        if (paths.length > 0) addBgDirectories(paths);
+    });
+
+    // Audio buttons & dropzone
+    modal.querySelector('#rbt-rm-pick-audio-dir-btn')?.addEventListener('click', async () => {
+        try {
+            const dir = await window.electronAPI?.selectDirectory?.();
+            if (!dir) return;
+            const scanned = _scanRepeatMakerDirFiles(dir, 'audio');
+            if (scanned.length === 0) {
+                alert('该文件夹中未找到音频文件 (.mp3, .wav, .m4a, .aac, .flac, .ogg)');
+                return;
+            }
+            audioFiles = scanned;
+            audioSourceLabel = _getPathBaseName(dir);
+            refreshModalSummary();
+        } catch (err) {
+            alert('读取人声文件夹失败: ' + (err.message || err));
+        }
+    });
+
+    modal.querySelector('#rbt-rm-pick-audio-files-btn')?.addEventListener('click', async () => {
+        try {
+            if (window.electronAPI && window.electronAPI.selectMediaFiles) {
+                const picked = await window.electronAPI.selectMediaFiles({
+                    title: '选择要循环添加的人声文件（可多选，如 24 个）',
+                    filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'wma'] }]
+                });
+                if (Array.isArray(picked) && picked.length > 0) {
+                    const sorted = [...picked].sort((a, b) => _naturalSortByName(_getPathBaseName(a), _getPathBaseName(b)));
+                    audioFiles = sorted;
+                    audioSourceLabel = `多选 ${sorted.length} 个文件`;
+                    refreshModalSummary();
+                }
+            }
+        } catch (err) {
+            alert('选择人声文件失败: ' + (err.message || err));
+        }
+    });
+
+    modal.querySelector('#rbt-rm-clear-audio-btn')?.addEventListener('click', () => {
+        audioFiles = [];
+        audioSourceLabel = '';
+        refreshModalSummary();
+    });
+
+    const audioDropzone = modal.querySelector('#rbt-rm-audio-dropzone');
+    audioDropzone?.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); audioDropzone.style.borderColor = '#38bdf8'; });
+    audioDropzone?.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); audioDropzone.style.borderColor = 'rgba(56,189,248,0.45)'; });
+    audioDropzone?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        audioDropzone.style.borderColor = 'rgba(56,189,248,0.45)';
+        const dropped = Array.from(e.dataTransfer?.files || []);
+        const paths = dropped.map(f => _rbtGetNativeFilePath(f)).filter(Boolean);
+        if (!paths.length) return;
+        const collected = [];
+        for (const p of paths) {
+            const fromDir = _scanRepeatMakerDirFiles(p, 'audio');
+            if (fromDir.length > 0) {
+                collected.push(...fromDir);
+            } else {
+                const ext = _getPathBaseName(p).split('.').pop().toLowerCase();
+                if (['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'wma'].includes(ext)) {
+                    collected.push(p);
+                }
+            }
+        }
+        if (collected.length > 0) {
+            collected.sort((a, b) => _naturalSortByName(_getPathBaseName(a), _getPathBaseName(b)));
+            audioFiles = collected;
+            audioSourceLabel = paths.length === 1 ? _getPathBaseName(paths[0]) : `拖入 ${collected.length} 个音频`;
+            refreshModalSummary();
+        }
+    });
+
+    // Scripts clipboard paste & clear
+    modal.querySelector('#rbt-rm-paste-clipboard-btn')?.addEventListener('click', async () => {
+        try {
+            const clipText = await navigator.clipboard.readText();
+            if (clipText) {
+                scriptsInput.value = clipText;
+                refreshModalSummary();
+            } else {
+                alert('剪贴板为空，请先复制文案');
+            }
+        } catch (_) {
+            scriptsInput.focus();
+            document.execCommand('paste');
+            refreshModalSummary();
+        }
+    });
+    modal.querySelector('#rbt-rm-clear-scripts-btn')?.addEventListener('click', () => {
+        scriptsInput.value = '';
+        refreshModalSummary();
+    });
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('#rbt-rm-close-btn')?.addEventListener('click', closeModal);
+    modal.querySelector('#rbt-rm-cancel-btn')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    // Apply Repeat Maker
+    modal.querySelector('#rbt-rm-apply-btn')?.addEventListener('click', () => {
+        const perFolder = getPerFolderCount();
+        const totalRows = getTotalTargetRows();
+        const parsedScripts = _parseRepeatMakerScripts(scriptsInput.value);
+        if (bgFolders.length === 0 && audioFiles.length === 0 && parsedScripts.length === 0) {
+            alert('请至少添加一项（背景文件夹、人声文件 或 批量文案）后再点击执行！');
+            return;
+        }
+
+        const writeMode = modal.querySelector('#rbt-rm-write-mode')?.value || 'overwrite';
+        const bgLoopOrder = modal.querySelector('#rbt-rm-bg-loop-order')?.value || 'sequence';
+        const fillTxtContent = Boolean(modal.querySelector('#rbt-rm-col-txtcontent')?.checked);
+        const fillScroll = Boolean(modal.querySelector('#rbt-rm-col-scroll')?.checked);
+        const fillCard = Boolean(modal.querySelector('#rbt-rm-col-card')?.checked);
+        const fillTts = Boolean(modal.querySelector('#rbt-rm-col-tts')?.checked);
+
+        if (!state.tasks) state.tasks = [];
+
+        // Preserve template overlay structure from first existing task (if any) when creating new rows
+        const templateTask = state.tasks[0] || null;
+        const cloneTemplateOverlays = () => {
+            if (templateTask && Array.isArray(templateTask.overlays) && templateTask.overlays.length > 0) {
+                return JSON.parse(JSON.stringify(templateTask.overlays));
+            }
+            if (Array.isArray(state.overlays) && state.overlays.length > 0) {
+                return JSON.parse(JSON.stringify(state.overlays));
+            }
+            return [];
+        };
+
+        let startIndex = 0;
+        if (writeMode === 'replace') {
+            state.tasks = [];
+            startIndex = 0;
+        } else if (writeMode === 'append') {
+            startIndex = state.tasks.length;
+        } else {
+            startIndex = 0;
+        }
+
+        // Ensure target rows exist
+        const requiredLength = startIndex + totalRows;
+        while (state.tasks.length < requiredLength) {
+            const newTask = _createEmptyTask();
+            const clonedOvs = cloneTemplateOverlays();
+            if (clonedOvs.length > 0) newTask.overlays = clonedOvs;
+            if (templateTask?.subtitlePreset) newTask.subtitlePreset = templateTask.subtitlePreset;
+            if (templateTask?.cardTemplate) newTask.cardTemplate = templateTask.cardTemplate;
+            _ensureTaskId(newTask);
+            state.tasks.push(newTask);
+        }
+
+        // 1. Fill Backgrounds (Folder by Folder, Per-Folder Block of N, strict isolation per folder)
+        if (bgFolders.length > 0) {
+            for (let fIdx = 0; fIdx < bgFolders.length; fIdx++) {
+                const folder = bgFolders[fIdx];
+                const srcFiles = [...(folder.files || [])];
+                if (srcFiles.length === 0) continue;
+                let pool = [...srcFiles];
+                if (bgLoopOrder === 'shuffle') {
+                    for (let k = pool.length - 1; k > 0; k--) {
+                        const j = Math.floor(Math.random() * (k + 1));
+                        [pool[k], pool[j]] = [pool[j], pool[k]];
+                    }
+                }
+                for (let s = 0; s < perFolder; s++) {
+                    const rowIdx = startIndex + fIdx * perFolder + s;
+                    const task = state.tasks[rowIdx];
+                    if (!task) continue;
+                    if (bgLoopOrder === 'shuffle' && s > 0 && s % pool.length === 0) {
+                        for (let k = pool.length - 1; k > 0; k--) {
+                            const j = Math.floor(Math.random() * (k + 1));
+                            [pool[k], pool[j]] = [pool[j], pool[k]];
+                        }
+                    }
+                    const chosenBg = pool[s % pool.length];
+                    task.bgMode = 'single';
+                    task.bgPath = chosenBg;
+                    task.videoPath = chosenBg;
+                    task.bgSrcUrl = null;
+                    task.srcUrl = null;
+                    const bgBase = _getPathBaseName(chosenBg).replace(/\.[^.]+$/, '');
+                    task.baseName = `${folder.name}_${String(s + 1).padStart(2, '0')}_${bgBase}`;
+                    task.fileName = `${task.baseName}.mp4`;
+                }
+            }
+        }
+
+        // 2. Fill Voice / Audio (1..N cycle across all totalRows)
+        if (audioFiles.length > 0) {
+            for (let i = 0; i < totalRows; i++) {
+                const rowIdx = startIndex + i;
+                const task = state.tasks[rowIdx];
+                if (!task) continue;
+                const chosenAudio = audioFiles[i % audioFiles.length];
+                const prevAudio = task.audioPath || '';
+                if (window.ReelsRenderPlan && typeof window.ReelsRenderPlan.setVoice === 'function') {
+                    window.ReelsRenderPlan.setVoice(task, chosenAudio);
+                } else {
+                    task.audioPath = chosenAudio;
+                }
+                if (prevAudio && prevAudio !== chosenAudio) {
+                    task.aligned = false;
+                    task.srtPath = null;
+                    task.segments = [];
+                }
+            }
+        }
+
+        // 3. Fill Scripts (1..N cycle across all totalRows)
+        if (parsedScripts.length > 0) {
+            for (let i = 0; i < totalRows; i++) {
+                const rowIdx = startIndex + i;
+                const task = state.tasks[rowIdx];
+                if (!task) continue;
+                const scriptText = parsedScripts[i % parsedScripts.length];
+                if (fillTxtContent) {
+                    if (task.txtContent !== scriptText) {
+                        task.txtContent = scriptText;
+                    }
+                }
+                if (fillTts) {
+                    task.ttsText = scriptText;
+                }
+                if (fillScroll) {
+                    if (!Array.isArray(task.overlays)) task.overlays = cloneTemplateOverlays();
+                    const scrollOv = _findBatchScrollOverlay(task);
+                    if (scrollOv) {
+                        scrollOv.content = scriptText;
+                    }
+                }
+                if (fillCard) {
+                    if (!Array.isArray(task.overlays)) task.overlays = cloneTemplateOverlays();
+                    const cardOv = _findBatchTextCardOverlay(task);
+                    if (cardOv) {
+                        cardOv.body_text = scriptText;
+                        cardOv.content = [cardOv.title_text, cardOv.body_text, cardOv.footer_text].filter(Boolean).join('\n');
+                    }
+                }
+            }
+        }
+
+        // 4. 自动复用已对齐的相同 (audioPath + txtContent) 字幕，避免重复对齐
+        const alignedDonorMap = new Map();
+        for (const t of state.tasks) {
+            if (t && t.aligned && t.srtPath && Array.isArray(t.segments) && t.segments.length > 0 && t.audioPath) {
+                const key = `${String(t.audioPath).replace(/\\/g, '/').toLowerCase()}||${String(t.txtContent || '').trim()}`;
+                if (!alignedDonorMap.has(key)) alignedDonorMap.set(key, t);
+            }
+        }
+        if (alignedDonorMap.size > 0) {
+            for (let i = 0; i < totalRows; i++) {
+                const task = state.tasks[startIndex + i];
+                if (!task || (task.aligned && task.srtPath)) continue;
+                const key = `${String(task.audioPath || '').replace(/\\/g, '/').toLowerCase()}||${String(task.txtContent || '').trim()}`;
+                const donor = alignedDonorMap.get(key);
+                if (donor) {
+                    task.srtPath = donor.srtPath;
+                    task.segments = JSON.parse(JSON.stringify(donor.segments));
+                    task.aligned = true;
+                    task.alignedAt = donor.alignedAt || new Date().toLocaleString('zh-CN');
+                    task.alignSource = 'reused_same_audio_text';
+                    task.alignMatchedText = '⚡ 复用相同音频+文案对齐结果';
+                }
+            }
+        }
+
+        _resolveDuplicateTaskNames(state.tasks);
+        _skipNextApply = true;
+        _renderBatchTable();
+        if (typeof _renderTaskList === 'function') _renderTaskList();
+        if (typeof _syncTasksToActiveTab === 'function') _syncTasksToActiveTab();
+        if (typeof _batchAutoSave === 'function') _batchAutoSave();
+
+        closeModal();
+        if (typeof showToast === 'function') {
+            showToast(`✅ 重复制作完成：已循环铺满 ${totalRows} 个视频任务！`, 'success');
+        }
+    });
+
+    refreshModalSummary();
+}
+window.reelsShowRepeatMakerModal = _showRepeatMakerModal;
+
+// ═══════════════════════════════════════════════════════
 // 9b. File assignment helpers
 // ═══════════════════════════════════════════════════════
 
@@ -15320,6 +16111,36 @@ async function _batchAlignAllTasks(overrideForce = false) {
         if (progressEl) progressEl.textContent = `🔗 对齐 ${i + 1}/${tasksToAlign.length}: ${taskName}${isRealignRedo ? (forceTranscribe ? ' (强制重新转录)' : ' (重新查找)') : ''}`;
 
         try {
+            // ⚡ 重复制作加速优化：若前面已经有完全相同的「音频路径 + 文案」完成对齐（例如 24 个音频循环铺满 120 行），直接复用其 SRT 与时间轴 segments，免去重复请求
+            const candidateAudioPath = getAlignAudioPath(task);
+            const candidateRawText = String(getSourceText(task) || '').trim();
+            if (!forceTranscribe && !singleTaskMode && candidateAudioPath) {
+                const normAudio = String(candidateAudioPath).replace(/\\/g, '/').toLowerCase();
+                const donor = (state.tasks || []).find(other => {
+                    if (!other || other === task || !other.aligned || !other.srtPath) return false;
+                    if (!Array.isArray(other.segments) || other.segments.length === 0) return false;
+                    const otherAudio = String(getAlignAudioPath(other) || '').replace(/\\/g, '/').toLowerCase();
+                    if (otherAudio !== normAudio) return false;
+                    const otherText = String(getSourceText(other) || '').trim();
+                    return otherText === candidateRawText;
+                });
+                if (donor) {
+                    task.srtPath = donor.srtPath;
+                    task.segments = JSON.parse(JSON.stringify(donor.segments));
+                    _rbtApplyPendingFirstSubtitleStyle(task);
+                    if (!candidateRawText && String(getSourceText(donor) || '').trim()) {
+                        setSourceText(task, getSourceText(donor));
+                    }
+                    task.aligned = true;
+                    task.alignedAt = new Date().toLocaleString('zh-CN');
+                    task.alignSource = 'reused_same_audio_text';
+                    task.alignMatchedText = '⚡ 复用相同音频+文案对齐结果';
+                    cacheCount++;
+                    ok++;
+                    continue;
+                }
+            }
+
             if (isRealignRedo) {
                 if (progressEl) progressEl.textContent = `🗑️ 废弃旧 SRT，准备从全部任务行重找: ${taskName}`;
                 if (await _discardTaskSrtBeforeRefind(task, taskName)) discardedSrtCount++;
@@ -16182,11 +17003,29 @@ async function _batchAlignWithMultipleKeys(opts = {}) {
         return _batchAlignAllTasks();
     }
 
+    // ⚡ 重复制作并发去重优化：相同「音频路径 + 文案」只派发第 1 条去云端并发识别，其余重复行在首条完成后直接毫秒级克隆复用
+    const uniqueLeaderIndices = [];
+    const duplicateFollowerMap = new Map(); // leaderIndex -> [followerIndex, ...]
+    const seenKeyToLeader = new Map();
+    for (const idx of targetIndices) {
+        const t = state.tasks[idx];
+        const rawAudio = alignSource === 'video' ? (t?.bgPath || t?.videoPath || '') : (t?.audioPath || '');
+        const normKey = `${String(rawAudio).replace(/\\/g, '/').toLowerCase()}||${String(textFor(t) || '').trim()}`;
+        if (!forceTranscribe && seenKeyToLeader.has(normKey)) {
+            const leaderIdx = seenKeyToLeader.get(normKey);
+            duplicateFollowerMap.get(leaderIdx).push(idx);
+        } else {
+            seenKeyToLeader.set(normKey, idx);
+            uniqueLeaderIndices.push(idx);
+            duplicateFollowerMap.set(idx, []);
+        }
+    }
+
     const primaryBtn = document.getElementById('rbt-align-all-btn');
     const parallelBtn = document.getElementById('rbt-align-multikey-btn');
     const progressEl = document.getElementById('rbt-align-progress');
     if (primaryBtn) primaryBtn.disabled = true;
-    const workerCount = Math.min(concurrency, targetIndices.length);
+    const workerCount = Math.min(concurrency, uniqueLeaderIndices.length);
     if (parallelBtn) { parallelBtn.disabled = true; parallelBtn.textContent = `⏳ ${workerCount} 路并发中...`; }
 
     let next = 0;
@@ -16204,8 +17043,8 @@ async function _batchAlignWithMultipleKeys(opts = {}) {
         }
         while (true) {
             const queueIndex = next++;
-            if (queueIndex >= targetIndices.length) return;
-            const taskIndex = targetIndices[queueIndex];
+            if (queueIndex >= uniqueLeaderIndices.length) return;
+            const taskIndex = uniqueLeaderIndices[queueIndex];
             activeTasks.add(taskIndex + 1);
 
             if (progressEl) {
@@ -16222,6 +17061,36 @@ async function _batchAlignWithMultipleKeys(opts = {}) {
                 fail += result?.fail || 0;
                 if (result?.failDetails?.length) failures.push(...result.failDetails);
                 if (result?.rows?.length) reportRows.push(...result.rows);
+
+                // 如果该组首条任务对齐成功，立即克隆复用到所有相同音频+文案的跟随行
+                const followers = duplicateFollowerMap.get(taskIndex) || [];
+                if (followers.length > 0) {
+                    const leaderTask = state.tasks[taskIndex];
+                    if (leaderTask && leaderTask.aligned && leaderTask.srtPath && Array.isArray(leaderTask.segments) && leaderTask.segments.length > 0) {
+                        for (const fIdx of followers) {
+                            const fTask = state.tasks[fIdx];
+                            if (!fTask) continue;
+                            fTask.srtPath = leaderTask.srtPath;
+                            fTask.segments = JSON.parse(JSON.stringify(leaderTask.segments));
+                            _rbtApplyPendingFirstSubtitleStyle(fTask);
+                            fTask.aligned = true;
+                            fTask.alignedAt = new Date().toLocaleString('zh-CN');
+                            fTask.alignSource = 'reused_same_audio_text';
+                            fTask.alignMatchedText = `⚡ 复用第 ${taskIndex + 1} 行对齐结果`;
+                            ok++;
+                            completed++;
+                        }
+                    } else {
+                        for (const fIdx of followers) {
+                            const fRes = await _batchAlignAllTasks({ targetIndices: [fIdx], silent: true });
+                            ok += fRes?.ok || 0;
+                            fail += fRes?.fail || 0;
+                            if (fRes?.failDetails?.length) failures.push(...fRes.failDetails);
+                            if (fRes?.rows?.length) reportRows.push(...fRes.rows);
+                            completed++;
+                        }
+                    }
+                }
             } finally {
                 activeTasks.delete(taskIndex + 1);
                 completed++;

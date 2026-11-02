@@ -4009,6 +4009,11 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
             ? (_baseCardRefX + _baseCardRefW / 2 - _cardW / 2 + _bgOffX)
             : (_baseCardRefX - _padL0 + _bgOffX);
 
+        const _fTopInset = Math.max(0, parseFloat(ov.feather_top_offset ?? 0)) + Math.max(0, parseFloat(ov.feather_top ?? 0)) * 0.55;
+        const _fBotInset = Math.max(0, parseFloat(ov.feather_bottom_offset ?? 0)) + Math.max(0, parseFloat(ov.feather_bottom ?? 0)) * 0.55;
+        const _effPadT = (_padT0 === 55 || _padT0 === 48) ? 18 : _padT0;
+        const _effPadB = (_padB0 === 55 || _padB0 === 48) ? 18 : _padB0;
+
         if (ov.bg_body_only) {
             const baseBodyY = _titleBottomWithGapY;
             const baseBodyBot = _origClipY + _origClipH;
@@ -4016,11 +4021,11 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
                 _cardH = Math.max(60, _rawBgH);
                 _cardY = Math.max(baseBodyY, baseBodyBot - _cardH) + _bgOffY;
             } else {
-                // 自动高度 + 仅包裹正文区：严格位于标题下方，且紧密包裹当前可见的正文区，不遮挡中间空白视频画面
-                const padTopVis = Math.max(16, Math.min(36, _padT0 > 0 ? _padT0 * 0.5 : 22));
-                const padBotVis = Math.max(16, Math.min(40, _padB0 > 0 ? _padB0 * 0.6 : 26));
-                const minTopAllowed = baseBodyY - Math.min(0, _padT0) + _bgOffY;
-                const maxBotAllowed = baseBodyBot + Math.max(0, _padB0) + _bgOffY;
+                // 自动高度 + 仅包裹正文区：严格位于标题与顶部羽化透明区下方，紧密包裹当前可见的正文区，不留大块空白背景挡画面
+                const padTopVis = Math.max(12, Math.min(28, _effPadT > 0 ? _effPadT : 18));
+                const padBotVis = Math.max(12, Math.min(32, _effPadB > 0 ? _effPadB : 20));
+                const minTopAllowed = Math.min(baseBodyBot - 80, baseBodyY + _fTopInset - Math.max(0, padTopVis)) - Math.min(0, _effPadT) + _bgOffY;
+                const maxBotAllowed = Math.max(minTopAllowed + 80, baseBodyBot - _fBotInset + Math.max(0, padBotVis)) + Math.min(0, _effPadB) + _bgOffY;
                 if (lines && lines.length > 0) {
                     const textTopY = curY - padTopVis + _bgOffY;
                     const textBotY = curY + lines.length * lineHeight + padBotVis + _bgOffY;
@@ -4036,10 +4041,17 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
         } else {
             const _baseCardRefY = _origClipY;
             const _baseCardRefH = _origClipH;
-            _cardH = _rawBgH > 0 ? Math.max(60, _rawBgH) : Math.max(60, _baseCardRefH + _padT0 + _padB0);
-            _cardY = _rawBgH > 0
-                ? (_baseCardRefY + _baseCardRefH / 2 - _cardH / 2 + _bgOffY)
-                : (_baseCardRefY - _padT0 + _bgOffY);
+            if (_rawBgH > 0) {
+                _cardH = Math.max(60, _rawBgH);
+                _cardY = _baseCardRefY + _baseCardRefH / 2 - _cardH / 2 + _bgOffY;
+            } else {
+                const topFeatherTrim = _titleFixed ? 0 : Math.max(0, _fTopInset - Math.max(0, _effPadT));
+                const botFeatherTrim = Math.max(0, _fBotInset - Math.max(0, _effPadB));
+                const cardTopY = (_baseCardRefY + (_titleFixed ? -_effPadT : topFeatherTrim)) + _bgOffY;
+                const cardBotY = (_baseCardRefY + _baseCardRefH - botFeatherTrim) + _bgOffY;
+                _cardY = cardTopY;
+                _cardH = Math.max(60, cardBotY - cardTopY);
+            }
         }
     }
     const _cardRad = ov.bg_fullscreen ? 0 : parseFloat(ov.bg_radius ?? 12);
@@ -4497,19 +4509,21 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
             }
         }
     } else {
-        // ── 标题跟随滚动 (原有逻辑) ──
+        // ── 标题跟随滚动或无标题 ──
+        const effClipY = ov.bg_body_only ? bodyClipTopBase : clipY;
+        const effClipH = ov.bg_body_only ? Math.max(40, bodyClipBotBase - bodyClipTopBase) : clipH;
         const _twSegments = Array.isArray(ov._taskSegments)
             ? ov._taskSegments
             : (typeof window !== 'undefined' && window._reelsState?.tasks?.[window._reelsState?.selectedIdx]?.segments) || null;
         const _twContext = { currentTime, start, end, effectiveDuration, segments: _twSegments };
         const hasFeather = featherTop > 0 || featherBottom > 0 || featherTopOff > 0 || featherBotOff > 0 || featherLeft > 0 || featherRight > 0 || featherLeftOff > 0 || featherRightOff > 0;
         if (hasFeather) {
-            const cW = Math.ceil(clipW), cH = Math.ceil(clipH);
+            const cW = Math.ceil(clipW), cH = Math.ceil(effClipH);
             const { tmp, tc } = _acquireFeatherCanvas(cW, cH);
             tc.font = fontStr;
 
             const offX = curX - clipX;
-            const offY = curY - clipY;
+            const offY = curY - effClipY;
             _drawScrollTextBlock(tc, ov, lines, offX, offY, textW, lineHeight, fontSize, align, _twContext);
 
             tc.globalCompositeOperation = 'destination-in';
@@ -4570,11 +4584,11 @@ function _drawScrollOverlay(ctx, ov, clipX, clipY, clipW, clipH, currentTime, ca
                 tc.fillRect(0, 0, cW, cH);
             }
 
-            ctx.drawImage(tmp, clipX, clipY);
+            ctx.drawImage(tmp, clipX, effClipY);
         } else {
             ctx.save();
             ctx.beginPath();
-            ctx.rect(clipX, clipY, clipW, clipH);
+            ctx.rect(clipX, effClipY, clipW, effClipH);
             ctx.clip();
             _drawScrollTextBlock(ctx, ov, lines, curX, curY, textW, lineHeight, fontSize, align, _twContext);
             ctx.restore();

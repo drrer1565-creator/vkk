@@ -693,13 +693,19 @@ class ReelsOverlayPanel {
                                 <input type="number" id="rop-scroll-bg-height-quick-num" class="rop-input" min="0" max="1920" step="10" value="500" style="width:48px;padding:1px 3px;font-size:11px;" title="输入具体像素长度，或输入0恢复自动">
                                 <button type="button" id="rop-scroll-bg-height-auto-btn" class="rop-btn" style="padding:1px 4px;font-size:10px;background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.18);border-radius:3px;cursor:pointer;" title="恢复自动长度">自动</button>
                             </div>
+                            <span style="color:#fde68a;white-space:nowrap;" title="调节整块大背景画板（如旧报纸、羊皮卷、圣诞贺卡）的不透明度（0%=完全透明，100%=完全不透明）">背景透明</span>
+                            <div style="grid-column:span 3;display:flex;align-items:center;gap:4px;">
+                                <input type="range" id="rop-scroll-bg-opacity-quick" class="rop-range" min="0" max="100" step="1" value="92" style="flex:1;min-width:60px;">
+                                <input type="number" id="rop-scroll-bg-opacity-quick-num" class="rop-input" min="0" max="100" step="1" value="92" style="width:48px;padding:1px 3px;font-size:11px;" title="背景不透明度百分比 (0-100%)">
+                                <span style="color:#94a3b8;font-size:10px;">%</span>
+                            </div>
                             <label style="grid-column:span 2;display:flex;align-items:center;gap:4px;cursor:pointer;color:#fef08a;margin:0;" title="开启后，报纸版面、报头线、撕边纹理与圣诞装饰会跟着字幕一起往上循环移动">
                                 <input type="checkbox" id="rop-scroll-bg-scroll-follow-quick" checked>
                                 <span>🔄 背景随字幕向上循环滚动</span>
                             </label>
-                            <label style="grid-column:span 2;display:flex;align-items:center;gap:4px;cursor:pointer;color:#cbd5e1;margin:0;" title="开启后，大背景/边框只包裹下方滚动正文区，不包裹顶部标题，也不遮挡中间空白视频区">
+                            <label style="grid-column:span 2;display:flex;align-items:center;gap:4px;cursor:pointer;color:#cbd5e1;margin:0;" title="开启后，大背景/边框只紧凑包裹滚动正文可见区，不遮挡上方空白视频画面">
                                 <input type="checkbox" id="rop-scroll-bg-body-only-quick">
-                                <span>📐 仅包裹正文区(不含标题)</span>
+                                <span>📐 紧凑包裹正文区(不挡上方画面)</span>
                             </label>
                         </div>
                         <div style="font-size:11px;font-weight:700;color:#93c5fd;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;border-top:1px dashed rgba(255,255,255,0.14);padding-top:5px;">
@@ -726,6 +732,12 @@ class ReelsOverlayPanel {
                             <div style="display:flex;align-items:center;gap:3px;">
                                 <input type="range" id="rop-scroll-body-bg-pad-v-quick" class="rop-range" min="-15" max="80" step="1" value="11" style="flex:1;min-width:45px;">
                                 <input type="number" id="rop-scroll-body-bg-pad-v-quick-num" class="rop-input" min="-20" max="200" step="1" value="11" style="width:46px;padding:1px 3px;font-size:11px;">
+                            </div>
+                            <span style="color:#93c5fd;white-space:nowrap;" title="调节每行剪报条/圣诞带底衬的不透明度（0%=完全透明，100%=完全不透明）">底衬透明</span>
+                            <div style="grid-column:span 3;display:flex;align-items:center;gap:4px;">
+                                <input type="range" id="rop-scroll-body-bg-opacity-quick" class="rop-range" min="0" max="100" step="1" value="95" style="flex:1;min-width:60px;">
+                                <input type="number" id="rop-scroll-body-bg-opacity-quick-num" class="rop-input" min="0" max="100" step="1" value="95" style="width:48px;padding:1px 3px;font-size:11px;" title="逐行底衬不透明度百分比 (0-100%)">
+                                <span style="color:#94a3b8;font-size:10px;">%</span>
                             </div>
                         </div>
                     </div>
@@ -2497,22 +2509,27 @@ class ReelsOverlayPanel {
                     this._syncToOverlay();
                     return;
                 }
+                const wasBgEnabled = Boolean(this._get('rop-scroll-bg-enabled'));
+                const curBgOp = Number(this._get('rop-scroll-bg-opacity'));
+                const nextBgOp = (wasBgEnabled && Number.isFinite(curBgOp) && curBgOp > 0 && curBgOp < 96) ? curBgOp : 92;
                 this._val('rop-scroll-bg-enabled', true);
                 this._val('rop-scroll-bg-style', preset);
                 this._val('rop-scroll-bg-scroll-follow', true);
-                this._val('rop-scroll-bg-opacity', 96);
+                this._val('rop-scroll-bg-opacity', nextBgOp);
+                this._val('rop-scroll-bg-opacity-quick', nextBgOp);
+                this._val('rop-scroll-bg-opacity-quick-num', nextBgOp);
                 this._val('rop-scroll-bg-radius', 20);
                 if (this._getScrollBgStoredSize('width') <= 0 && (this._selectedOv?.w ?? 1080) >= 1020) {
                     this._setScrollBgSizeField('width', 940, this._selectedOv);
                 }
-                const hasFixedTitle = Boolean((this._selectedOv?.scroll_title || '').trim()) && this._selectedOv?.scroll_title_fixed !== false;
-                const hasLargeMiddleVideoGap = hasFixedTitle && ((Number(this._selectedOv?.scroll_from_y ?? 960) - Number(this._selectedOv?.y ?? 400)) >= 420);
-                if (hasLargeMiddleVideoGap && this._selectedOv?.bg_body_only === undefined) {
+                if (!wasBgEnabled && this._selectedOv?.bg_body_only === undefined) {
                     this._val('rop-scroll-bg-body-only', true);
                     this._val('rop-scroll-bg-body-only-quick', true);
                 }
-                if (Number(this._get('rop-scroll-bg-pad-top') || 0) < 36) this._val('rop-scroll-bg-pad-top', 48);
-                if (Number(this._get('rop-scroll-bg-pad-bottom') || 0) < 36) this._val('rop-scroll-bg-pad-bottom', 48);
+                const curPadTop = Number(this._get('rop-scroll-bg-pad-top') ?? 55);
+                const curPadBot = Number(this._get('rop-scroll-bg-pad-bottom') ?? 55);
+                if (!wasBgEnabled || curPadTop === 55 || curPadTop === 48) this._val('rop-scroll-bg-pad-top', 18);
+                if (!wasBgEnabled || curPadBot === 55 || curPadBot === 48) this._val('rop-scroll-bg-pad-bottom', 18);
                 if (Number(this._get('rop-scroll-bg-pad-left') || 0) < 24) this._val('rop-scroll-bg-pad-left', 30);
                 if (Number(this._get('rop-scroll-bg-pad-right') || 0) < 24) this._val('rop-scroll-bg-pad-right', 30);
                 // 关闭单行剪报底衬，避免浅色报纸大背景与浅色单行剪报叠重（用户可随时再点下面一排开启）
@@ -2659,6 +2676,8 @@ class ReelsOverlayPanel {
                 qNum.addEventListener('change', () => applyQuickVal(qNum.value));
             }
         };
+        bindQuickPair('rop-scroll-bg-opacity-quick', 'rop-scroll-bg-opacity-quick-num', ['rop-scroll-bg-opacity'], () => ensureScrollBgVisibleOnEdit());
+        bindQuickPair('rop-scroll-body-bg-opacity-quick', 'rop-scroll-body-bg-opacity-quick-num', ['rop-scroll-body-bg-opacity']);
         bindQuickPair('rop-scroll-body-bg-pad-h-quick', 'rop-scroll-body-bg-pad-h-quick-num', ['rop-scroll-body-bg-pad-h']);
         bindQuickPair('rop-scroll-body-bg-pad-v-quick', 'rop-scroll-body-bg-pad-v-quick-num', ['rop-scroll-body-bg-pad-top', 'rop-scroll-body-bg-pad-bottom']);
         const bindQuickCheckbox = (quickChkId, targetChkId, onToggle) => {
@@ -5244,7 +5263,10 @@ class ReelsOverlayPanel {
             this._val('rop-scroll-body-bg-style', ov.scroll_body_bg_style || 'solid');
             this._val('rop-scroll-body-bg-mode', ov.scroll_body_bg_mode || 'block');
             this._val('rop-scroll-body-bg-color', ov.scroll_body_bg_color || '#000000');
-            this._val('rop-scroll-body-bg-opacity', ov.scroll_body_bg_opacity ?? 60);
+            const _bodyBgOpPct = ov.scroll_body_bg_opacity ?? 60;
+            this._val('rop-scroll-body-bg-opacity', _bodyBgOpPct);
+            this._val('rop-scroll-body-bg-opacity-quick', _bodyBgOpPct);
+            this._val('rop-scroll-body-bg-opacity-quick-num', _bodyBgOpPct);
             this._val('rop-scroll-body-bg-radius', ov.scroll_body_bg_radius ?? 12);
             this._val('rop-scroll-body-bg-pad-h', ov.scroll_body_bg_pad_h ?? 0);
             this._val('rop-scroll-body-bg-pad-top', ov.scroll_body_bg_pad_top ?? 0);
@@ -5287,7 +5309,10 @@ class ReelsOverlayPanel {
             this._val('rop-scroll-bg-enabled', ov.bg_enabled || false);
             this._val('rop-scroll-bg-style', ov.bg_style || 'solid');
             this._val('rop-scroll-bg-color', ov.bg_color || '#000000');
-            this._val('rop-scroll-bg-opacity', Math.round((ov.bg_opacity ?? 191) / 255 * 100));
+            const _bgOpPct = Math.round((ov.bg_opacity ?? 191) / 255 * 100);
+            this._val('rop-scroll-bg-opacity', _bgOpPct);
+            this._val('rop-scroll-bg-opacity-quick', _bgOpPct);
+            this._val('rop-scroll-bg-opacity-quick-num', _bgOpPct);
             this._val('rop-scroll-bg-scroll-follow', ov.bg_scroll_follow !== false);
             this._val('rop-scroll-bg-scroll-follow-quick', ov.bg_scroll_follow !== false);
             this._val('rop-scroll-bg-body-only', ov.bg_body_only === true);
@@ -5902,6 +5927,12 @@ class ReelsOverlayPanel {
             ov.bg_radius = this._get('rop-scroll-bg-radius');
             ov.bg_fullscreen = this._get('rop-scroll-bg-fullscreen');
             // 同步顶部快捷栏显示
+            const _syncBgOpPct = Math.round((ov.bg_opacity ?? 191) / 255 * 100);
+            this._val('rop-scroll-bg-opacity-quick', _syncBgOpPct);
+            this._val('rop-scroll-bg-opacity-quick-num', _syncBgOpPct);
+            const _syncBodyBgOpPct = ov.scroll_body_bg_opacity ?? 60;
+            this._val('rop-scroll-body-bg-opacity-quick', _syncBodyBgOpPct);
+            this._val('rop-scroll-body-bg-opacity-quick-num', _syncBodyBgOpPct);
             this._val('rop-scroll-bg-scroll-follow-quick', ov.bg_scroll_follow);
             this._val('rop-scroll-bg-body-only-quick', ov.bg_body_only);
             this._setScrollBgSizeField('width', ov.bg_width, ov);

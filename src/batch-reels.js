@@ -12576,13 +12576,94 @@ function _reelsTaskCardBaseName(task) {
     return _sanitizeReelsFileBaseName(task?.baseName || task?.fileName || '', '');
 }
 
+function _extractReelsTaskFullScriptText(task) {
+    if (!task) return '';
+    const firstScroll = Array.isArray(task?.overlays) ? task.overlays.find(ov => ov?.type === 'scroll' && !ov.disabled) : null;
+    const scrollBody = String(firstScroll?.content || firstScroll?.scroll_body || '').trim();
+    const scrollTitle = String(firstScroll?.scroll_title || '').trim();
+    let text = String(task?.txtContent || task?.ttsText || task?.aiScript || scrollBody || scrollTitle || '').trim();
+    if (!text && Array.isArray(task?.overlays)) {
+        for (const ov of task.overlays) {
+            if (!ov || ov.fixed_text) continue;
+            const b = String(ov.body_text || ov.content || '').trim();
+            const t = String(ov.title_text || '').trim();
+            if (b || t) {
+                text = b || t;
+                break;
+            }
+        }
+    }
+    if (!text && Array.isArray(task?.segments) && task.segments.length > 0) {
+        text = task.segments.map(s => String(s?.text || '').trim()).filter(Boolean).join(' ');
+    }
+    return text;
+}
+window._extractReelsTaskFullScriptText = _extractReelsTaskFullScriptText;
+
+async function _ensureReelsAiChineseExportNames(tasks, options = {}) {
+    const list = Array.isArray(tasks) ? tasks : [];
+    if (list.length === 0) return [];
+    const now = new Date();
+    const defaultDateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const dateStr = String(options.dateStr || localStorage.getItem('reels_ai_cn_date_str') || defaultDateStr).replace(/[^0-9]/g, '').slice(0, 8) || defaultDateStr;
+    const overwriteManual = Boolean(options.overwriteManual);
+
+    const items = list.map((t, idx) => ({
+        index: idx,
+        text: _extractReelsTaskFullScriptText(t)
+    }));
+
+    try {
+        if (typeof apiCall === 'function') {
+            const res = await apiCall('ai/smart-export-names', { items, dateStr });
+            if (res && Array.isArray(res.results)) {
+                res.results.forEach((r, idx) => {
+                    const task = list[idx];
+                    if (!task || !r?.fullName) return;
+                    const cleanName = _sanitizeReelsFileBaseName(r.fullName, `${dateStr}-未命名文案`);
+                    task._aiCnDateName = cleanName;
+                    if (overwriteManual || !String(task.exportName || '').trim()) {
+                        task.exportName = cleanName;
+                    }
+                });
+                return res.results;
+            }
+        }
+    } catch (err) {
+        console.warn('[_ensureReelsAiChineseExportNames] AI中文命名回退本地提取:', err);
+    }
+
+    // 本地兜底
+    list.forEach((task) => {
+        if (!task) return;
+        const fallbackText = _reelsTaskTextBaseName(task) || '未命名文案';
+        const cleanName = _sanitizeReelsFileBaseName(`${dateStr}-${fallbackText.slice(0, 20)}`, `${dateStr}-未命名文案`);
+        task._aiCnDateName = cleanName;
+        if (overwriteManual || !String(task.exportName || '').trim()) {
+            task.exportName = cleanName;
+        }
+    });
+    return [];
+}
+window._ensureReelsAiChineseExportNames = _ensureReelsAiChineseExportNames;
+
 function _resolveReelsExportBaseName(task, namingMode = 'text') {
+    const mode = namingMode || 'text';
+    if (mode === 'ai-cn-date' && task?._aiCnDateName) {
+        let aiBase = _sanitizeReelsFileBaseName(task._aiCnDateName, '');
+        if (aiBase) {
+            if (task?.versionTag) {
+                const tag = _sanitizeReelsFileBaseName(String(task.versionTag).trim(), '');
+                if (tag && !aiBase.endsWith(`_${tag}`)) aiBase = `${aiBase}_${tag}`;
+            }
+            return aiBase;
+        }
+    }
     const manual = _sanitizeReelsFileBaseName(task?.exportName || '', '');
     let base = '';
     if (manual) {
         base = manual;
     } else {
-        const mode = namingMode || 'text';
         const byMode = mode === 'background'
             ? _reelsTaskBackgroundBaseName(task)
             : mode === 'audio'
@@ -13574,11 +13655,22 @@ async function reelsStartExport(options = {}) {
     _reelsUpdateExportProgressUI(resumeManifest.nextIndex, totalJobs);
 
     // ═══ 文件名去重：行号 + 冲突检测 ═══
+    if (namingMode === 'ai-cn-date') {
+        const statusEl = document.getElementById('reels-export-status');
+        if (statusEl) statusEl.textContent = '🤖 正在生成日期-AI首句中文命名(含上下篇识别)...';
+        await _ensureReelsAiChineseExportNames(exportJobs.map(j => j.task));
+        if (window.ReelsBatchTable && typeof window.ReelsBatchTable.render === 'function') {
+            try { window.ReelsBatchTable.render(); } catch (_) { }
+        }
+    }
     const _exportResolvedNames = {};
     {
-        // 先给每个任务加上行号
+        // 先给每个任务加上行号（纯序号与日期-首句中文模式直接按目标格式输出，重名时在下方自动加 _1, _2）
         const namedWithRow = exportJobs.map((job, idx) => {
             const rowNo = job.taskListRowNo || idx + 1;
+            if (namingMode === 'ai-cn-date') {
+                return _resolveReelsExportBaseName(job.task, 'ai-cn-date');
+            }
             if (namingMode === 'index') {
                 const prefix = localStorage.getItem('reels_naming_prefix') || '';
                 const suffixVal = localStorage.getItem('reels_naming_suffix') || '';
