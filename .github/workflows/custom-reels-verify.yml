@@ -43,3 +43,21 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
       - name: Verify production frame transport with real H.264 encoder
         run: node scripts/validate-frame-pipeline-media.cjs
+
+  native-utility-ack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install native Electron and FFmpeg prerequisites
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
+      - name: Encode 30 real frames through native Electron utilityProcess and MessageChannelMain
+        run: xvfb-run -a ./node_modules/.bin/electron scripts/validate-vkk-native-utility-ack.cjs --no-sandbox
+        env:
+          ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
