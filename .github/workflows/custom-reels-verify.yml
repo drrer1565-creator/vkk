@@ -122,6 +122,35 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: 'false'
+      - name: Package truly portable x64 directory as ZIP
+        shell: pwsh
+        run: |
+          $folder = 'dist-electron/win-unpacked'
+          $binary = Join-Path $folder 'VideoKit.exe'
+          $ffmpeg = Join-Path $folder 'resources/vendor/ffmpeg/bin/ffmpeg.exe'
+          $ffprobe = Join-Path $folder 'resources/vendor/ffmpeg/bin/ffprobe.exe'
+          foreach ($required in @($binary, $ffmpeg, $ffprobe)) {
+            if (-not (Test-Path $required -PathType Leaf)) { throw "Portable ZIP missing required file: $required" }
+          }
+          $zipPath = 'dist-electron/VideoKit-Reels-ACK-Portable-Windows-x64.zip'
+          Compress-Archive -Path (Join-Path $folder '*') -DestinationPath $zipPath -CompressionLevel Optimal -Force
+          if (-not (Test-Path $zipPath -PathType Leaf)) { throw 'Portable ZIP was not created' }
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zipPath))
+          try {
+            $names = $archive.Entries | ForEach-Object FullName
+            foreach ($required in @('VideoKit.exe', 'resources/vendor/ffmpeg/bin/ffmpeg.exe', 'resources/vendor/ffmpeg/bin/ffprobe.exe')) {
+              if ($names -notcontains $required) { throw "Portable archive missing required entry: $required" }
+            }
+            Write-Host "Portable ZIP verified: $($archive.Entries.Count) entries"
+          } finally { $archive.Dispose() }
+          Get-Item $zipPath | Select-Object Name,Length
+      - name: Upload portable Windows x64 ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: vkk-reels-ack-windows-portable-x64
+          path: dist-electron/VideoKit-Reels-ACK-Portable-Windows-x64.zip
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload test-only installer
         uses: actions/upload-artifact@v4
         with:
