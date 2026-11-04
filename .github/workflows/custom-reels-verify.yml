@@ -61,3 +61,28 @@ jobs:
         run: xvfb-run -a ./node_modules/.bin/electron scripts/validate-vkk-native-utility-ack.cjs --no-sandbox
         env:
           ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+
+  windows-native-utility-ack:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Ensure FFmpeg and FFprobe are available
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --yes --no-progress
+          }
+          ffmpeg -version
+          ffprobe -version
+      - name: Verify native Windows MessageChannelMain and utilityProcess encoding
+        shell: pwsh
+        run: .\\node_modules\\.bin\\electron.cmd scripts/validate-vkk-native-utility-ack.cjs
+        env:
+          ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
