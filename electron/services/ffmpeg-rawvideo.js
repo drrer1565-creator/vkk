@@ -1452,55 +1452,13 @@ async function prepareOverlay(opts) {
 // 阶段 2: FFmpeg 编码器会话管理
 // ═══════════════════════════════════════════════════════
 
-let _cachedGPUProbeResults = {};
-
-/**
- * 探测 GPU 编码器是否可用：试编码 3 帧纯色测试帧
- * 如果 GPU 编码器初始化失败（驱动/硬件不支持），快速返回 false
- */
-function _probeGPUEncoder(ffmpegPath, vcodec, encoderArgs, width, height, fps) {
-    // 同一个编码器可能支持基础参数，却不支持某种码率控制模式。
-    // 缓存必须包含完整参数，避免 UI 的轻量探测掩盖正式导出参数不兼容。
-    const probeKey = `${vcodec}\u0000${encoderArgs.join('\u0000')}`;
-    if (_cachedGPUProbeResults[probeKey] !== undefined) {
-        return _cachedGPUProbeResults[probeKey];
-    }
+// Async, cached hardware probe: does not freeze renderer or utility event loop.
+async function _probeGPUEncoder(ffmpegPath, codec, encoderArgs, width, height, fps, options = {}) {
     try {
-        const settings = require('./settings');
-        const testOut = settings.secureTmpFile('gpu_probe', '.mp4');
-        const testArgs = [
-            '-y',
-            '-f', 'rawvideo', '-pix_fmt', 'rgba',
-            '-s', `${width}x${height}`,
-            '-framerate', String(fps),
-            '-i', 'pipe:0',
-            '-an',
-            ...encoderArgs,
-            '-pix_fmt', 'yuv420p',
-            '-frames:v', '3',
-            testOut,
-        ];
-        console.log(`[WYSIWYG] 探测 GPU 编码器 (${vcodec})...`);
-        const testProc = require('child_process').spawnSync(ffmpegPath, testArgs, {
-            input: Buffer.alloc(width * height * 4 * 3), // 3 帧纯黑 RGBA
-            timeout: 15000,
-            stdio: ['pipe', 'ignore', 'pipe'],
-        });
-        // 清理测试文件
-        try { fs.unlinkSync(testOut); } catch (_) { }
-
-        if (testProc.status === 0) {
-            console.log(`[WYSIWYG] GPU 编码器 ${vcodec} 可用 ✓`);
-            _cachedGPUProbeResults[probeKey] = true;
-            return true;
-        } else {
-            const stderr = (testProc.stderr || '').toString().slice(-500);
-            console.warn(`[WYSIWYG] GPU 编码器 ${vcodec} 不可用 (code=${testProc.status}): ${stderr}`);
-            _cachedGPUProbeResults[probeKey] = false;
-            return false;
-        }
-    } catch (e) {
-        console.warn(`[WYSIWYG] GPU 编码器探测异常: ${e.message}`);
+        return await require('./gpu-encoder-probe').probeGPUEncoder(ffmpegPath, codec, encoderArgs, width, height, fps, options);
+    } catch (error) {
+        if (options.signal?.aborted) throw new Error('__CANCELLED__');
+        console.warn('[WYSIWYG] GPU 编码器探测失败:', error.message);
         return false;
     }
 }
@@ -1590,7 +1548,7 @@ async function startSession(opts) {
             maxBitrateMbps
         );
         for (const candidate of gpuCandidates) {
-            if (_probeGPUEncoder(ffmpeg, candidate.codec, candidate.args, width, height, fps)) {
+            if (await _probeGPUEncoder(ffmpeg, candidate.codec, candidate.args, width, height, fps, { signal: opts.signal })) {
                 encoderArgs = candidate.args;
                 const bitrate = h264RateControlArgs(crf, targetBitrateMbps, maxBitrateMbps)[1];
                 console.log(`[WYSIWYG] 使用 GPU 编码 (${candidate.label}, 目标码率 ${bitrate})`);
@@ -2969,7 +2927,7 @@ async function handleWysiwygIPC(action, data) {
             const ffmpeg = findFFmpeg();
             const platform = process.platform;
             if (platform === 'darwin') {
-                const ok = _probeGPUEncoder(ffmpeg, 'h264_videotoolbox', ['-c:v', 'h264_videotoolbox', '-b:v', '1M'], 256, 256, 30);
+                const ok = await _probeGPUEncoder(ffmpeg, 'h264_videotoolbox', ['-c:v', 'h264_videotoolbox', '-b:v', '1M'], 256, 256, 30);
                 let chipName = 'Apple VT';
                 try {
                     const cpuModel = require('os').cpus()[0].model;
@@ -2979,9 +2937,9 @@ async function handleWysiwygIPC(action, data) {
                 } catch(e) {}
                 return { available: ok, name: ok ? chipName : 'CPU' };
             } else if (platform === 'win32') {
-                if (_probeGPUEncoder(ffmpeg, 'h264_nvenc', ['-c:v', 'h264_nvenc', '-b:v', '1M'], 256, 256, 30)) return { available: true, name: 'Nvidia NVENC' };
-                if (_probeGPUEncoder(ffmpeg, 'h264_amf', ['-c:v', 'h264_amf'], 256, 256, 30)) return { available: true, name: 'AMD AMF' };
-                if (_probeGPUEncoder(ffmpeg, 'h264_qsv', ['-c:v', 'h264_qsv'], 256, 256, 30)) return { available: true, name: 'Intel QSV' };
+                if (await _probeGPUEncoder(ffmpeg, 'h264_nvenc', ['-c:v', 'h264_nvenc', '-b:v', '1M'], 256, 256, 30)) return { available: true, name: 'Nvidia NVENC' };
+                if (await _probeGPUEncoder(ffmpeg, 'h264_amf', ['-c:v', 'h264_amf'], 256, 256, 30)) return { available: true, name: 'AMD AMF' };
+                if (await _probeGPUEncoder(ffmpeg, 'h264_qsv', ['-c:v', 'h264_qsv'], 256, 256, 30)) return { available: true, name: 'Intel QSV' };
                 return { available: false, name: 'CPU' };
             }
             return { available: false, name: 'CPU' };
