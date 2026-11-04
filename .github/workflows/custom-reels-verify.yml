@@ -102,7 +102,7 @@ jobs:
           ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
 
   windows-installer:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     permissions:
       contents: write
     runs-on: windows-latest
