@@ -153,7 +153,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          $tag = 'v4.5.1-reels-ack-template-search-portable-test'
+          $tag = 'v4.5.1-reels-ack-template-search-portable-r2'
           $zip = 'dist-electron/VideoKit-Reels-ACK-Portable-Windows-x64.zip'
           if (-not (Test-Path $zip)) { throw 'Verified portable ZIP is missing' }
           $notes = @'
@@ -164,10 +164,14 @@ jobs:
           Back up VideoKit projects and configuration before testing because this build uses the existing app identity and version.
           '@
           $releaseSha = if ($env:PR_HEAD_SHA) { $env:PR_HEAD_SHA } else { $env:GITHUB_SHA }
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $zip --repo $env:GITHUB_REPOSITORY --clobber
-          } else {
-            gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --target $releaseSha --title 'VideoKit 4.5.1 ACK + Template Search Portable (Windows x64 test)' --notes $notes --prerelease
+          # Create an empty prerelease first, then upload. A concurrent build may have created the tag already.
+          gh release create $tag --repo $env:GITHUB_REPOSITORY --target $releaseSha --title 'VideoKit 4.5.1 ACK + Template Search Portable (Windows x64 test)' --notes $notes --prerelease
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'Release creation did not succeed; checking whether the tag already has a release.'
+            gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" --jq '.id'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create or find the target GitHub Release' }
           }
-          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release publishing failed' }
+          gh release upload $tag $zip --repo $env:GITHUB_REPOSITORY --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release asset upload failed' }
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to verify uploaded Release asset' }
