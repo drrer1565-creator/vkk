@@ -287,7 +287,7 @@ async function _refreshTemplateList() {
             `;
         }
         html += '</div>';
-        const savedScroll=container._tplRenderedFolder===_tplFolderId?container.scrollTop:0;
+        const savedScroll=container._tplRenderedFolder===_tplFolderId && container._tplRenderedSearch===query ? container.scrollTop : 0;
         container.innerHTML = html;
         if(!searching && !_tplFolderId&&(localStorage.getItem('videokit_template_sort')||'manual')==='manual'&&Array.isArray(_tplFolderData.libraryOrder)){
             const grid=container.querySelector('#tpl-card-grid'),rank=new Map(_tplFolderData.libraryOrder.map((id,i)=>[id,i]));
@@ -371,6 +371,7 @@ async function _refreshTemplateList() {
         _paintTemplateSelection();
         _updateTemplatePresetSelectionUI();
         container._tplRenderedFolder=_tplFolderId;
+        container._tplRenderedSearch=query;
         container.scrollTop=savedScroll;
 
     } catch (e) {
