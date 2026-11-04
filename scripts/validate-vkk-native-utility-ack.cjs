@@ -57,6 +57,8 @@ let browser;
         const { ipcRenderer } = require('electron');
         const bridge = require(${JSON.stringify(path.join(root, 'electron/services/reels-frame-bridge.js'))})
             .createReelsFrameBridge(ipcRenderer, { ackTimeoutMs: 30000 });
+        window.electronAPI = { ...bridge.api,
+            reelsComposeWysiwyg: (action, data) => ipcRenderer.invoke('reels-compose-wysiwyg', action, data) };
         require(${JSON.stringify(path.join(root, 'src/reels-frame-pipeline.js'))});
         const producer = window.ReelsFramePipeline.create(${JSON.stringify(sessionId)}, 3);
         for (let i = 0; i < 30; i++) {
