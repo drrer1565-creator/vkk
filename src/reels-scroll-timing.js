@@ -7,8 +7,6 @@
         const explicit = valid(context.bodyDuration);
         if (explicit) return r(explicit);
         if (!task) return 0;
-        const custom = valid(task.customDuration) || valid(task.durationOverride);
-        if (custom) return r(custom);
         const overlays = Array.isArray(task.overlays) ? task.overlays : [];
         let flipper = 0;
         for (const ov of overlays) {
@@ -18,6 +16,9 @@
             flipper = Math.max(flipper, (Number(ov.start) || 0) + chunks * (Number(ov.flipper_duration) || 2));
         }
         if (flipper) return r(flipper);
+        const custom = valid(task.customDuration) || valid(task.durationOverride);
+        if (custom) return r(custom);
+
         const cache = context.mediaDurations || {};
         const audio = valid(cache[task.audioPath]);
         const scale = valid(task.audioDurScale) / 100 || 1;
