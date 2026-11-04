@@ -1,0 +1,27 @@
+name: Custom Reels regression verification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'electron/**'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/custom-reels-verify.yml'
+  workflow_dispatch:
+jobs:
+  regression:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run all regression tests
+        run: npm test
+      - name: Build web assets
+        run: npm run build
