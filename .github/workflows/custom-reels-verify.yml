@@ -88,7 +88,7 @@ jobs:
           ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
 
   windows-installer:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/custom/preview-scroll-ack'
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     permissions:
       contents: write
     runs-on: windows-latest
@@ -151,21 +151,23 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          $tag = 'v4.5.1-reels-ack-portable-test'
+          $tag = 'v4.5.1-reels-ack-template-search-portable-test'
           $zip = 'dist-electron/VideoKit-Reels-ACK-Portable-Windows-x64.zip'
           if (-not (Test-Path $zip)) { throw 'Verified portable ZIP is missing' }
           $notes = @'
           VideoKit vkk - portable Windows x64 test build. Extract the ZIP, then run VideoKit.exe. No installer is needed.
 
-          Changes: direct-preview without whole-file SDR proxy; per-task scroll end and reset; utility-process ACK video export.
+          Changes: full-library live template search (including folders); direct-preview without whole-file SDR proxy; per-task scroll end and reset; utility-process ACK video export.
           Automated Windows/Linux regression tests passed. This is a PRE-RELEASE, not yet accepted against real production projects.
           Back up VideoKit projects and configuration before testing because this build uses the existing app identity and version.
           '@
+          $releaseSha = if ($env:PR_HEAD_SHA) { $env:PR_HEAD_SHA } else { $env:GITHUB_SHA }
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $zip --repo $env:GITHUB_REPOSITORY --clobber
           } else {
-            gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'VideoKit 4.5.1 Reels ACK Portable (Windows x64 test)' --notes $notes --prerelease
+            gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --target $releaseSha --title 'VideoKit 4.5.1 ACK + Template Search Portable (Windows x64 test)' --notes $notes --prerelease
           }
           if ($LASTEXITCODE -ne 0) { throw 'GitHub Release publishing failed' }
