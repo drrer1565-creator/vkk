@@ -1119,7 +1119,7 @@ class ReelsOverlayPanel {
                         <label title="整体水平位置（裁切区+文字一起移动）" style="font-weight:bold;color:#FF6B35;">整体X</label><input type="number" id="rop-scroll-offset-x" class="rop-input" step="10" value="0">
                         <label title="整体垂直位置（裁切区+文字一起移动）" style="font-weight:bold;color:#FF6B35;">整体Y</label><input type="number" id="rop-scroll-offset-y" class="rop-input" step="10" value="0">
                         <label>开始(s)</label><input type="number" id="rop-scroll-start-time" class="rop-input" step="0.1" min="0">
-                        <label>结束(s)</label><input type="number" id="rop-scroll-end-time" class="rop-input" step="0.1" min="0">
+                        <label>结束(s)</label><div style="display:flex;gap:5px;align-items:center;"><input type="number" id="rop-scroll-end-time" class="rop-input" step="0.1" min="0" style="min-width:0;flex:1"><button type="button" id="rop-scroll-end-reset" class="btn btn-secondary" title="仅当前项目：跟随本项目主体时长" style="white-space:nowrap;font-size:11px;padding:3px 6px;">恢复默认时间</button></div>
                         <label title="文字开始向上滚动时的初始Y坐标">起始Y</label><input type="number" id="rop-scroll-from-y" class="rop-input" step="10" value="960">
                         <label title="文字向上滚动最终消失或停留的结束Y坐标">结束Y</label><input type="number" id="rop-scroll-to-y" class="rop-input" step="10" value="-200">
                         <label>结束Y自动适配</label><label style="display:flex;gap:5px;align-items:center;font-size:11px;"><input type="checkbox" id="rop-scroll-end-y-auto" checked>底部羽化上方留 0.4 行</label>
@@ -2357,6 +2357,26 @@ class ReelsOverlayPanel {
             el.addEventListener('input', syncField);
             el.addEventListener('change', syncField);
         }
+
+        // Reset only the currently selected scroll overlay; never broadcast this timing.
+        this.container.querySelector('#rop-scroll-end-reset')?.addEventListener('click', () => {
+            const ov = this._selectedOv;
+            if (!ov || ov.type !== 'scroll') return;
+            const task = this.videoCanvas?.scopedTask ||
+                (typeof _getSelectedTask === 'function' ? _getSelectedTask() : null);
+            const duration = Number(this.videoCanvas?.getDuration?.());
+            if (Number.isFinite(duration) && duration > 0 && Number(ov.start) > duration) {
+                if (typeof showToast === 'function') showToast('开始时间超过本项目时长，请先调整开始时间', 'warning');
+                return;
+            }
+            ov.scroll_end_auto = true;
+            ov.end = 9999; // unresolved automatic placeholder, not a shared manual duration
+            this._val('rop-end', Number.isFinite(duration) && duration > 0 ? _ropRound(duration) : 9999);
+            this._val('rop-scroll-end-time', Number.isFinite(duration) && duration > 0 ? _ropRound(duration) : 9999);
+            if (typeof _syncScrollAudioTiming === 'function' && task) _syncScrollAudioTiming(task);
+            if (typeof this.videoCanvas?.onOverlayChange === 'function') this.videoCanvas.onOverlayChange(ov);
+            this._requestRender();
+        });
 
         // 滚动字幕出字效果：快捷按钮、16款小图标点选与图片上传
         const scrollTwCursorKindEl = this.container.querySelector('#rop-scroll-tw-cursor-kind');
@@ -4806,7 +4826,8 @@ class ReelsOverlayPanel {
         if (ov.type === 'scroll' && ov.scroll_end_auto !== false && !ov.display_ranges?.length) {
             const task = this.videoCanvas?.scopedTask || (typeof _getSelectedTask === 'function' ? _getSelectedTask() : null);
             const duration = Number(window._reelsState?._mediaDurations?.[task?.audioPath]);
-            if (duration > 0 && Number.isFinite(duration)) { ov.end = _ropRound(duration); ov.scroll_end_auto = true; }
+            // Display the resolved duration without mutating the persisted automatic marker.
+            // Automatic time is resolved by the rendering/task timing path.
         }
         let displayEnd = ov.end || 0;
         if (displayEnd >= 9999) {
@@ -5494,9 +5515,11 @@ class ReelsOverlayPanel {
         ov.rotation = this._get('rop-rotation');
         ov.opacity = Math.round(this._get('rop-opacity') / 100 * 255);
         ov.start = _ropRound(this._get('rop-start'));
-        // 保留 9999（全程）：如果面板显示的值等于视频时长，说明用户没改，保持 9999
+        // Never turn an automatic displayed duration into a new manual end when editing styling.
         const panelEnd = _ropRound(this._get('rop-end'));
-        if (ov.end >= 9999) {
+        if (ov.type === 'scroll' && ov.scroll_end_auto !== false) {
+            ov.end = 9999;
+        } else if (ov.end >= 9999) {
             // 检查用户是否手动修改了结束时间
             const v2Duration = this.videoCanvas?.getDuration ? this.videoCanvas.getDuration() : window.ReelsPreviewV2?.isOpen?.()
                 ? window.ReelsPreviewV2.getDuration?.()
