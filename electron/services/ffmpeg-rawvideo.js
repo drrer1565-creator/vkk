@@ -29,7 +29,7 @@ function _resolveCpuBudgetModulePath() {
 
 function spawn(command, args, options) {
     const proc = nativeSpawn(command, args, { ...options, windowsHide: true });
-    if (process.platform === 'win32' && proc.pid) {
+    if (process.type !== 'utility' && process.platform === 'win32' && proc.pid) {
         proc._cpuBudget = require(_resolveCpuBudgetModulePath()).assign(proc.pid);
         proc._cpuBudget.catch(error => { console.error('[Export CPU budget]', error.message); try { proc.kill(); } catch (_) {} });
     }
