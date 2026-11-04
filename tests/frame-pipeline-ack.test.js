@@ -9,13 +9,13 @@ const { createReelsFrameBridge } = require('../electron/services/reels-frame-bri
 const { createReelsFrameReceiver } = require('../electron/services/reels-frame-receiver');
 const { writeEncoderFrame } = require('../electron/services/encoder-frame-write');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const exporter = fs.readFileSync(path.join(__dirname, '../src/reels-wysiwyg-export.js'), 'utf8');
+const producer = fs.readFileSync(path.join(__dirname, '../src/reels-frame-pipeline.js'), 'utf8');
 
 function loadPipeline(api) {
     const context = { window: { electronAPI: api }, console, setTimeout, clearTimeout, setInterval, clearInterval, URL, ArrayBuffer, Uint8Array, Image: class {} };
     vm.createContext(context);
-    vm.runInContext(exporter, context);
-    return context._createFramePipeline;
+    vm.runInContext(producer, context);
+    return context.window.ReelsFramePipeline.create;
 }
 
 function fixture(options = {}) {
