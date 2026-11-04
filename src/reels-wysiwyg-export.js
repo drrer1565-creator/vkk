@@ -671,6 +671,10 @@ async function reelsWysiwygExport(params) {
     }
     const totalFrames = Math.max(1, Math.round(duration * fps));
     const outputDuration = totalFrames / fps;
+    // Every exported scroll overlay uses this task's actual encoded body duration.
+    if (Array.isArray(taskOverlays) && window.ReelsScrollTiming?.renderingOverlay) {
+        taskOverlays = taskOverlays.map(ov => window.ReelsScrollTiming.renderingOverlay(ov, null, { bodyDuration: outputDuration }));
+    }
     log(`时长: ${duration.toFixed(2)}s, 帧数: ${totalFrames}, FPS: ${fps}`);
     if (bgScale !== 100) log(`背景缩放: ${bgScale}%`);
     if (bgX !== 0 || bgY !== 0) log(`背景偏移: X=${bgX}%, Y=${bgY}%`);
