@@ -35,6 +35,10 @@ let powerSaveId = null;
 let isQuitting = false;
 const templateWindows = new Map(); // templateId → BrowserWindow
 const isolatedReelsRenderers = new Map(); // requestId → BrowserWindow
+const { ReelsExportScheduler } = require('./services/reels-export-scheduler');
+const reelsExportScheduler = new ReelsExportScheduler();
+const isolatedReelsJobs = new Map();
+
 let idleCacheMaintenance = null;
 let manualCacheCleaning = false;
 function startIdleCacheMaintenance() {
@@ -1632,6 +1636,22 @@ app.whenReady().then(async () => {
         const requestId = String(opts.requestId || `isolated-${Date.now()}`);
         if (isolatedReelsRenderers.has(requestId)) throw new Error('后台渲染任务 ID 重复');
         const owner = event.sender;
+        const controller = new AbortController();
+        isolatedReelsJobs.set(requestId, controller);
+        const ownerGone = () => controller.abort(new Error('__CANCELLED__'));
+        owner.once('destroyed', ownerGone);
+        let release;
+        try {
+            release = await reelsExportScheduler.acquire(opts.params || {}, {
+                signal: controller.signal,
+                onQueue: queue => {
+                    if (!owner.isDestroyed()) owner.send('isolated-wysiwyg-progress', {
+                        requestId, pct: 0, stage: 'queued',
+                        message: `等待导出资源：正在运行 ${queue.active}，排队 ${queue.waiting}`,
+                    });
+                },
+            });
+            if (controller.signal.aborted) throw new Error('__CANCELLED__');
         const htmlPath = path.join(__dirname, 'isolated-wysiwyg-renderer.html');
         const scriptBase = app.isPackaged
             ? path.join(__dirname, '..', 'dist')
@@ -1732,10 +1752,17 @@ app.whenReady().then(async () => {
             });
             win.loadFile(htmlPath).catch(error => finish(error));
         });
+        } finally {
+            release?.();
+            isolatedReelsJobs.delete(requestId);
+            owner.removeListener('destroyed', ownerGone);
+        }
     });
     ipcMain.on('cancel-isolated-wysiwyg-export', (_event, requestId) => {
         try { assertTrustedRenderer(_event); } catch { return; }
-        const win = isolatedReelsRenderers.get(String(requestId || ''));
+        const id = String(requestId || '');
+        isolatedReelsJobs.get(id)?.abort(new Error('__CANCELLED__'));
+        const win = isolatedReelsRenderers.get(id);
         if (win && !win.isDestroyed()) win.webContents.send('isolated-wysiwyg-cancel');
     });
 
