@@ -120,7 +120,7 @@ jobs:
         run: |
           npm run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npx electron-builder --win dir --x64
+          npx electron-builder --dir --win --x64
           exit $LASTEXITCODE
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
