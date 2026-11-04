@@ -117,7 +117,7 @@ jobs:
         run: |
           npm run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npx electron-builder --win nsis --x64 -c.win.artifactName=VideoKit-Reels-ACK-Test.exe
+          npx electron-builder --win nsis --x64
           exit $LASTEXITCODE
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
