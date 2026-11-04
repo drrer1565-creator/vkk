@@ -27,3 +27,19 @@ jobs:
         run: npm test
       - name: Build web assets
         run: npm run build
+
+  ffmpeg-media:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install FFmpeg and FFprobe
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+      - name: Verify production frame transport with real H.264 encoder
+        run: node scripts/validate-frame-pipeline-media.cjs
