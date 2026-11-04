@@ -16,7 +16,9 @@ const report = { exports: [], faults: [], pass: false };
 // all cases finish, instead of accepting a premature default app exit as green.
 app.on('window-all-closed', () => {});
 const deadline = setTimeout(() => { console.error('Native frame pipeline validation timed out'); app.exit(1); }, 240000);
-const scripts = ['reels-text-direction.js', 'reels-anim-engine.js', 'reels-rich-text.js', 'subtitle-render-policy.js', 'reels-canvas-renderer.js', 'reels-speech-writing.js', 'reels-visual-renderer.js', 'reels-overlay.js', 'fonts-metadata.js', 'reels-font-manager.js', 'reels-wysiwyg-export.js'].map(name => path.join(root, 'dist', name));
+const scripts = ['reels-text-direction.js', 'reels-anim-engine.js', 'reels-rich-text.js',
+    'reels-scroll-timing.js', 'reels-canvas-renderer.js', 'reels-overlay.js',
+    'fonts-metadata.js', 'reels-font-manager.js', 'reels-frame-pipeline.js', 'reels-wysiwyg-export.js'].map(name => path.join(root, 'dist', name));
 
 ipcMain.on('persistent-presets:hydrate', event => { event.returnValue = { ok: true, values: {} }; });
 ipcMain.handle('persistent-presets:save', () => ({ ok: true }));
