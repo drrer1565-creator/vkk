@@ -949,15 +949,12 @@ async function reelsWysiwygExport(params) {
     });
     if (!sessionId) throw new Error('FFmpeg 启动失败');
 
-    // 所有模式都启用三帧批量通道以消除逐帧同步 IPC 往返开销；硬件编码器由主进程探测并自动回退。
-    let framePipeline = null;
+    // All modes use the persistent ACK pipe; precise mode allows exactly one in-flight frame.
     const normalizedEngine = exportEngine === 'experimental' ? 'hardware' : exportEngine;
-    const wantsPipeline = normalizedEngine === 'canvas' || normalizedEngine === 'pipeline' || normalizedEngine === 'hardware';
-    if (normalizedEngine === 'hardware') log('极速硬件模式：正在自动探测系统 H.264 硬件编码器，不可用时回退 CPU。');
-    if (wantsPipeline) {
-        framePipeline = _createFramePipeline(sessionId, Math.max(1, Math.min(3, Math.floor(24 * 1024 * 1024 / (targetWidth * targetHeight * 4)))));
-        log('阶段2.1: 已启用三帧批量流水线（同画布、同 FFmpeg 编码）。');
-    }
+    const maxInFlight = (normalizedEngine === 'pipeline' || normalizedEngine === 'canvas' || normalizedEngine === 'hardware') ? 3 : 1;
+    const framePipeline = _createFramePipeline(sessionId, maxInFlight, { isCancelled });
+    if (normalizedEngine === 'hardware') log('极速硬件模式：后台异步检测 H.264 硬件编码器。');
+    log(`阶段2.1: ACK 帧流水线已启用，在途上限 ${maxInFlight}（同画布、同 FFmpeg 编码）。`);
 
     // 全局蒙版
     const hasMask = !!style.global_mask_enabled;
@@ -1331,6 +1328,7 @@ async function reelsWysiwygExport(params) {
         return { output_path: result.output_path || outputPath };
 
     } catch (e) {
+        try { framePipeline?.abort(e); } catch (_) { }
         clearBgFrameCache();
         if (currentBgImg) currentBgImg.src = '';
         if (currentCvImg) currentCvImg.src = '';
