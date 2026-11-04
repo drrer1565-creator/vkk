@@ -92,7 +92,8 @@ let browser;
     await service.close();
     browser.destroy(); browser = null;
     clearTimeout(timeout);
-    fs.rmSync(rootTmp, { recursive: true, force: true });
+    try { fs.rmSync(rootTmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 }); }
+    catch (error) { console.warn('[Smoke cleanup after Electron exit]', error.message); }
     app.exit(0);
 })().catch(async error => {
     console.error(error.stack || error);
