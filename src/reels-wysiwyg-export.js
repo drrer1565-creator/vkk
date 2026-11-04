@@ -22,25 +22,9 @@ function _canvasToRawRGBA(canvas, transferable = false) {
     return imageData.data.buffer;
 }
 
-function _createFramePipeline(sessionId, batchSize = 3) {
-    let frames = [];
-    const flush = async () => {
-        if (!frames.length) return;
-        const batch = frames;
-        frames = [];
-        const result = await window.electronAPI.reelsComposeWysiwyg('frames', { sessionId, frames: batch });
-        const ok = result === true || (result && result.ok);
-        if (!ok) throw new Error((result && result.error) || '批量写入视频帧失败');
-    };
-    return {
-        async send(raw) {
-            frames.push(raw);
-            if (frames.length >= batchSize) await flush();
-        },
-        async drain() {
-            await flush();
-        },
-    };
+function _createFramePipeline(sessionId, batchSize = 3, options = {}) {
+    if (!window.ReelsFramePipeline?.create) throw new Error('ACK 帧流水线模块未加载');
+    return window.ReelsFramePipeline.create(sessionId, batchSize, options);
 }
 
 /**
