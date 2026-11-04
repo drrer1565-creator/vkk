@@ -12,6 +12,8 @@
 const { spawn: nativeSpawn, spawnSync, execFileSync } = require('child_process');
 const { formatMediaError, formatProcessStartError } = require('./media-error');
 const { classifyVideoColorProfile } = require('./reels-hdr-preview');
+const { createReelsFrameReceiver } = require('./reels-frame-receiver');
+const { writeEncoderFrame } = require('./encoder-frame-write');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -35,6 +37,8 @@ function spawn(command, args, options) {
 }
 
 const sessions = new Map();
+let exportRuntime = {};
+function configureExportRuntime(runtime) { exportRuntime = runtime || {}; }
 const _cachedColorProfiles = new Map();
 const _cachedLibplaceboAvailable = new Map();
 
@@ -1851,7 +1855,9 @@ async function writeFrame(sessionId, rawData) {
         let buf;
         if (Buffer.isBuffer(rawData)) {
             buf = rawData;
-        } else if (rawData instanceof ArrayBuffer || ArrayBuffer.isView(rawData)) {
+        } else if (ArrayBuffer.isView(rawData)) {
+            buf = Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength);
+        } else if (rawData instanceof ArrayBuffer || Object.prototype.toString.call(rawData) === '[object ArrayBuffer]') {
             buf = Buffer.from(rawData);
         } else if (rawData && rawData.type === 'Buffer' && Array.isArray(rawData.data)) {
             buf = Buffer.from(rawData.data);
@@ -1931,46 +1937,29 @@ async function writeFrame(sessionId, rawData) {
 
 // 持久帧通道：避免每一帧都走一次 ipcRenderer.invoke 的往返等待。
 // Canvas 像素仍由同一个 FFmpeg/rawvideo 编码器处理，因而不会改变画面效果。
-function attachFramePipeline(sessionId, port) {
+function attachFramePipeline(sessionId, port, options = {}) {
     const session = sessions.get(sessionId);
-    if (!session || session.closed || !port) {
-        return { ok: false, error: '编码会话无效，无法建立帧流水线' };
-    }
-    if (session.framePipeline) {
-        try { session.framePipeline.port.close(); } catch (_) { }
-    }
-    const pipeline = { port, pending: Promise.resolve(), failed: null, closed: false, expectedSeq: 0 };
-    session.framePipeline = pipeline;
-    port.on('message', (event) => {
-        const data = event && event.data ? event.data : event;
-        if (!data || data.type !== 'frame' || pipeline.closed) return;
-        pipeline.pending = pipeline.pending.then(async () => {
-            if (!pipeline.failed && (!Number.isInteger(data.seq) || data.seq !== pipeline.expectedSeq)) {
-                pipeline.failed = `帧序号不连续：收到 ${data.seq}，期望 ${pipeline.expectedSeq}`;
-            }
-            if (!pipeline.failed) {
-                pipeline.expectedSeq++;
-                const result = await writeFrame(sessionId, data.raw);
-                if (!result || !result.ok) pipeline.failed = (result && result.error) || '帧流水线写入失败';
-            }
-            try {
-                port.postMessage({ type: 'ack', seq: data.seq, ok: !pipeline.failed, error: pipeline.failed || '' });
-            } catch (_) { }
-        }).catch((err) => {
-            pipeline.failed = err.message || '帧流水线异常';
-            try { port.postMessage({ type: 'ack', seq: data.seq, ok: false, error: pipeline.failed }); } catch (_) { }
-        });
+    if (!session || session.closed || !port) return { ok: false, error: '编码会话无效，无法建立帧流水线' };
+    if (session.framePipeline) return { ok: false, error: '编码会话已有帧流水线' };
+    const pipeline = createReelsFrameReceiver({
+        port, sessionId, frameBytes: session.width * session.height * 4,
+        writeFrame: raw => options.executeFrame ? options.executeFrame(() => writeFrame(sessionId, raw)) : writeFrame(sessionId, raw),
+        trace: message => console.log('[ReelsFrame] ' + message),
+        onFailure: error => {
+            try { options.onFailure?.(error); }
+            finally { abortSession(sessionId); }
+        },
     });
-    try { port.start(); } catch (_) { }
+    if (pipeline.failed) return { ok: false, error: pipeline.failed };
+    session.framePipeline = pipeline;
     return { ok: true };
 }
 
 async function flushFramePipeline(session) {
-    if (!session || !session.framePipeline) return;
-    await session.framePipeline.pending;
+    if (!session?.framePipeline) return;
     const pipeline = session.framePipeline;
-    pipeline.closed = true;
-    try { pipeline.port.close(); } catch (_) { }
+    await pipeline.pending;
+    pipeline.dispose();
     session.framePipeline = null;
     if (pipeline.failed) throw new Error(pipeline.failed);
 }
@@ -2240,7 +2229,7 @@ async function mixAudio(session) {
 
     if (targetPathToRender) {
         try {
-            const wavResult = await renderChromiumAudioWav({
+            const wavResult = await (exportRuntime.renderAudio || renderChromiumAudioWav)({
                 filePath: targetPathToRender,
                 reverbEnabled: session.reverbEnabled,
                 reverbPreset: session.reverbPreset,
@@ -2586,8 +2575,7 @@ function abortSession(sessionId) {
     if (!session) return;
     session.closed = true;
     if (session.framePipeline) {
-        session.framePipeline.closed = true;
-        try { session.framePipeline.port.close(); } catch (_) { }
+        session.framePipeline.dispose?.();
         session.framePipeline = null;
     }
     try { session.proc.stdin.destroy(); } catch (_) { }
@@ -3128,11 +3116,13 @@ async function renderChromiumAudioWav(opts) {
 }
 
 module.exports = {
+    configureExportRuntime,
     handleWysiwygIPC,
     attachFramePipeline,
     renderChromiumAudioWav,
     parallelExport,
     _test: {
+        activeSessionCount: () => sessions.size,
         stableJpegEncoderArgs,
         h264RateControlArgs,
         cpuH264EncoderArgs,
