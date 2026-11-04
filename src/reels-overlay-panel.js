@@ -2358,23 +2358,26 @@ class ReelsOverlayPanel {
             el.addEventListener('change', syncField);
         }
 
-        // Reset only the currently selected scroll overlay; never broadcast this timing.
+        // Reset is a single-task undoable operation, regardless of shared style scope.
         this.container.querySelector('#rop-scroll-end-reset')?.addEventListener('click', () => {
             const ov = this._selectedOv;
             if (!ov || ov.type !== 'scroll') return;
             const task = this.videoCanvas?.scopedTask ||
                 (typeof _getSelectedTask === 'function' ? _getSelectedTask() : null);
-            const duration = Number(this.videoCanvas?.getDuration?.());
-            if (Number.isFinite(duration) && duration > 0 && Number(ov.start) > duration) {
+            if (!task) return;
+            const duration = window.ReelsScrollTiming?.duration(task, {
+                mediaDurations: window._reelsState?._mediaDurations || {},
+            }) || 0;
+            if (duration > 0 && Number(ov.start) > duration) {
                 if (typeof showToast === 'function') showToast('开始时间超过本项目时长，请先调整开始时间', 'warning');
                 return;
             }
-            ov.scroll_end_auto = true;
-            ov.end = 9999; // unresolved automatic placeholder, not a shared manual duration
-            this._val('rop-end', Number.isFinite(duration) && duration > 0 ? _ropRound(duration) : 9999);
-            this._val('rop-scroll-end-time', Number.isFinite(duration) && duration > 0 ? _ropRound(duration) : 9999);
-            // Timing resolution is task-scoped; do not force an audio-only duration here.
-            if (typeof this.videoCanvas?.onOverlayChange === 'function') this.videoCanvas.onOverlayChange(ov);
+            window.ReelsScrollTiming?.reset(ov);
+            const label = duration || 9999;
+            this._val('rop-end', label);
+            this._val('rop-scroll-end-time', label);
+            this.videoCanvas?.onOverlayChange?.(ov);
+            if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
             this._requestRender();
         });
 
@@ -4822,30 +4825,12 @@ class ReelsOverlayPanel {
         // 清理源数据浮点精度 + 显示
         ov.start = _ropRound(ov.start || 0);
         this._val('rop-start', ov.start);
-        // 9999 = 全程，面板显示实际时长但不修改数据
-        if (ov.type === 'scroll' && ov.scroll_end_auto !== false && !ov.display_ranges?.length) {
-            const task = this.videoCanvas?.scopedTask || (typeof _getSelectedTask === 'function' ? _getSelectedTask() : null);
-            const duration = Number(window._reelsState?._mediaDurations?.[task?.audioPath]);
-            // Display the resolved duration without mutating the persisted automatic marker.
-            // Automatic time is resolved by the rendering/task timing path.
-        }
-        let displayEnd = ov.end || 0;
-        if (displayEnd >= 9999) {
-            const v2Duration = this.videoCanvas?.getDuration ? this.videoCanvas.getDuration() : window.ReelsPreviewV2?.isOpen?.()
-                ? window.ReelsPreviewV2.getDuration?.()
-                : 0;
-            const mediaEl = document.getElementById('reels-preview-video') || document.querySelector('#reels-preview video');
-            if (v2Duration && isFinite(v2Duration)) {
-                displayEnd = _ropRound(v2Duration);
-            } else if (mediaEl && mediaEl.duration && isFinite(mediaEl.duration)) {
-                displayEnd = _ropRound(mediaEl.duration);
-            } else {
-                displayEnd = 9999; // 保持原值
-            }
-        } else {
-            ov.end = _ropRound(displayEnd);
-            displayEnd = ov.end;
-        }
+        // The UI displays task-local resolved duration; persisted auto state stays intact.
+        const scoped = this.videoCanvas?.scopedTask || (typeof _getSelectedTask === 'function' ? _getSelectedTask() : null);
+        const cache = window._reelsState?._mediaDurations || {};
+        const effectiveDuration = window.ReelsScrollTiming?.duration(scoped, { mediaDurations: cache }) || 0;
+        let displayEnd = (ov.type === 'scroll' && ov.scroll_end_auto !== false && !ov.display_ranges?.length)
+            ? (effectiveDuration || 9999) : (Number(ov.end) || 0);
         this._val('rop-end', displayEnd);
         // 卡片的变换区默认隐藏，使用其专属字段显示同一套起止时间。
         this._val('rop-card-start', ov.start);
