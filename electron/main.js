@@ -29,6 +29,7 @@ ipcMain.on('profile:runtime-paths', (event) => {
 
 ipcMain.on('workspace:read-startup', (event) => { try { assertTrustedRenderer(event); event.returnValue = sharedProfile.readUnifiedBatchWorkspace(); } catch (_) { event.returnValue = ''; } });
 let mainWindow;
+let reelsExportService = null;
 let appIsReady = false;
 let powerSaveId = null;
 let isQuitting = false;
@@ -1578,35 +1579,44 @@ app.whenReady().then(async () => {
     });
 
     // IPC: WYSIWYG 逐帧渲染导出（与 Canvas 预览 100% 一致）
-    const { handleWysiwygIPC, attachFramePipeline, parallelExport } = require('./services/ffmpeg-rawvideo');
-    handleTrusted('reels-compose-wysiwyg', async (event, action, data) => {
-        const result = await handleWysiwygIPC(action, data);
-        // 隐藏 renderer 若被系统终止，确保它启动的 FFmpeg 会话也被回收。
-        if (action === 'start' && typeof result === 'string') {
-            const sessionId = result;
-            event.sender.once('destroyed', () => {
-                handleWysiwygIPC('abort', { sessionId }).catch(() => {});
-            });
-        }
-        return result;
+    const { renderChromiumAudioWav, parallelExport } = require('./services/ffmpeg-rawvideo');
+    const { ReelsExportService } = require('./services/reels-export-service');
+    const exportSettings = require('./services/settings');
+    reelsExportService = new ReelsExportService({
+        config: {
+            userData: app.getPath('userData'),
+            tempDir: exportSettings.getSecureTmpDir(),
+            systemDirs: ['downloads', 'desktop', 'documents'].map(name => app.getPath(name)),
+            ffmpegPath: ffmpegService.resolveCommand('ffmpeg'),
+            ffprobePath: ffmpegService.resolveCommand('ffprobe'),
+        },
+        renderAudio: renderChromiumAudioWav,
+        trace: message => log('[ExportWorker] ' + message),
     });
+    handleTrusted('reels-compose-wysiwyg', (event, action, data) => reelsExportService.handle(event.sender, action, data));
     // Reels 插入素材：只分析本地音轨停顿，不调用外部 AI 服务。
     handleTrusted('reels-detect-silence', async (event, data = {}) => {
         if (!data.filePath) throw new Error('缺少待检测的音视频文件');
         return ffmpegService.detectSilence(data.filePath, Number(data.noiseDb ?? -35), Number(data.minDuration ?? .35));
     });
-    ipcMain.on('reels-frame-pipeline-open', (event, data = {}) => {
-        try { assertTrustedRenderer(event); } catch { return; }
+    ipcMain.on('reels-frame-pipeline-open', async (event, data = {}) => {
+        try { assertTrustedRenderer(event); } catch (_) { return; }
+        const sender = event.sender;
         const { port1, port2 } = new MessageChannelMain();
-        const result = attachFramePipeline(data.sessionId, port1);
+        const fail = error => {
+            if (!sender.isDestroyed()) sender.send('reels-frame-pipeline-failed', {
+                requestId: data.requestId, error: error?.message || String(error),
+            });
+        };
         try {
-            event.sender.postMessage('reels-frame-pipeline-ready', {
-                requestId: data.requestId,
-                ...result,
-            }, [port2]);
-        } catch (err) {
+            const result = await reelsExportService.attach(sender, data.sessionId, port1, fail);
+            if (!result?.ok) throw new Error(result?.error || '无法建立帧通道');
+            if (sender.isDestroyed()) throw new Error('渲染窗口已关闭');
+            sender.postMessage('reels-frame-pipeline-ready', { requestId: data.requestId, ...result }, [port2]);
+        } catch (error) {
             try { port1.close(); port2.close(); } catch (_) { }
-            console.warn('[WYSIWYG] 无法建立帧流水线:', err.message);
+            fail(error);
+            reelsExportService.handle(sender, 'abort', { sessionId: data.sessionId }).catch(() => {});
         }
     });
 
@@ -2738,6 +2748,7 @@ app.on('activate', () => {
 app.on('before-quit', () => {
     isQuitting = true;
     idleCacheMaintenance?.stop();
+    reelsExportService?.close().catch(error => console.warn('[ExportWorker] close', error.message));
     app.isQuitting = true;
     try {
         if (typeof app.releaseSingleInstanceLock === 'function') {
