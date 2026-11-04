@@ -1,0 +1,177 @@
+name: Custom Reels regression verification
+on:
+  push:
+    branches: ['custom/preview-scroll-ack']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'electron/**'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/custom-reels-verify.yml'
+  workflow_dispatch:
+jobs:
+  regression:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run all regression tests
+        run: npm test
+      - name: Build web assets
+        run: npm run build
+
+  ffmpeg-media:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install FFmpeg and FFprobe
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+      - name: Verify production frame transport with real H.264 encoder
+        run: node scripts/validate-frame-pipeline-media.cjs
+
+  native-utility-ack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install native Electron and FFmpeg prerequisites
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
+      - name: Encode 30 real frames through native Electron utilityProcess and MessageChannelMain
+        run: xvfb-run -a ./node_modules/.bin/electron scripts/validate-vkk-native-utility-ack.cjs --no-sandbox
+        env:
+          ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+
+  windows-native-utility-ack:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Ensure FFmpeg and FFprobe are available
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --yes --no-progress
+          }
+          ffmpeg -version
+          ffprobe -version
+      - name: Verify native Windows MessageChannelMain and utilityProcess encoding
+        shell: pwsh
+        run: .\\node_modules\\.bin\\electron.cmd scripts/validate-vkk-native-utility-ack.cjs
+        env:
+          ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+
+  windows-installer:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    timeout-minutes: 45
+    needs: [regression, windows-native-utility-ack]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Supply tested FFmpeg and FFprobe in packaged vendor folder
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --yes --no-progress
+          }
+          $binary = Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -Filter ffmpeg.exe -File | Select-Object -First 1
+          if (-not $binary) { throw 'Cannot locate Windows FFmpeg distribution for self-contained test build' }
+          $binDir = Join-Path 'vendor/windows/ffmpeg' 'bin'
+          New-Item -ItemType Directory -Force $binDir | Out-Null
+          Copy-Item $binary.FullName (Join-Path $binDir 'ffmpeg.exe')
+          Copy-Item (Join-Path $binary.DirectoryName 'ffprobe.exe') (Join-Path $binDir 'ffprobe.exe')
+          & (Join-Path $binDir 'ffmpeg.exe') -version
+      - name: Build Windows portable directory without an installer
+        shell: pwsh
+        run: |
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx electron-builder --dir --win --x64
+          exit $LASTEXITCODE
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: 'false'
+      - name: Package truly portable x64 directory as ZIP
+        shell: pwsh
+        run: |
+          $folder = 'dist-electron/win-unpacked'
+          $binary = Join-Path $folder 'VideoKit.exe'
+          $ffmpeg = Join-Path $folder 'resources/vendor/ffmpeg/bin/ffmpeg.exe'
+          $ffprobe = Join-Path $folder 'resources/vendor/ffmpeg/bin/ffprobe.exe'
+          foreach ($required in @($binary, $ffmpeg, $ffprobe)) {
+            if (-not (Test-Path $required -PathType Leaf)) { throw "Portable ZIP missing required file: $required" }
+          }
+          $zipPath = 'dist-electron/VideoKit-Reels-ACK-Portable-Windows-x64.zip'
+          Compress-Archive -Path (Join-Path $folder '*') -DestinationPath $zipPath -CompressionLevel Optimal -Force
+          if (-not (Test-Path $zipPath -PathType Leaf)) { throw 'Portable ZIP was not created' }
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zipPath))
+          try {
+            $names = $archive.Entries | ForEach-Object FullName
+            foreach ($required in @('VideoKit.exe', 'resources/vendor/ffmpeg/bin/ffmpeg.exe', 'resources/vendor/ffmpeg/bin/ffprobe.exe')) {
+              if ($names -notcontains $required) { throw "Portable archive missing required entry: $required" }
+            }
+            Write-Host "Portable ZIP verified: $($archive.Entries.Count) entries"
+          } finally { $archive.Dispose() }
+          Get-Item $zipPath | Select-Object Name,Length
+      - name: Publish portable ZIP directly to GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          $tag = 'v4.5.1-reels-ack-template-search-portable-r2'
+          $zip = 'dist-electron/VideoKit-Reels-ACK-Portable-Windows-x64.zip'
+          if (-not (Test-Path $zip)) { throw 'Verified portable ZIP is missing' }
+          $notes = @'
+          VideoKit vkk - portable Windows x64 test build. Extract the ZIP, then run VideoKit.exe. No installer is needed.
+
+          Changes: full-library live template search (including folders); direct-preview without whole-file SDR proxy; per-task scroll end and reset; utility-process ACK video export.
+          Automated Windows/Linux regression tests passed. This is a PRE-RELEASE, not yet accepted against real production projects.
+          Back up VideoKit projects and configuration before testing because this build uses the existing app identity and version.
+          '@
+          $releaseSha = if ($env:PR_HEAD_SHA) { $env:PR_HEAD_SHA } else { $env:GITHUB_SHA }
+          # Create an empty prerelease first, then upload. A concurrent build may have created the tag already.
+          gh release create $tag --repo $env:GITHUB_REPOSITORY --target $releaseSha --title 'VideoKit 4.5.1 ACK + Template Search Portable (Windows x64 test)' --notes $notes --prerelease
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'Release creation did not succeed; checking whether the tag already has a release.'
+            gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" --jq '.id'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create or find the target GitHub Release' }
+          }
+          gh release upload $tag $zip --repo $env:GITHUB_REPOSITORY --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release asset upload failed' }
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to verify uploaded Release asset' }

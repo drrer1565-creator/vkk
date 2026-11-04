@@ -1119,7 +1119,7 @@ class ReelsOverlayPanel {
                         <label title="整体水平位置（裁切区+文字一起移动）" style="font-weight:bold;color:#FF6B35;">整体X</label><input type="number" id="rop-scroll-offset-x" class="rop-input" step="10" value="0">
                         <label title="整体垂直位置（裁切区+文字一起移动）" style="font-weight:bold;color:#FF6B35;">整体Y</label><input type="number" id="rop-scroll-offset-y" class="rop-input" step="10" value="0">
                         <label>开始(s)</label><input type="number" id="rop-scroll-start-time" class="rop-input" step="0.1" min="0">
-                        <label>结束(s)</label><input type="number" id="rop-scroll-end-time" class="rop-input" step="0.1" min="0">
+                        <label>结束(s)</label><div style="display:flex;gap:5px;align-items:center;"><input type="number" id="rop-scroll-end-time" class="rop-input" step="0.1" min="0" style="min-width:0;flex:1"><button type="button" id="rop-scroll-end-reset" class="btn btn-secondary" title="仅当前项目：跟随本项目主体时长" style="white-space:nowrap;font-size:11px;padding:3px 6px;">恢复默认时间</button></div>
                         <label title="文字开始向上滚动时的初始Y坐标">起始Y</label><input type="number" id="rop-scroll-from-y" class="rop-input" step="10" value="960">
                         <label title="文字向上滚动最终消失或停留的结束Y坐标">结束Y</label><input type="number" id="rop-scroll-to-y" class="rop-input" step="10" value="-200">
                         <label>结束Y自动适配</label><label style="display:flex;gap:5px;align-items:center;font-size:11px;"><input type="checkbox" id="rop-scroll-end-y-auto" checked>底部羽化上方留 0.4 行</label>
@@ -2357,6 +2357,29 @@ class ReelsOverlayPanel {
             el.addEventListener('input', syncField);
             el.addEventListener('change', syncField);
         }
+
+        // Reset is a single-task undoable operation, regardless of shared style scope.
+        this.container.querySelector('#rop-scroll-end-reset')?.addEventListener('click', () => {
+            const ov = this._selectedOv;
+            if (!ov || ov.type !== 'scroll') return;
+            const task = this.videoCanvas?.scopedTask ||
+                (typeof _getSelectedTask === 'function' ? _getSelectedTask() : null);
+            if (!task) return;
+            const duration = window.ReelsScrollTiming?.duration(task, {
+                mediaDurations: window._reelsState?._mediaDurations || {},
+            }) || 0;
+            if (duration > 0 && Number(ov.start) > duration) {
+                if (typeof showToast === 'function') showToast('开始时间超过本项目时长，请先调整开始时间', 'warning');
+                return;
+            }
+            window.ReelsScrollTiming?.reset(ov);
+            const label = duration || 9999;
+            this._val('rop-end', label);
+            this._val('rop-scroll-end-time', label);
+            this.videoCanvas?.onOverlayChange?.(ov);
+            if (typeof window.reelsSaveHistory === 'function') window.reelsSaveHistory();
+            this._requestRender();
+        });
 
         // 滚动字幕出字效果：快捷按钮、16款小图标点选与图片上传
         const scrollTwCursorKindEl = this.container.querySelector('#rop-scroll-tw-cursor-kind');
@@ -3799,7 +3822,7 @@ class ReelsOverlayPanel {
                 'shadow_enabled', 'shadow_color', 'shadow_blur', 'shadow_opacity',
                 'shadow_offset_x', 'shadow_offset_y',
                 'scroll_x_anchor', 'scroll_from_x', 'scroll_from_y', 'scroll_to_x', 'scroll_to_y',
-                'scroll_speed', 'scroll_end_y_auto', 'scroll_end_auto', 'scroll_auto_stop', 'scroll_auto_stop_lead', 'scroll_static', 'scroll_auto_fit', 'scroll_min_fontsize',
+                'scroll_speed', 'scroll_end_y_auto', 'scroll_auto_stop', 'scroll_auto_stop_lead', 'scroll_static', 'scroll_auto_fit', 'scroll_min_fontsize',
                 'scroll_title_fontsize', 'scroll_title_font_family', 'scroll_title_font_weight',
                 'scroll_title_bold', 'scroll_title_color', 'scroll_title_gradient_direction', 'scroll_title_align', 'scroll_title_gap', 'scroll_title_fixed',
                 'scroll_title_independent', 'scroll_title_x', 'scroll_title_y',
@@ -4802,29 +4825,12 @@ class ReelsOverlayPanel {
         // 清理源数据浮点精度 + 显示
         ov.start = _ropRound(ov.start || 0);
         this._val('rop-start', ov.start);
-        // 9999 = 全程，面板显示实际时长但不修改数据
-        if (ov.type === 'scroll' && ov.scroll_end_auto !== false && !ov.display_ranges?.length) {
-            const task = this.videoCanvas?.scopedTask || (typeof _getSelectedTask === 'function' ? _getSelectedTask() : null);
-            const duration = Number(window._reelsState?._mediaDurations?.[task?.audioPath]);
-            if (duration > 0 && Number.isFinite(duration)) { ov.end = _ropRound(duration); ov.scroll_end_auto = true; }
-        }
-        let displayEnd = ov.end || 0;
-        if (displayEnd >= 9999) {
-            const v2Duration = this.videoCanvas?.getDuration ? this.videoCanvas.getDuration() : window.ReelsPreviewV2?.isOpen?.()
-                ? window.ReelsPreviewV2.getDuration?.()
-                : 0;
-            const mediaEl = document.getElementById('reels-preview-video') || document.querySelector('#reels-preview video');
-            if (v2Duration && isFinite(v2Duration)) {
-                displayEnd = _ropRound(v2Duration);
-            } else if (mediaEl && mediaEl.duration && isFinite(mediaEl.duration)) {
-                displayEnd = _ropRound(mediaEl.duration);
-            } else {
-                displayEnd = 9999; // 保持原值
-            }
-        } else {
-            ov.end = _ropRound(displayEnd);
-            displayEnd = ov.end;
-        }
+        // The UI displays task-local resolved duration; persisted auto state stays intact.
+        const scoped = this.videoCanvas?.scopedTask || (typeof _getSelectedTask === 'function' ? _getSelectedTask() : null);
+        const cache = window._reelsState?._mediaDurations || {};
+        const effectiveDuration = window.ReelsScrollTiming?.duration(scoped, { mediaDurations: cache }) || 0;
+        let displayEnd = (ov.type === 'scroll' && ov.scroll_end_auto !== false && !ov.display_ranges?.length)
+            ? (effectiveDuration || 9999) : (Number(ov.end) || 0);
         this._val('rop-end', displayEnd);
         // 卡片的变换区默认隐藏，使用其专属字段显示同一套起止时间。
         this._val('rop-card-start', ov.start);
@@ -5494,9 +5500,11 @@ class ReelsOverlayPanel {
         ov.rotation = this._get('rop-rotation');
         ov.opacity = Math.round(this._get('rop-opacity') / 100 * 255);
         ov.start = _ropRound(this._get('rop-start'));
-        // 保留 9999（全程）：如果面板显示的值等于视频时长，说明用户没改，保持 9999
+        // Never turn an automatic displayed duration into a new manual end when editing styling.
         const panelEnd = _ropRound(this._get('rop-end'));
-        if (ov.end >= 9999) {
+        if (ov.type === 'scroll' && ov.scroll_end_auto !== false) {
+            ov.end = 9999;
+        } else if (ov.end >= 9999) {
             // 检查用户是否手动修改了结束时间
             const v2Duration = this.videoCanvas?.getDuration ? this.videoCanvas.getDuration() : window.ReelsPreviewV2?.isOpen?.()
                 ? window.ReelsPreviewV2.getDuration?.()
@@ -6363,13 +6371,16 @@ class ReelsOverlayPanel {
         
         try {
             const styleObj = this._extractScrollStyle(ov);
+            // End time and auto/manual mode belong to each task, never to shared style.
+            delete styleObj.end;
+            delete styleObj.scroll_end_auto;
 
             scopedTasks.forEach(task => {
                 const targetOv = this._findMatchingOverlayInTask(task, ov);
-                if (targetOv) {
+                if (targetOv && targetOv !== ov) {
                     const styleCopy = JSON.parse(JSON.stringify(styleObj));
                     Object.assign(targetOv, styleCopy);
-                    if (typeof _syncScrollAudioTiming === 'function') _syncScrollAudioTiming(task);
+                    // Styling must not reset a target task's own manual scroll timing.
                 }
             });
         } finally {
@@ -7749,6 +7760,7 @@ class ReelsOverlayPanel {
                     && !(Array.isArray(clone.display_ranges) && clone.display_ranges.length)) {
                     clone.end = 9999;
                 }
+                if (clone.type === 'scroll') { clone.scroll_end_auto = true; if (!clone.display_ranges?.length) clone.end = 9999; }
 
                 mgr.overlays.push(clone);
                 newlyAdded.push(clone);
@@ -7872,6 +7884,18 @@ class ReelsOverlayPanel {
                 && !(Array.isArray(clone.display_ranges) && clone.display_ranges.length)) {
                 clone.end = 9999;
             }
+            if (clone.type === 'scroll') {
+                const target = oldScrolls[replacedScrollCount++];
+                if (target) {
+                    clone.end = target.end;
+                    clone.scroll_end_auto = target.scroll_end_auto;
+                    if (Array.isArray(target.display_ranges)) clone.display_ranges = cleanSerialize(target.display_ranges);
+                    else delete clone.display_ranges;
+                } else {
+                    clone.scroll_end_auto = true;
+                    if (!clone.display_ranges?.length) clone.end = 9999;
+                }
+            }
             // For non-fixed layers, preserve text from corresponding old overlay.
             // Prefer same index, then same type, then any remaining text layer.
             if (!clone.fixed_text) {
@@ -7914,6 +7938,8 @@ class ReelsOverlayPanel {
         const cleanSerialize = (arr) => JSON.parse(JSON.stringify(arr || [], (key, val) => key === '_allOverlays' ? undefined : val));
         const oldOverlays = cleanSerialize(existingOverlays);
         const layers = Array.isArray(presetLayers) ? presetLayers : [];
+        const oldScrolls = oldOverlays.filter(o => o?.type === 'scroll');
+        let replacedScrollCount = 0;
         if (loadMode === 'merge') {
             const newlyAdded = [];
             const idMap = {};
