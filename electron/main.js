@@ -1144,10 +1144,7 @@ app.whenReady().then(async () => {
                 return new Response('Not Found', { status: 404 });
             }
 
-            if (request.url.includes('?reelsPreview=sdr-v2') && request.method !== 'OPTIONS') {
-                resolved = await require('./services/reels-hdr-preview').prepareReelsPreview(resolved);
-                ext = path.extname(resolved).toLowerCase();
-            }
+            // Direct preview: legacy reelsPreview query is ignored; serve original bytes and Range.
 
             const stat = fs.statSync(resolved);
             const size = stat.size;
