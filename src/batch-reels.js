@@ -5855,9 +5855,11 @@ function _toPlayablePath(filePath, srcUrl = null) {
         if (!filePath || !_reelsFileExists(filePath)) return '';
         url = window.electronAPI?.toFileUrl?.(filePath) || _normalizeWatermarkPath(filePath);
     }
-    // Only Reels playback requests use SDR proxies. Export keeps the source path.
-    if (url.startsWith('local-media://') && /\.(mp4|mov|m4v|mkv|webm|avi|ts|mts|m2ts|3gp)(?:[?#]|$)/i.test(url)) {
-        url = url.split('?')[0].split('#')[0] + '?reelsPreview=sdr-v2';
+    // Historical preview query must not trigger proxy conversion; preserve other URL parts.
+    if (url.startsWith('local-media://') && url.includes('reelsPreview=')) {
+        const parsed = new URL(url);
+        parsed.searchParams.delete('reelsPreview');
+        url = parsed.toString();
     }
     return url;
 }
