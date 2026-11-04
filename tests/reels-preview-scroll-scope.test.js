@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
@@ -10,7 +11,7 @@ test('legacy preview service never invokes a transcode command', async () => {
     const { createPreviewService, classifyVideoColorProfile } = require('../electron/services/reels-hdr-preview');
     let called = 0;
     const service = createPreviewService(async () => { called++; throw Error('unexpected ffmpeg'); }, () => { called++; throw Error('unexpected cache'); });
-    for (const file of ['/tmp/a.mp4', '/tmp/b.mov', '/tmp/c.mkv']) {
+    for (const file of ['a.mp4', 'b.mov', 'c.mkv'].map(name => path.join(os.tmpdir(), name))) {
         assert.equal(await service(file), file);
     }
     assert.equal(called, 0);
