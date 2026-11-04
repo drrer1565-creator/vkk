@@ -24,7 +24,7 @@ test('Reels player keeps original local-media URL without proxy parameter', () =
     assert.ok(start >= 0 && end > start, 'production player path function found');
     const context = {
         window: { electronAPI: { fileExists: () => true, toFileUrl: path => path } },
-        URL, _normalizeWatermarkPath: p => p
+        URL, _reelsFileExists: () => true, _normalizeWatermarkPath: p => p
     };
     vm.runInNewContext(source.slice(start, end), context);
     const unchanged = 'local-media:///C:/media/video%20one.mp4?foo=bar';
