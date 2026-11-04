@@ -4345,7 +4345,13 @@ function _reelsUpdatePreviewInternal() {
                     });
                 }
 
-                ReelsOverlay.drawOverlay(ctx, ov, ovTime, w, h);
+                const offset = (_reelsState.hookDuration || 0) + (_selectedTask?.cover?.enabled ? (Number(_selectedTask.cover.duration) || .01) : 0);
+                const bodyDuration = Math.max(0, _getPreviewDuration() - offset);
+                const renderOv = window.ReelsScrollTiming?.renderingOverlay(ov, _selectedTask, {
+                    bodyDuration, mediaDurations: _reelsState._mediaDurations,
+                }) || ov;
+                if (_reelsState._scrollPreviewEnd && ov.type === 'scroll') ovTime = Number(renderOv.end) || ovTime;
+                ReelsOverlay.drawOverlay(ctx, renderOv, ovTime, w, h);
             }
         }
         // ── 选中框 + 拖拽手柄 ──
@@ -6721,13 +6727,14 @@ function _resolveTaskHookPath(task, globalIntroPath) {
 }
 
 function _syncScrollAudioTiming(task) {
-    if (!task?.audioPath) return;
-    const duration = Number(_reelsState._mediaDurations?.[task.audioPath]);
-    if (!(duration > 0 && Number.isFinite(duration))) return;
+    // Audio-only timing was wrong for slowed audio, trimmed video and non-audio tasks.
+    // Keep persistent auto markers untouched; resolve on render/export per task.
+    if (!task || !window.ReelsScrollTiming) return;
     for (const ov of task.overlays || []) {
-        if (ov?.type !== 'scroll' || ov.scroll_end_auto === false || ov.display_ranges?.length) continue;
-        ov.scroll_end_auto = true;
-        ov.end = Math.round(duration * 1000) / 1000;
+        if (ov?.type === 'scroll' && ov.scroll_end_auto !== false && !ov.display_ranges?.length) {
+            ov.scroll_end_auto = true;
+            ov.end = 9999;
+        }
     }
 }
 
