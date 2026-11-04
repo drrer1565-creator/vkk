@@ -6,11 +6,11 @@ const root = path.resolve(__dirname, '..');
     const stage = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vk-export-asar-'));
     const archive = path.join(root, 'validation-export.asar');
     try {
-        for (const directory of ['electron', 'dist']) await fs.promises.cp(path.join(root, directory), path.join(stage, directory), { recursive: true });
+        for (const directory of ['electron', 'dist', 'resources']) await fs.promises.cp(path.join(root, directory), path.join(stage, directory), { recursive: true });
         if (fs.existsSync(path.join(root, 'assets'))) await fs.promises.cp(path.join(root, 'assets'), path.join(stage, 'assets'), { recursive: true });
         await fs.promises.copyFile(path.join(root, 'package.json'), path.join(stage, 'package.json'));
         await asar.createPackage(stage, archive);
-        for (const file of ['electron/main.js', 'electron/services/reels-export-worker.js', 'dist/reels-visual-renderer.js']) {
+        for (const file of ['electron/main.js', 'electron/services/reels-export-worker.js', 'dist/reels-frame-pipeline.js', 'dist/reels-scroll-timing.js', 'resources/export-cpu-budget.js']) {
             const archiveEntry = file.split('/').join(path.sep);
             if (!asar.extractFile(archive, archiveEntry).length) throw new Error('Missing packaged export entry: ' + file);
         }

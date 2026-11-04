@@ -1629,6 +1629,17 @@ app.whenReady().then(async () => {
         return parallelExport(opts, mainWindow);
     });
     handleTrusted('get-latest-crash-diagnostic', () => getLatestRendererCrashReport());
+    handleTrusted('show-reels-export-error', async (event, payload = {}) => {
+        const owner = BrowserWindow.fromWebContents(event.sender);
+        const options = {
+            type: 'error', title: '视频导出失败', message: '视频未能完成导出',
+            detail: String(payload.detail || '未知错误，请查看导出日志。').slice(0, 16000),
+            buttons: ['关闭'], defaultId: 0, cancelId: 0, noLink: true,
+        };
+        return owner && !owner.isDestroyed()
+            ? dialog.showMessageBox(owner, options)
+            : dialog.showMessageBox(options);
+    });
 
     // 每个队列任务使用一次性隐藏 renderer。任务完成后销毁窗口，Chromium 会把
     // 该任务的 Canvas、图片与媒体解码缓存整体归还，不再累积到主界面进程。
@@ -1669,7 +1680,7 @@ app.whenReady().then(async () => {
             'reels-wysiwyg-export.js',
         ].map(name => path.join(scriptBase, name));
 
-        return new Promise((resolve, reject) => {
+        return await new Promise((resolve, reject) => {
             const win = new BrowserWindow({
                 show: false,
                 width: 160,
@@ -1681,6 +1692,7 @@ app.whenReady().then(async () => {
                     webSecurity: false,
                 },
             });
+            const renderer = win.webContents;
             isolatedReelsRenderers.set(requestId, win);
             let settled = false;
             const timeout = setTimeout(() => finish(new Error('后台渲染任务超时（60 分钟）')), 60 * 60 * 1000);
@@ -1697,16 +1709,17 @@ app.whenReady().then(async () => {
                 settled = true;
                 clearTimeout(timeout);
                 clearTimeout(readyTimeout);
+                controller.signal.removeEventListener('abort', onCancel);
                 removeListeners();
                 isolatedReelsRenderers.delete(requestId);
+                reelsExportService.cancelOwner(renderer.id);
                 if (!win.isDestroyed()) win.destroy();
                 if (error) reject(error);
                 else resolve(result);
             };
-            if (owner && typeof owner.once === 'function') {
-                owner.once('destroyed', () => finish(new Error('主窗口已关闭')));
-            }
-            const fromThisWindow = ipcEvent => ipcEvent.sender === win.webContents;
+            const onCancel = () => finish(null, { cancelled: true });
+            controller.signal.addEventListener('abort', onCancel, { once: true });
+            const fromThisWindow = ipcEvent => ipcEvent.sender === renderer;
             const onReady = async ipcEvent => {
                 if (!fromThisWindow(ipcEvent)) return;
                 clearTimeout(readyTimeout);
@@ -1752,6 +1765,9 @@ app.whenReady().then(async () => {
             });
             win.loadFile(htmlPath).catch(error => finish(error));
         });
+        } catch (error) {
+            if (controller.signal.aborted) return { cancelled: true };
+            throw error;
         } finally {
             release?.();
             isolatedReelsJobs.delete(requestId);

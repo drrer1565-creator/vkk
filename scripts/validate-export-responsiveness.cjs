@@ -1,10 +1,23 @@
 'use strict';
 // Actual shipped main/preload/isolated renderer/utility process, without provider requests.
-const { app, nativeImage } = require('electron');
+const { app, nativeImage, dialog } = require('electron');
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const execFile = require('node:util').promisify(require('node:child_process').execFile);
 const root = path.resolve(__dirname, '..');
 const mainModule = process.env.VIDEOKIT_MAIN_UNDER_TEST || path.join(root, 'electron/main.js');
+if (process.env.VIDEOKIT_PACKAGED_RESOURCES) {
+    Object.defineProperty(process, 'resourcesPath', { value: path.resolve(process.env.VIDEOKIT_PACKAGED_RESOURCES) });
+}
+// Keep the fixture isolated, including on hosts that prohibit singleton Unix sockets.
+process.env.VIDEOKIT_TEST_PROFILE = '1';
+app.requestSingleInstanceLock = () => true;
+app.releaseSingleInstanceLock = () => {};
+const errorDialogs = [];
+dialog.showMessageBox = async (...args) => {
+    const options = args[1] || args[0];
+    if (options.type === 'error') errorDialogs.push(options);
+    return { response: 0 };
+};
 const { ReelsExportService } = require(path.join(path.dirname(mainModule), 'services/reels-export-service.js'));
 const ensureWorker = ReelsExportService.prototype.ensureWorker;
 let liveService;
@@ -99,6 +112,19 @@ app.on('browser-window-created', (_event, win) => {
             report.recovered = await evaluate(`electronAPI.isolatedWysiwygExport({requestId:'after-worker-restart',params:{...${JSON.stringify(common)},outputPath:${JSON.stringify(path.join(output, 'recovered.mp4'))},exportEngine:'pipeline'}})`);
             await checkVideo(report.recovered.output_path, 21); report.finalStatus = await waitIdle();
             report.restartedUtilityPid = liveService.child.pid;
+            report.startupError = await evaluate(`(async()=>{
+                const original=window._reelsStartExportImpl;
+                try{
+                    window._reelsStartExportImpl=async()=>{throw Error('fixture: startup dependency missing')};
+                    const result=await reelsStartExport();
+                    return {error:result.error,buttonEnabled:!document.getElementById('reels-export-btn').disabled};
+                }finally{window._reelsStartExportImpl=original}
+            })()`);
+            assert.equal(report.startupError.buttonEnabled, true);
+            assert.equal(report.startupError.error, 'fixture: startup dependency missing');
+            assert.equal(errorDialogs.length, 1, 'Startup failure did not reach the real native dialog IPC');
+            assert.match(errorDialogs[0].detail, /startup dependency missing/);
+            report.errorDialogs = errorDialogs.length;
             clearInterval(pingTimer); pingTimer = null;
             assert.ok(pings.length >= 5, 'Window responsiveness was not sampled');
             const sorted = pings.slice().sort((a, b) => a - b);

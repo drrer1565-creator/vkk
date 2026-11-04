@@ -13262,7 +13262,42 @@ function _selectReelsDownloadTasks(tasks, settings) {
     return tasks.filter((task, index) => selected.has(index));
 }
 
+async function _reelsShowExportError(detail) {
+    const message = String(detail || '未知导出错误');
+    _reelsUpdateLastErrorUI(message);
+    if (window.electronAPI?.showReelsExportError) {
+        try { await window.electronAPI.showReelsExportError({ detail: message }); return; }
+        catch (error) { console.warn('[Reels] 原生错误提示失败，使用页面提示:', error); }
+    }
+    alert(message);
+}
+
+let _reelsExportInvocationActive = false;
 async function reelsStartExport(options = {}) {
+    if (_reelsExportInvocationActive || _reelsState.isExporting) return;
+    _reelsExportInvocationActive = true;
+    try {
+        return await _reelsStartExportImpl(options);
+    } catch (error) {
+        const message = String(error?.message || error || '未知错误')
+            .replace(/^(?:Error invoking remote method '[^']+':\s*(?:Error:\s*)*)+/i, '');
+        console.error('[Reels] 导出启动或任务准备失败:', error);
+        _reelsAppendExportLogUI('导出失败：' + message, 'error');
+        const status = document.getElementById('reels-export-status');
+        if (status) status.textContent = '❌ 导出失败：' + message;
+        _reelsFinishExportTiming();
+        try { localStorage.removeItem(REELS_EXPORT_RESUME_KEY); } catch (_) { }
+        await _reelsShowExportError(message);
+        return { error: message };
+    } finally {
+        _reelsExportInvocationActive = false;
+        _reelsState.isExporting = false;
+        const button = document.getElementById('reels-export-btn');
+        if (button) { button.disabled = false; button.innerHTML = '🚀 开始导出'; }
+    }
+}
+
+async function _reelsStartExportImpl(options = {}) {
     // Freeze the task-list numbering before selection, validation or matrix
     // expansion; the selected-job index is not the row the user sees.
     const taskListRows = new Map();
@@ -14745,7 +14780,7 @@ async function reelsStartExport(options = {}) {
     }
     if (!canceled && failCount > 0) {
         const shortErr = failDetails.slice(0, 5).join('\n');
-        alert(`导出失败 ${failCount} 个\n输出目录: ${outputDirTrimmed}\n\n失败原因:\n${shortErr}`);
+        await _reelsShowExportError(`导出失败 ${failCount} 个\n输出目录: ${outputDirTrimmed}\n\n失败原因:\n${shortErr}`);
     } else if (!canceled && okCount > 0) {
         _reelsUpdateLastErrorUI('');
         const latest = _reelsState.lastExportOutputPath || `${outputDirTrimmed}${outputJoinSep}`;
