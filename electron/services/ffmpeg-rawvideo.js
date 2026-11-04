@@ -1894,15 +1894,10 @@ async function writeFrame(sessionId, rawData) {
             };
         }
 
-        const written = session.proc.stdin.write(buf);
+        // ACK only after the encoder's write callback AND any required drain.
+        await writeEncoderFrame(session, buf);
         session.frameCount++;
         session.bytesWritten += buf.length;
-        if (!written) {
-            await new Promise((r) => {
-                session.proc.stdin.once('drain', r);
-                setTimeout(r, 5000);
-            });
-        }
 
         // 写入后检查 FFmpeg 是否还活着（尤其是前几帧，编码器可能延迟初始化失败）
         if (session.frameCount <= 5) {
