@@ -4,9 +4,9 @@
     const valid = v => Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0;
     const r = v => Math.round(v * 1000) / 1000;
     function duration(task, context = {}) {
-        if (!task) return 0;
         const explicit = valid(context.bodyDuration);
         if (explicit) return r(explicit);
+        if (!task) return 0;
         const custom = valid(task.customDuration) || valid(task.durationOverride);
         if (custom) return r(custom);
         const overlays = Array.isArray(task.overlays) ? task.overlays : [];
