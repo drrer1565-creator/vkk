@@ -1640,6 +1640,7 @@ app.whenReady().then(async () => {
             'reels-text-direction.js',
             'reels-anim-engine.js',
             'reels-rich-text.js',
+            'reels-scroll-timing.js',
             'reels-overlay.js',
             'reels-canvas-renderer.js',
             'fonts-metadata.js',
