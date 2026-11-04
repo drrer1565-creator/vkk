@@ -1,5 +1,7 @@
 name: Custom Reels regression verification
 on:
+  push:
+    branches: ['custom/preview-scroll-ack']
   pull_request:
     branches: [main]
     paths:
