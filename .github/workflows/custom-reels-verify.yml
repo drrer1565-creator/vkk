@@ -3,14 +3,21 @@ on:
   push:
     branches: ['custom/preview-scroll-ack']
   pull_request:
-    branches: [main]
+    branches: [main, 'custom/preview-scroll-ack']
     paths:
       - 'src/**'
       - 'electron/**'
       - 'tests/**'
+      - 'scripts/**'
+      - 'resources/**'
       - 'package*.json'
       - '.github/workflows/custom-reels-verify.yml'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish a tested portable ZIP (explicit opt-in only)'
+        type: boolean
+        default: false
 jobs:
   regression:
     runs-on: windows-latest
@@ -61,6 +68,13 @@ jobs:
         run: xvfb-run -a ./node_modules/.bin/electron scripts/validate-vkk-native-utility-ack.cjs --no-sandbox
         env:
           ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+      - name: Build and verify the production main, preload and isolated export lifecycle
+        run: |
+          npm run build
+          xvfb-run -a ./node_modules/.bin/electron scripts/validate-export-responsiveness.cjs --no-sandbox
+        env:
+          ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+          VIDEOKIT_RESPONSIVENESS_DIR: ${{ runner.temp }}/vkk-app-export-source
 
   windows-native-utility-ack:
     runs-on: windows-latest
@@ -88,7 +102,7 @@ jobs:
           ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
 
   windows-installer:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     permissions:
       contents: write
     runs-on: windows-latest
@@ -115,6 +129,19 @@ jobs:
           Copy-Item $binary.FullName (Join-Path $binDir 'ffmpeg.exe')
           Copy-Item (Join-Path $binary.DirectoryName 'ffprobe.exe') (Join-Path $binDir 'ffprobe.exe')
           & (Join-Path $binDir 'ffmpeg.exe') -version
+      - name: Prepare complete embedded Windows Python
+        shell: pwsh
+        run: ./scripts/prepare-windows-python.ps1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install bundled Python fallback dependencies
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-edge.txt yt-dlp requests --target vendor/windows/python/Lib/site-packages --no-warn-script-location
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & vendor/windows/python/python.exe -I -c "import ctypes, edge_tts, yt_dlp; print('Bundled runtime imports OK')"
+          exit $LASTEXITCODE
       - name: Build Windows portable directory without an installer
         shell: pwsh
         run: |
@@ -126,13 +153,16 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: 'false'
       - name: Package truly portable x64 directory as ZIP
+        # The package hook first checks the runtime; exercise its actual ASAR entry before ZIP/publish.
+        if: success()
         shell: pwsh
         run: |
           $folder = 'dist-electron/win-unpacked'
           $binary = Join-Path $folder 'VideoKit.exe'
           $ffmpeg = Join-Path $folder 'resources/vendor/ffmpeg/bin/ffmpeg.exe'
           $ffprobe = Join-Path $folder 'resources/vendor/ffmpeg/bin/ffprobe.exe'
-          foreach ($required in @($binary, $ffmpeg, $ffprobe)) {
+          $python = Join-Path $folder 'resources/vendor/python/python.exe'
+          foreach ($required in @($binary, $ffmpeg, $ffprobe, $python)) {
             if (-not (Test-Path $required -PathType Leaf)) { throw "Portable ZIP missing required file: $required" }
           }
           $zipPath = 'dist-electron/VideoKit-Reels-ACK-Portable-Windows-x64.zip'
@@ -141,13 +171,26 @@ jobs:
           $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zipPath))
           try {
             $names = $archive.Entries | ForEach-Object FullName
-            foreach ($required in @('VideoKit.exe', 'resources/vendor/ffmpeg/bin/ffmpeg.exe', 'resources/vendor/ffmpeg/bin/ffprobe.exe')) {
+            foreach ($required in @('VideoKit.exe', 'resources/vendor/ffmpeg/bin/ffmpeg.exe', 'resources/vendor/ffmpeg/bin/ffprobe.exe', 'resources/vendor/python/python.exe', 'resources/vendor/python/python311.dll', 'resources/vendor/python/python311.zip', 'resources/vendor/python/_ctypes.pyd')) {
               if ($names -notcontains $required) { throw "Portable archive missing required entry: $required" }
             }
             Write-Host "Portable ZIP verified: $($archive.Entries.Count) entries"
           } finally { $archive.Dispose() }
           Get-Item $zipPath | Select-Object Name,Length
+      - name: Verify the actual packaged main, preload, isolated renderer and embedded CPU helper
+        shell: pwsh
+        run: |
+          $env:VIDEOKIT_MAIN_UNDER_TEST = (Resolve-Path 'dist-electron/win-unpacked/resources').Path + '/app.asar/electron/main.js'
+          $env:VIDEOKIT_PACKAGED_RESOURCES = (Resolve-Path 'dist-electron/win-unpacked/resources').Path
+          $env:VIDEOKIT_RESPONSIVENESS_DIR = "$env:RUNNER_TEMP/vkk-app-export-packaged"
+          .\node_modules\.bin\electron.cmd scripts/validate-export-responsiveness.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content "$env:VIDEOKIT_RESPONSIVENESS_DIR/results.json" -Raw | ConvertFrom-Json
+          if (-not $report.pass -or $report.errorDialogs -ne 1 -or $report.frames.Count -ne 4) { throw 'Packaged production export verification incomplete' }
+        env:
+          ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
       - name: Publish portable ZIP directly to GitHub Release
+        if: github.event_name == 'workflow_dispatch' && inputs.publish == true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -175,3 +218,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'GitHub Release asset upload failed' }
           gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
           if ($LASTEXITCODE -ne 0) { throw 'Unable to verify uploaded Release asset' }
+      - name: Keep the verified portable candidate without publishing a Release
+        if: success()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: vkk-export-startup-fix-${{ github.sha }}
+          path: dist-electron/VideoKit-Reels-ACK-Portable-Windows-x64.zip
+          retention-days: 3

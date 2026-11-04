@@ -551,6 +551,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => ipcRenderer.removeListener('parallel-export-progress', handler);
     },
     isolatedWysiwygExport: (opts) => ipcRenderer.invoke('isolated-wysiwyg-export', opts),
+    showReelsExportError: (payload) => ipcRenderer.invoke('show-reels-export-error', payload),
     cancelIsolatedWysiwygExport: (requestId) => ipcRenderer.send('cancel-isolated-wysiwyg-export', requestId),
     getLatestCrashDiagnostic: () => ipcRenderer.invoke('get-latest-crash-diagnostic'),
     onReelsCrashDiagnostic: (callback) => {

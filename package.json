@@ -47,6 +47,7 @@
     "appId": "com.timcode.videokit",
     "productName": "VideoKit",
     "npmRebuild": true,
+    "afterPack": "scripts/verify-packaged-runtime.cjs",
     "publish": [
       {
         "provider": "github",
