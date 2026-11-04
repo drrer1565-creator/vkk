@@ -1644,6 +1644,7 @@ app.whenReady().then(async () => {
             'reels-canvas-renderer.js',
             'fonts-metadata.js',
             'reels-font-manager.js',
+            'reels-frame-pipeline.js',
             'reels-wysiwyg-export.js',
         ].map(name => path.join(scriptBase, name));
 
