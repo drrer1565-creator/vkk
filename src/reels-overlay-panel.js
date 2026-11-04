@@ -2373,7 +2373,7 @@ class ReelsOverlayPanel {
             ov.end = 9999; // unresolved automatic placeholder, not a shared manual duration
             this._val('rop-end', Number.isFinite(duration) && duration > 0 ? _ropRound(duration) : 9999);
             this._val('rop-scroll-end-time', Number.isFinite(duration) && duration > 0 ? _ropRound(duration) : 9999);
-            if (typeof _syncScrollAudioTiming === 'function' && task) _syncScrollAudioTiming(task);
+            // Timing resolution is task-scoped; do not force an audio-only duration here.
             if (typeof this.videoCanvas?.onOverlayChange === 'function') this.videoCanvas.onOverlayChange(ov);
             this._requestRender();
         });
