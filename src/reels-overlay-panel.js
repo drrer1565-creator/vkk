@@ -3822,7 +3822,7 @@ class ReelsOverlayPanel {
                 'shadow_enabled', 'shadow_color', 'shadow_blur', 'shadow_opacity',
                 'shadow_offset_x', 'shadow_offset_y',
                 'scroll_x_anchor', 'scroll_from_x', 'scroll_from_y', 'scroll_to_x', 'scroll_to_y',
-                'scroll_speed', 'scroll_end_y_auto', 'scroll_end_auto', 'scroll_auto_stop', 'scroll_auto_stop_lead', 'scroll_static', 'scroll_auto_fit', 'scroll_min_fontsize',
+                'scroll_speed', 'scroll_end_y_auto', 'scroll_auto_stop', 'scroll_auto_stop_lead', 'scroll_static', 'scroll_auto_fit', 'scroll_min_fontsize',
                 'scroll_title_fontsize', 'scroll_title_font_family', 'scroll_title_font_weight',
                 'scroll_title_bold', 'scroll_title_color', 'scroll_title_gradient_direction', 'scroll_title_align', 'scroll_title_gap', 'scroll_title_fixed',
                 'scroll_title_independent', 'scroll_title_x', 'scroll_title_y',
@@ -7760,6 +7760,7 @@ class ReelsOverlayPanel {
                     && !(Array.isArray(clone.display_ranges) && clone.display_ranges.length)) {
                     clone.end = 9999;
                 }
+                if (clone.type === 'scroll') { clone.scroll_end_auto = true; if (!clone.display_ranges?.length) clone.end = 9999; }
 
                 mgr.overlays.push(clone);
                 newlyAdded.push(clone);
@@ -7883,6 +7884,18 @@ class ReelsOverlayPanel {
                 && !(Array.isArray(clone.display_ranges) && clone.display_ranges.length)) {
                 clone.end = 9999;
             }
+            if (clone.type === 'scroll') {
+                const target = oldScrolls[replacedScrollCount++];
+                if (target) {
+                    clone.end = target.end;
+                    clone.scroll_end_auto = target.scroll_end_auto;
+                    if (Array.isArray(target.display_ranges)) clone.display_ranges = cleanSerialize(target.display_ranges);
+                    else delete clone.display_ranges;
+                } else {
+                    clone.scroll_end_auto = true;
+                    if (!clone.display_ranges?.length) clone.end = 9999;
+                }
+            }
             // For non-fixed layers, preserve text from corresponding old overlay.
             // Prefer same index, then same type, then any remaining text layer.
             if (!clone.fixed_text) {
@@ -7925,6 +7938,8 @@ class ReelsOverlayPanel {
         const cleanSerialize = (arr) => JSON.parse(JSON.stringify(arr || [], (key, val) => key === '_allOverlays' ? undefined : val));
         const oldOverlays = cleanSerialize(existingOverlays);
         const layers = Array.isArray(presetLayers) ? presetLayers : [];
+        const oldScrolls = oldOverlays.filter(o => o?.type === 'scroll');
+        let replacedScrollCount = 0;
         if (loadMode === 'merge') {
             const newlyAdded = [];
             const idMap = {};
