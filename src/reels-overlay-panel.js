@@ -6363,13 +6363,16 @@ class ReelsOverlayPanel {
         
         try {
             const styleObj = this._extractScrollStyle(ov);
+            // End time and auto/manual mode belong to each task, never to shared style.
+            delete styleObj.end;
+            delete styleObj.scroll_end_auto;
 
             scopedTasks.forEach(task => {
                 const targetOv = this._findMatchingOverlayInTask(task, ov);
-                if (targetOv) {
+                if (targetOv && targetOv !== ov) {
                     const styleCopy = JSON.parse(JSON.stringify(styleObj));
                     Object.assign(targetOv, styleCopy);
-                    if (typeof _syncScrollAudioTiming === 'function') _syncScrollAudioTiming(task);
+                    // Styling must not reset a target task's own manual scroll timing.
                 }
             });
         } finally {
