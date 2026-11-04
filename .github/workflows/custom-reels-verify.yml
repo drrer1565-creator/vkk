@@ -86,3 +86,29 @@ jobs:
         run: .\\node_modules\\.bin\\electron.cmd scripts/validate-vkk-native-utility-ack.cjs
         env:
           ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    needs: [regression, windows-native-utility-ack]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build unsigned Windows test installer without publishing
+        shell: pwsh
+        run: npm run pack:win-x64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: 'false'
+      - name: Upload test-only installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: vkk-reels-ack-windows-test-installer
+          path: dist-electron/*.exe
+          retention-days: 7
+          if-no-files-found: error
