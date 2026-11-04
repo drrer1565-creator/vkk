@@ -39,8 +39,8 @@ settings.getSecureTmpDir = () => temp;
     try {
         const context = { window: { electronAPI: { ...bridge.api, reelsComposeWysiwyg: (action, data) => raw.handleWysiwygIPC(action, data) } }, console, setTimeout, clearTimeout, setInterval, clearInterval, URL, ArrayBuffer, Uint8Array, Image: class {} };
         vm.createContext(context);
-        vm.runInContext(fs.readFileSync(path.join(root, 'src/reels-wysiwyg-export.js'), 'utf8'), context);
-        const pipeline = context._createFramePipeline(sessionId, 3);
+        vm.runInContext(fs.readFileSync(path.join(root, 'src/reels-frame-pipeline.js'), 'utf8'), context);
+        const pipeline = context.window.ReelsFramePipeline.create(sessionId, 3);
         for (let i = 0; i < 30; i++) {
             const pixels = Buffer.alloc(192 * 320 * 4);
             for (let p = 0; p < pixels.length; p += 4) { pixels[p] = i * 7; pixels[p + 1] = 120; pixels[p + 2] = 180; pixels[p + 3] = 255; }
