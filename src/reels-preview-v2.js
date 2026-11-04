@@ -1846,7 +1846,10 @@
                 delete ov._scrollBodyFirstLineY;
                 delete ov._scrollBodyCurX;
                 if (ov.disabled || time < numberOr(ov.start, 0)) continue;
-                const measured = { ...ov, _exporting: false };
+                const measured = { ...(window.ReelsScrollTiming?.renderingOverlay(ov, task, {
+                    bodyDuration: Math.max(0, computeDuration() - getTimelineOffset(task)),
+                    mediaDurations: window._reelsState?._mediaDurations || {},
+                }) || ov), _exporting: false };
                 try {
                     window.ReelsOverlay.drawOverlay(measureCtx, measured, time, w, h);
                     ov._scrollBodyFirstLineY = measured._scrollBodyFirstLineY;
@@ -1865,7 +1868,11 @@
                 try {
                     // Preview must never inherit a stale/concurrent export marker,
                     // otherwise ReelsOverlay intentionally suppresses guide boxes.
-                    const previewOv = { ...ov, _allOverlays: allEnabled, _taskSegments: task.segments, _exporting: false };
+                    const effective = window.ReelsScrollTiming?.renderingOverlay(ov, task, {
+                        bodyDuration: Math.max(0, computeDuration() - getTimelineOffset(task)),
+                        mediaDurations: window._reelsState?._mediaDurations || {},
+                    }) || ov;
+                    const previewOv = { ...effective, _allOverlays: allEnabled, _taskSegments: task.segments, _exporting: false };
                     window.ReelsOverlay.drawOverlay(ctx, previewOv, time, w, h);
                     // Keep computed bounds available to hit-testing/property UI.
                     for (const key of ['_renderedX', '_renderedY', '_renderedW', '_renderedH', '_scrollBodyFirstLineY', '_scrollBodyCurX']) {
